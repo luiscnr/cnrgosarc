@@ -131,6 +131,11 @@ def check_py():
         print('[ERROR] pyresample was not found')
         check = False
     try:
+        import pyproj
+    except:
+        print('[ERROR] pyproj was not found')
+        check = False
+    try:
         import shapely
     except:
         print('[ERROR] shapely was not found')
