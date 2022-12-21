@@ -1,69 +1,110 @@
-import math
+import math, os
+import configparser
 
 from pyresample.geometry import AreaDefinition
-from pyresample import save_quicklook, SwathDefinition, image
+from pyresample import save_quicklook, SwathDefinition, utils, image
 from pyresample.kd_tree import resample_nearest
+from pyresample.kd_tree import get_sample_from_neighbour_info, get_neighbour_info
 import numpy as np
 import numpy.ma as ma
 from netCDF4 import Dataset
 
 
 class ArcMapInfo:
-    def __init__(self, area_id):
-        if area_id is None:  # DEFAULT
-            area_id = 'npsn_olci'
+    def __init__(self, fconfig, verbose):
+        # DEFAULTS
+        area_id = 'polar_stereographic'
+        self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
+
+        if fconfig is None:
+            fconfig = 'arc_config.ini'
+
+        if os.path.exists(fconfig):
+            options = configparser.ConfigParser()
+            options.read(fconfig)
+            if options.has_option('GENERAL', 'area_id'):
+                area_id = options['GENERAL']['area_id']
+            if options.has_option('GENERAL', 'grid_base'):
+                self.ifile_base = options['GENERAL']['grid_base']
+
         self.area_def = self.get_area_definition(area_id)
-        self.print_area_def_info()
+        self.verbose = verbose
+        if self.verbose:
+            self.print_area_def_info()
+            print('---------------------------------------------------------------------------------------------')
+
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
 
-
-    def create_nc_filegrid(self, ofname, createMask):
-
-        # lons, lats = self.area_def.get_lonlats()
+    def create_nc_filegrid(self, ofname, createMask, createLatLong):
 
         try:
             OFILE = Dataset(ofname, 'w', format='NETCDF4')
         except PermissionError:
-            # print('Permission denied: ', ofname)
             return False
 
         print(f'Starting file:{ofname}')
 
-        OFILE.createDimension('lat', self.area_def.height)  # ny
-        OFILE.createDimension('lon', self.area_def.width)  # nx
+        OFILE.createDimension('y', self.area_def.height)  # ny
+        OFILE.createDimension('x', self.area_def.width)  # nx
 
-        # latitude
-        satellite_latitude = OFILE.createVariable('latitude', 'f4', ('lat', 'lon'), fill_value=-999, zlib=True,
-                                                  complevel=6)
-        # satellite_latitude[:, :] = [np.transpose(lats[:, :])]
-        satellite_latitude.units = "degrees_north"
-        satellite_latitude.long_name = "latitude"
-        satellite_latitude.standard_name = "latitude"
+        # variable stereographic
+        stereographic = OFILE.createVariable('stereographic', 'i4')
+        stereographic.grid_mapping_name = "polar_stereographic"
+        stereographic.latitude_of_projection_origin = 90.0
+        # stereographic.longitude_of_projection_origin = -45.0
+        # stereographic.scale_factor_at_projection_origin = 1.0
+        stereographic.standard_parallel = 70.0
+        stereographic.straight_vertical_longitude_from_pole = -45.0
+        stereographic.false_easting = 0.0
+        stereographic.false_northing = 0.0
 
-        # longitude
-        satellite_longitude = OFILE.createVariable('longitude', 'f4', ('lat', 'lon'), fill_value=-999, zlib=True,
-                                                   complevel=6)
-        # satellite_longitude[:, :] = [np.transpose(lons[:, :])]
-        satellite_longitude.units = "degrees_east"
-        satellite_longitude.long_name = "longitude"
-        satellite_longitude.standard_name = "longitude"
+        # y
+        satellite_y = OFILE.createVariable('y', 'f4', ('y',), zlib=True, shuffle=True, complevel=4)
+        satellite_y.units = "metres"
+        satellite_y.standard_name = "projection_y_coordinate"
+        satellite_y.axis = "Y"
+        ymin = self.area_def.area_extent[3]
+        ymax = self.area_def.area_extent[1]
+        array = np.linspace(ymin, ymax, self.area_def.height)
+        satellite_y[:] = [array[:]]
+
+        # x
+        satellite_x = OFILE.createVariable('x', 'f4', ('x',), zlib=True, shuffle=True, complevel=4)
+        satellite_x.units = "metres"
+        satellite_x.standard_name = "projection_x_coordinate"
+        satellite_x.axis = "X"
+        xmin = self.area_def.area_extent[0]
+        xmax = self.area_def.area_extent[2]
+        array = np.linspace(xmin, xmax, self.area_def.width)
+        satellite_x[:] = [array[:]]
+
+        if createLatLong:
+            # latitude
+            satellite_latitude = OFILE.createVariable('latitude', 'f4', ('y', 'x'), zlib=True, shuffle=True,
+                                                      complevel=4, least_significant_digit=3)
+            satellite_latitude.units = "degrees_north"
+            satellite_latitude.standard_name = "latitude"
+
+            # longitude
+            satellite_longitude = OFILE.createVariable('longitude', 'f4', ('y', 'x'), zlib=True, shuffle=True,
+                                                       complevel=4, least_significant_digit=3)
+            satellite_longitude.units = "degrees_east"
+            satellite_longitude.standard_name = "longitude"
 
         # mask
         if createMask:
             min_lat = self.get_lat_min_spherical()
-            satellite_mask = OFILE.createVariable('smask', 'i2', ('lat', 'lon'), fill_value=-999, zlib=True,
-                                                  complevel=6)
-            # satellite_mask[:, :] = [np.transpose(maskma[:, :])]
-            satellite_mask.long_name = f'coordinates_mask'
-            satellite_mask.standard_name = f'coordinates_mask'
+            satellite_mask = OFILE.createVariable('sensor_mask', 'i2', ('y', 'x'), fill_value=-999, zlib=True,
+                                                  shuffle=True, complevel=4)
+            satellite_mask.standard_name = f'sensor_mask'
             satellite_mask.description = f'Pixels with latitude lower than: {min_lat} are masked'
+            satellite_mask.grid_mapping = "stereographic"
+            satellite_mask.coordinates = "longitude latitude"
 
         tileY = 5000
         tileX = 5000
 
         for y in range(0, self.area_def.height, tileY):
-            # if self.verbose and (y == 0 or ((y % tileY) == 0)):
-            #     print(f'[INFO] Processing line {y}/{ny}')
             print(f'[INFO] Line-> {y}')
             for x in range(0, self.area_def.width, tileX):
                 yini = y
@@ -79,40 +120,104 @@ class ArcMapInfo:
                 xval = np.zeros((height_here, width_here))
                 yval = np.zeros((height_here, width_here))
                 for yvalhere in range(height_here):
-                    yval[yvalhere, :] = np.linspace(xini, xend, width_here)
+                    yval[yvalhere, :] = yini + yvalhere
                 for xvalhere in range(width_here):
-                    xval[:, xvalhere] = np.linspace(yini, yend, height_here)
+                    xval[:, xvalhere] = xini + xvalhere
                 lons, lats = self.area_def.get_lonlat_from_array_coordinates(xval, yval)
-                print(lons.shape)
-                satellite_latitude[yini:yend, xini:xend] = [lats[:, :]]
-                satellite_longitude[yini:yend, xini:xend] = [lons[:, :]]
+
+                if createLatLong:
+                    satellite_latitude[yini:yend, xini:xend] = [lats[:, :]]
+                    satellite_longitude[yini:yend, xini:xend] = [lons[:, :]]
+
                 if createMask:
-                    mask = np.zeros(lats.shape, dtype=bool)
-                    mask[lats < min_lat] = True
-                    maskma = ma.MaskedArray(mask, mask=mask)
-                    satellite_mask[yini:yend, xini:xend] = [maskma[:, :]]
+                    mask = np.zeros(lats.shape, dtype=int)
+                    mask[lats < min_lat] = -999
+                    # mask[np.where((lats >= 70) & (lats <= 75))] = 10
+                    # mask[np.where((lons >= 10) & (lons <= 20))] = mask[np.where((lons >= 10) & (lons <= 20))] + 10
+                    satellite_mask[yini:yend, xini:xend] = [mask[:, :]]
+
+        OFILE.Conventions = "CF-1.8"
+        OFILE.title = "title"
+        OFILE.history = "history"
+        OFILE.institution = "institution"
+        OFILE.source = "source"
+        OFILE.comment = "comment"
+        OFILE.reference = "reference"
 
         OFILE.close()
 
         return True
 
-    def create_nc_reflectance_file(self, ofname):
-        print('Copy file')
+    def create_nc_file_resampled(self, ofname, olimage):
         datasetout = self.copy_nc_base(ofname)
+
+        if datasetout is None:
+            return datasetout
+
         ##create rrs variables
         for wl in self.olci_l2_bands:
             wlstr = str(wl).replace('.', '_')
             bandname = f'RRS{wlstr}'
-            var = datasetout.createVariable(bandname, 'f4', ('lat', 'lon'), fill_value=-999, zlib=True,complevel=6)
+            var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var[:] = -999
             var.wavelength = wl
+            var.standard_name = f'surface_ratio_of_upwelling_radiance_emerging_from_sea_water_to_downwelling_radiative_flux_in_air'
+            var.long_name = f'Sea surface reflectance defined as the ratio of water-leaving radiance to surface irradiance at {wl} nm.'
+            var.grid_mapping = "stereographic"
+            var.coordinates = "longitude latitude"
+            var.units = "sr^-1"
+            var.source = "Sentinel-3a, Sentinel-3b, OLCIA-L3, OLCIB-L3"
+            var.valid_min = 0.0
+            var.valid_max = 1.0
+
+        ##create angle variable
+        name_angles = ['OZA', 'OAA', 'SZA', 'SAA']
+        for angle in name_angles:
+            info = olimage.get_angle_info(angle)
+            var = datasetout.createVariable(angle, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var.grid_mapping = "stereographic"
+            var.coordinates = "longitude latitude"
+            for at in info.keys():
+                if at == '_FillValue':
+                    continue
+                if at == 'scale_factor':
+                    continue
+                var.setncattr(at, info[at])
+
+        # create mask variable
+        satellite_mask = datasetout.createVariable('mask', 'i2', ('y', 'x'), fill_value=-999, zlib=True,
+                                                   shuffle=True, complevel=4)
+        satellite_mask.standard_name = f'mask'
+        satellite_mask.description = f'Masked pixels: 0; Valid pixels: 1'
+        satellite_mask.grid_mapping = "stereographic"
+        satellite_mask.coordinates = "longitude latitude"
 
         return datasetout
 
+    def create_nc_file_resampled_from_pmldataset(self, ofname, ncpml):
+        datasetout = self.copy_nc_base(ofname)
+        if datasetout is None:
+            return datasetout
 
+        ##create variables
+        for var in ncpml.variables:
+
+            if var.lower().startswith('lat') or var.lower().startswith('lon') or var.lower().startswith('time'):
+                continue
+            if self.verbose:
+                print(f'[INFO] [PML] Adding variable: {var}')
+            datasetout.createVariable(var, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=4, shuffle=True)
+
+        return datasetout
 
     def copy_nc_base(self, ofile):
-        ifile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGridOlci.nc'
-        with Dataset(ifile) as src:
+        dst = None
+        if not os.path.exists(self.ifile_base):
+            print(f'[ERROR] Grid file base: {self.ifile_base} does not exist')
+            return dst
+        if self.verbose:
+            print(f'[INFO] Copying file grid: {self.ifile_base}...')
+        with Dataset(self.ifile_base) as src:
             dst = Dataset(ofile, 'w', format='NETCDF4')
             # copy global attributes all at once via dictionary
             dst.setncatts(src.__dict__)
@@ -124,7 +229,8 @@ class ArcMapInfo:
 
             # copy all file data except for the excluded
             for name, variable in src.variables.items():
-                dst.createVariable(name, variable.datatype, variable.dimensions)
+                dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
+                                   shuffle=True, complevel=4)
                 # copy variable attributes all at once via dictionary
                 dst[name].setncatts(src[name].__dict__)
 
@@ -148,16 +254,16 @@ class ArcMapInfo:
         print('MASKED: ', np.ma.count_masked(datavis))
         self.save_quick_look_impl(fileout, datavis)
 
-    def save_quick_look_fdata(self,fileout,fdata):
+    def save_quick_look_fdata(self, fileout, fdata, name_var):
         dataset = Dataset(fdata)
-        data = np.ma.array(dataset.variables['RRS560'][:, :])
-        data = np.ma.masked_values(data,0)
+        data = np.ma.array(dataset.variables[name_var][:, :])
+        # data = np.ma.masked_values(data, 0)
         self.save_quick_look_impl(fileout, data)
 
     def get_lat_min_spherical(self):
         xmid = math.floor(self.area_def.width / 2)
         lon, lat = self.area_def.get_lonlat_from_array_coordinates(xmid, 0)
-        lat_min = np.floor(lat)
+        lat_min = np.round(lat)
         return lat_min
 
     def print_area_def_info(self):
@@ -189,12 +295,14 @@ class ArcMapInfo:
         print('Lower Middle: ', lat, lon3)
         lon4, lat = self.area_def.get_lonlat_from_array_coordinates(0, ymid)
         print('Left Middle: ', lat, lon4)
+        lon5, lat5 = self.area_def.get_lonlat_from_array_coordinates(xmid, ymid)
+        print('Middle: ', lat5, lon5)
 
         print('SPHERIC LIMITS:')
         lons = [np.degrees(ob[0].lon), np.degrees(ob[1].lon), np.degrees(ob[2].lon), np.degrees(ob[3].lon), lon1, lon2,
                 lon3, lon4]
-        lonmin = np.min(lons)
-        lonmax = np.max(lons)
+        lonmin = round(np.min(lons))
+        lonmax = round(np.max(lons))
         if lonmin == -180 or lonmax == 180:
             lonmin = -180
             lonmax = 180
@@ -216,8 +324,9 @@ class ArcMapInfo:
 
     def get_projection_info(self, proj_id):
         projections = {
-            'npsn': '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs'
-
+            'npsn': '+proj=stere +lat_0=90 +lon_0=-45 +k_0=1 +x_0=0 +y_0=0 +ellps=WGS84',
+            'polarn': '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k_0=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs +type=crs',
+            'polarn_orig': '+proj=stere +lat_0=90 +lon_0=-45 +k_0=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs'
         }
         return projections[proj_id]
 
@@ -245,91 +354,367 @@ class ArcMapInfo:
                 'height': 22098,
                 'extent': (-3314693.24, -3314693.24, 3314693.24, 3314693.24)
             },
+            'polar_stereographic': {
+                'description': 'WGS 84 / Polar Stereographic North',
+                'proj_id': 'polarn',
+                'width': 18345,
+                'height': 18345,
+                'extent': (-2751778, 2751778, 2751778, -2751778)
+            },
+            'polar_stereographic_orig': {
+                'description': 'WGS 84 / Polar Stereographic North',
+                'proj_id': 'polarn_orig',
+                'width': 18915,
+                'height': 18915,
+                'extent': (-2837300, -2837300, 2837200, 2837200)
+            },
+            'polar_stereographic_3km': {
+                'description': 'WGS 84 / Polar Stereographic North',
+                'proj_id': 'polarn',
+                'width': 1892,
+                'height': 1892,
+                'extent': (-2837300, -2837300, 2837200, 2837200)
+            },
+            'polar_stereographic_600m': {
+                'description': 'WGS 84 / Polar Stereographic North',
+                'proj_id': 'polarn',
+                'width': 6000,
+                'height': 6000,
+                'extent': (-2837300, -2837300, 2837200, 2837200)
+            },
+            'polar_stereographic_nerc': {
+                'description': 'WGS 84 / Polar Stereographic North',
+                'proj_id': 'npsn',
+                'width': 609,
+                'height': 881,
+                'extent': (-3800000, 5500000, 3800000, -5500000)
+            }
         }
         return areas[area_id]
 
     def get_subarea_def(self, lats, lons):
 
         xcoords, ycoords = self.area_def.get_array_coordinates_from_lonlat(lons, lats)
-        print(xcoords.shape)
-        print(ycoords.shape)
+        # print(xcoords.shape)
+        # print(ycoords.shape)
+
         xmin = np.floor(np.min(xcoords))
+        if xmin < 0:
+            xmin = 0
         xmax = np.ceil(np.max(xcoords)) + 1
+        if xmax >= self.area_def.width:
+            xmax = self.area_def.width - 1
         ymin = np.floor(np.min(ycoords))
+        if ymin < 0:
+            ymin = 0
         ymax = np.ceil(np.max(ycoords)) + 1
-        print(xmin)
-        print(xmax)
-        print(ymin)
-        print(ymax)
+        if ymax >= self.area_def.height:
+            ymax = self.area_def.height - 1
+        # print(xmin)
+        # print(xmax)
+        # print(ymin)
+        # print(ymax)
         width = (xmax - xmin)
         height = (ymax - ymin)
-        print(width, height)
+        # print(width, height)
         projection = self.get_projection_info(self.area_def.proj_id)
-        print(projection)
+        # print(projection)
 
         xvalues = [xmin, xmax, xmax, xmin]
         yvalues = [ymin, ymin, ymax, ymax]
         xcoords, ycoords = self.area_def.get_projection_coordinates_from_array_coordinates(xvalues, yvalues)
-        extent = (np.min(xcoords), np.min(ycoords), np.max(xcoords), np.max(ycoords))
-        print(extent)
+        # lontal,lattal = self.area_def.get_lonlat_from_array_coordinates(xvalues,yvalues)
+        # print(yvalues)
+        # print(xvalues)
+        # print(lontal)
+        # print(lattal)
+
+        extent = (np.min(xcoords), np.max(ycoords), np.max(xcoords), np.min(ycoords))
+        # print(extent)
 
         area_def = AreaDefinition('SubArea', 'SubArea', self.area_def.proj_id, projection,
                                   width, height, extent)
 
-        print(area_def.pixel_size_x, area_def.pixel_size_y)
-        print(area_def.width, area_def.height)
+        # print(area_def.pixel_size_x, area_def.pixel_size_y)
+        # print(area_def.width, area_def.height)
 
         limits = [xmin, xmax, ymin, ymax]
         return limits, area_def
 
-    def make_resample_impl(self, olimage, fileout):
+    def make_resample_impl(self, olimage, fileout, granuleindex, orbitindex):
+        if self.verbose:
+            print('--------------------')
+            print(f'[INFO] Starting resampling for granule: {olimage.path_source}')
+
+        if self.verbose:
+            print(f'[INFO] Defining subarea for the granule...')
         lats, lons = olimage.get_lat_long_arrays()
+
+        if self.verbose:
+            print(
+                f'[INFO] Granule geographic limits. Lat: {np.min(lats)} - {np.max(lats)}  Long: {np.min(lons)} - {np.max(lons)}')
+
         limits, sub_area_def = self.get_subarea_def(lats, lons)
         swath_def = SwathDefinition(lons=lons, lats=lats)
+        if self.verbose:
+            print(f'[INFO] Array limits after resampling: {limits}')
+            print(f'[INFO] Getting neighbour info...')
+        # row_indices, col_indices = utils.generate_nearest_neighbour_linesample_arrays(swath_def, sub_area_def, 2000)
+        valid_input_index, valid_output_index, index_array, distance_array = get_neighbour_info(swath_def, sub_area_def,
+                                                                                                500, neighbours=1)
 
-        datasetout = self.create_nc_reflectance_file(fileout)
+        mask,res_original = olimage.get_mask_default()
+
+
+        if self.verbose:
+            print(f'[INFO] Creating output file from file grid...')
+        datasetout = self.create_nc_file_resampled(fileout, olimage)
+
+        if datasetout is None:
+            print(f'[ERROR] Output file {fileout} could not be created')
+
+        ymin = int(limits[2])
+        ymax = int(limits[3])
+        xmin = int(limits[0])
+        xmax = int(limits[1])
+
+
+        if self.verbose:
+            print(f'[INFO] Resampling variables...')
+
         for var in datasetout.variables:
             if var.startswith('RRS'):
+                if self.verbose:
+                    print(f'[INFO] --->{var}')
                 var_rrs = datasetout.variables[var]
                 wlref = var_rrs.wavelength
-                print(var,wlref)
-                if wlref>0:
+                if wlref > 0:
                     rrsarray = olimage.get_reflectance_band_array(wlref)
-                    print('doing resample...')
-                    result = resample_nearest(swath_def, rrsarray, sub_area_def, radius_of_influence=2000)
+                    rrsarray[mask == 1] = -999
+                    output_shape = (sub_area_def.height, sub_area_def.width)
+                    result = get_sample_from_neighbour_info('nn', output_shape, rrsarray, valid_input_index,
+                                                            valid_output_index, index_array,
+                                                            distance_array=distance_array, fill_value=-999)
                     ymin = int(limits[2])
                     ymax = int(limits[3])
                     xmin = int(limits[0])
                     xmax = int(limits[1])
-                    ancho = xmax-xmin
-                    alto = ymax-ymin
-                    print(ymin,ymax,xmin,xmax)
-                    print(alto,ancho)
-                    print(result.shape)
-                    var_rrs[ymin:ymax,xmin:xmax]=[result[:,:]]
+                    var_rrs[ymin:ymax, xmin:xmax] = [result[:, :]]
+        name_angles = ['OZA', 'OAA', 'SZA', 'SAA']
+        for angle in name_angles:
+            if self.verbose:
+                print(f'[INFO] --->{angle}')
+            var = datasetout.variables[angle]
+            fvalue = var.getncattr('_FillValue')
+
+            array = olimage.get_angle_array(angle)
+            result = get_sample_from_neighbour_info('nn', output_shape, array, valid_input_index, valid_output_index,
+                                                    index_array, distance_array=distance_array, fill_value=fvalue)
+            # print(np.min(array), np.max(array), np.min(result), np.max(result))
+            var[ymin:ymax, xmin:xmax] = [result[:, :]]
+
+        # mask (using fill_value=10 becuase of the problems resampling with fill_value=-999)
+        result = get_sample_from_neighbour_info('nn', output_shape, mask, valid_input_index,
+                                                valid_output_index, index_array,
+                                                distance_array=distance_array, fill_value=10)
+        result_m = np.zeros(result.shape, dtype=np.int)
+        result_m[result == 10] = -999
+        result_m[result == 0] = 1
+        r_n_t = result_m.shape[0]*result_m.shape[1]
+        resampled_n_total = np.count_nonzero(result_m >= 0)
+        resampled_n_valid = np.count_nonzero(result_m == 1)
+        var = datasetout.variables['mask']
+        var[ymin:ymax, xmin:xmax] = [result_m[:, :]]
+
+        # sensor mask
+        var = datasetout.variables['sensor_mask']
+        array = np.array(datasetout.variables['sensor_mask'][ymin:ymax, xmin:xmax])
+        sensorflag = granuleindex
+        if orbitindex >= 0:
+            sensorflag = math.pow(2, orbitindex / 100)
+        array[result_m != -999] = array[result_m != -999] + sensorflag
+        var[ymin:ymax, xmin:xmax] = [array[:, :]]
+
+        datasetout.granule_index = int(granuleindex)
+        datasetout.relative_orbit = int(olimage.get_rel_pass())
+        datasetout.sensorflag = int(sensorflag)
+        start_date = olimage.get_start_date()
+        start_date_str = start_date.strftime('%Y%m%dT%H%M%S')
+        datasetout.start_date = start_date_str
+        lc = []
+        for c in olimage.coords_image:
+            lc.append(str(c))
+        str_coords = ';'.join(lc)
+        datasetout.source = olimage.name_source
+        datasetout.geo_polygon = str_coords
+        datasetout.resampled_ymin = ymin
+        datasetout.resampled_ymax = ymax
+        datasetout.resampled_xmin = xmin
+        datasetout.resampled_xmax = xmax
+        datasetout.resampled_width = sub_area_def.width
+        datasetout.resampled_height = sub_area_def.height
+        datasetout.resampled_n_total = resampled_n_total
+        datasetout.resampled_n_valid = resampled_n_valid
+        resampled_p_valid = (resampled_n_valid / resampled_n_total) * 100
+        datasetout.resampled_p_valid = resampled_p_valid
+
+        datasetout.original_width = res_original[0]
+        datasetout.original_height = res_original[1]
+        datasetout.original_total = res_original[2]
+        datasetout.original_n_validrrs = res_original[3]
+        datasetout.original_n_nonmasked = res_original[4]
+        datasetout.original_p_valid = res_original[5]
 
         datasetout.close()
-        # refband = olimage.get_reflectance_band_array(560)
-        # print('doing resample...')
-        # result = resample_nearest(swath_def, refband, sub_area_def, radius_of_influence=2000)
-        # print(result.shape)
 
-        # refband = olimage.get_reflectance_band_array(560)
-        # print(type(lats), lats.shape)
-        # print(type(lons), lons.shape)
-        # print(type(refband), refband.shape)
-        # print('defining image container...')
-        # lats = lats[0:500, 0:500]
-        # lons = lons[0:500, 0:500]
-        # refband = refband[0:500, 0:500]
-        # swath_def = SwathDefinition(lons=lons, lats=lats)
-        # # swath_con = image.ImageContainerNearest(refband, swath_def, radius_of_influence=2000)
-        # print('doing resample...')
-        # # area_con = swath_con.resample(self.area_def)
-        #
-        # result = resample_nearest(swath_def, refband, self.area_def, radius_of_influence=50000, epsilon=0.5)
-        #
-        # print(type(result), result.shape)
+        line_original = ';'.join(str(l) for l in res_original)
+        res_resampled = [ymin,ymax,xmin,xmax,sub_area_def.width,sub_area_def.height,resampled_n_total,resampled_n_valid,resampled_p_valid]
+        line_resampled = ';'.join(str(l) for l in res_resampled)
+        line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};{sensorflag};{line_original};{line_resampled}'
 
-        # result = kd_tree.resample_nearest(swath_def, data,
-        #                                   area_def, radius_of_influence=50000, epsilon=0.5)
+
+
+
+        if self.verbose:
+            print(f'[INFO] Completed. Output file: {fileout}')
+
+        return line_output
+
+    def make_resample_pml(self, fpml, fileout):
+        if self.verbose:
+            print('--------------------')
+            print(f'[INFO] Starting resampling for PML product: {fpml}')
+
+        ncpml = Dataset(fpml)
+        datasetout = self.create_nc_file_resampled_from_pmldataset(fileout, ncpml)
+
+        # print(ncpml.variables)
+        lat_array = ncpml.variables['latitude'][:]
+        lon_array = ncpml.variables['longitude'][:]
+        nlat = len(lat_array)
+        nlon = len(lon_array)
+        ystep = 2400
+        xstep = 2400
+
+        for y in range(0, nlat, ystep):
+            # CHECKING NON MASKED VALUES
+
+            yini = y
+            yfin = y + ystep
+            if yfin > nlat:
+                yfin = nlat
+            xini = 0
+            xfin = nlon
+            height = (yfin - yini)
+            width = (xfin - xini)
+            shape = (height, width)
+
+            nnonmasked = 0
+            for var in ncpml.variables:
+                if var.lower().startswith('lat') or var.lower().startswith('lon') or var.lower().startswith('time'):
+                    continue
+                rrsarray = np.ma.zeros(shape)
+                rrsarray[:, :] = np.ma.array(ncpml.variables[var][0, yini:yfin, xini:xfin])
+                # print('Non masked: ',rrsarray.count())
+                nnonmasked = nnonmasked + rrsarray.count()
+
+            if self.verbose:
+                print(f'[INFO] [PML] Counting non-masked values: {yini} to {yfin} / {nlat}: {nnonmasked}')
+            if nnonmasked == 0:
+                continue
+
+            for x in range(0, nlon, xstep):
+                xini = x
+                xfin = x + xstep
+                if xfin > nlon:
+                    xfin = nlon
+                height = (yfin - yini)
+                width = (xfin - xini)
+                shape = (height, width)
+
+                nnonmasked = 0
+                for var in ncpml.variables:
+                    if var.lower().startswith('lat') or var.lower().startswith('lon') or var.lower().startswith('time'):
+                        continue
+                    rrsarray = np.ma.zeros(shape)
+                    rrsarray[:, :] = np.ma.array(ncpml.variables[var][0, yini:yfin, xini:xfin])
+                    # print('Non masked: ',rrsarray.count())
+                    nnonmasked = nnonmasked + rrsarray.count()
+
+                if self.verbose:
+                    print(f'[INFO] [PML] Non-masked pixels in block x: {xini}-{xfin} y: {yini}-{yfin} -> {nnonmasked}')
+
+                if nnonmasked == 0:
+                    continue
+
+                lon_here = lon_array[xini:xfin]
+                lat_here = lat_array[yini:yfin]
+
+                lat2D, lon2D = self.get_2D_lat_lon_arrays(lat_here, lon_here)
+                limits, sub_area_def = self.get_subarea_def(lat2D, lon2D)
+                swath_def = SwathDefinition(lons=lon2D, lats=lat2D)
+
+                if self.verbose:
+                    print(f'[INFO] [PML RESAMPLE]     Getting neighbour info...')
+                # row_indices, col_indices = utils.generate_nearest_neighbour_linesample_arrays(swath_def, sub_area_def, 2000)
+
+                valid_input_index, valid_output_index, index_array, distance_array = get_neighbour_info(swath_def,
+                                                                                                        sub_area_def,
+                                                                                                        500,
+                                                                                                        neighbours=1)
+
+                for var in ncpml.variables:
+                    if var.lower().startswith('lat') or var.lower().startswith('lon') or var.lower().startswith('time'):
+                        continue
+                    if var.lower().endswith('count') or var.lower().endswith('error'):
+                        continue
+                    if self.verbose:
+                        print(f'[INFO] [PML RESAMPLE]     Resampling variable: {var}...')
+                    var_rrs = datasetout.variables[var]
+
+                    # rrsarray = np.ma.zeros(shape)
+                    rrsarray = np.array(ncpml.variables[var][0, yini:yfin, xini:xfin])
+
+                    # print('Non masked before: ',rrsarray.count())
+                    # print(rrsarray.shape)
+                    # output_shape = (sub_area_def.height, sub_area_def.width)
+                    # print('Before:', rrsarray.shape, np.max(rrsarray))
+                    result = get_sample_from_neighbour_info('nn', sub_area_def.shape, rrsarray, valid_input_index,
+                                                            valid_output_index, index_array,
+                                                            distance_array=distance_array,
+                                                            fill_value=-999)
+                    # print('Afger:', result.shape, np.max(result), type(result))
+                    # print('Non masked later: ',result.count())
+                    ymin = int(limits[2])
+                    ymax = int(limits[3])
+                    xmin = int(limits[0])
+                    xmax = int(limits[1])
+                    var_rrs_array = np.array(var_rrs[ymin:ymax, xmin:xmax])
+                    var_rrs_array[result != -999] = result[result != -999]
+                    var_rrs[ymin:ymax, xmin:xmax] = [var_rrs_array[:, :]]
+
+                    for yp in range(ymin, ymax):
+                        for xp in range(xmin, xmax):
+                            val = result[yp - ymin, xp - xmin]
+                            if val != -999:
+                                # print('-->',yp,xp)
+                                var_rrs[yp, xp] = [val]
+                    # var_rrs[ymin:ymax, xmin:xmax] = [result[:, :]]
+
+        datasetout.close()
+        ncpml.close()
+        print('DONE')
+        # print('Dim',nlat,nlon)
+        # for x in range(nlon):
+        #     print(lon_array[x])
+
+    def get_2D_lat_lon_arrays(self, lat1D, lon1D):
+        height = len(lat1D)
+        width = len(lon1D)
+        lat2D = np.zeros((height, width), lat1D.dtype)
+        lon2D = np.zeros((height, width), lat1D.dtype)
+        for y in range(height):
+            lat2D[y, :] = lat1D[y]
+        for x in range(width):
+            lon2D[:, x] = lon1D[x]
+        return lat2D, lon2D
