@@ -103,7 +103,7 @@ def check_py():
     try:
         import simplekml
     except:
-        print('[WARNING] simplekml was not found...')
+        print('[ERROR] simplekml was not found...')
         check = False
     try:
         import netCDF4
