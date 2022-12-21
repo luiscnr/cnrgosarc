@@ -28,6 +28,7 @@ def main():
     print('[INFO] Started Artic Resampler')
     if args.mode == "CHECKPY":
         check_py()
+        return
 
     from arc_mapinfo import ArcMapInfo
 
