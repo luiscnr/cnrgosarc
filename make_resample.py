@@ -1,12 +1,12 @@
 import math
 import os
 
-import netCDF4
-import numpy as np
-import zipfile as zp
-from arc_mapinfo import ArcMapInfo
-from arc_integration import ArcIntegration
-from olci_l2 import OLCI_L2
+#import netCDF4
+#import numpy as np
+#import zipfile as zp
+# from arc_mapinfo import ArcMapInfo
+# from arc_integration import ArcIntegration
+# from olci_l2 import OLCI_L2
 import argparse
 #import simplekml
 
@@ -28,6 +28,12 @@ def main():
     print('[INFO] Started Artic Resampler')
     if args.mode == "CHECKPY":
         check_py()
+
+    from arc_mapinfo import ArcMapInfo
+
+    from olci_l2 import OLCI_L2
+
+
     if args.mode == "CHECK":
         do_check5()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
@@ -112,6 +118,9 @@ def check_py():
 
 
 def do_check6():
+
+    import numpy as np
+
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/NERC_EXAMPLES/202207_mm-metno-MODEL-topaz4-ARC-fv02.0.nc'
     from netCDF4 import Dataset
     dataset = Dataset(file_in)
@@ -125,7 +134,7 @@ def do_check6():
     latitude = dataset.variables['latitude']
     longitude = dataset.variables['longitude']
     print(np.min(latitude[:]), np.max(latitude[:]), np.min(longitude[:]), np.max(longitude[:]))
-
+    from arc_mapinfo import ArcMapInfo
     ami = ArcMapInfo(None, True)
 
     x0 = xcoords[0] * 100000
@@ -178,6 +187,7 @@ def do_check5():
     print('do check 5')
     input_dir = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
     fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/20180715_CNR_ARC_Resampled_v3.nc'
+    from arc_integration import ArcIntegration
     arc_integration = ArcIntegration(None, args.verbose, input_dir)
     arc_integration.make_integration_avg(fout)
     #arc_integration.get_info()
@@ -220,11 +230,15 @@ def do_check44():
 
 def make_resample_dir(dirorig, unzip_path, doresample, dokml):
     import simplekml
+    # import netCDF4
+    #import numpy as np
+    import zipfile as zp
     # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
     # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
     fconfig = None
     if args.config_file:
         fconfig = args.config_file
+    from arc_mapinfo import ArcMapInfo
     ami = ArcMapInfo(fconfig, args.verbose)
 
     first_line = ['Source', 'StartDate', 'RelOrbit', 'GranuleId', 'SensorFlag', 'OrigWidth', 'OrigHeight', 'OrigNTotal',
@@ -265,7 +279,7 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
             output_name = path_prod_u.split('/')[-1][0:-5]
         else:
             output_name = path_prod_u.split('/')[-1]
-
+        from olci_l2 import OLCI_L2
         olimage = OLCI_L2(path_prod_u, args.verbose)
         olimage.get_geo_and_params()
 
@@ -325,6 +339,8 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
 
 
 def do_check3():
+    import netCDF4
+
     file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/20220713_cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D.nc'
     dataset = netCDF4.Dataset(file)
     import numpy as np
@@ -334,6 +350,9 @@ def do_check3():
 
 
 def do_check2():
+    import netCDF4
+    # import numpy as np
+    # import zipfile as zp
     print('-----------------------')
     print('ORIGINAL')
     file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/PML_EXAMPLES/20220713_cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D.nc'
@@ -456,6 +475,7 @@ def do_check2():
 
 
 def do_check():
+    from olci_l2 import OLCI_L2
     folci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T110812_20180715T111112_20211121T193318_0180_033_251______MAR_R_NT_003.SEN3'
     olimage = OLCI_L2(folci, args.verbose)
     array = olimage.get_observation_angle_array()
