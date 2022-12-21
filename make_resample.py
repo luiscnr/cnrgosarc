@@ -1,13 +1,12 @@
 import math
 import os
-
+import argparse
 #import netCDF4
 #import numpy as np
 #import zipfile as zp
 # from arc_mapinfo import ArcMapInfo
 # from arc_integration import ArcIntegration
 # from olci_l2 import OLCI_L2
-import argparse
 #import simplekml
 
 parser = argparse.ArgumentParser(description="Artic resampler")
@@ -100,22 +99,47 @@ def main():
 
 def check_py():
     print('[INFO] Checking py imports...')
+    check = True
     try:
         import simplekml
     except:
-        print('[ERROR] simplekml was not found...')
+        print('[WARNING] simplekml was not found...')
+        check = False
     try:
         import netCDF4
     except:
         print('[ERROR] netCDF4 was not found...')
+        check = False
     try:
         import numpy as np
     except:
         print('[ERROR] numpy was not found')
+        check = False
     try:
         import zipfile as zp
     except:
         print('[ERROR] zipfile was not found')
+        check = False
+    try:
+        import json
+    except:
+        print('[ERROR] json was not found')
+        check = False
+    try:
+        import pyresample
+    except:
+        print('[ERROR] pyresample was not found')
+        check = False
+    try:
+        import shapely
+    except:
+        print('[ERROR] shapely was not found')
+        check = False
+
+    if not check:
+        print('[ERROR] Some packages are not available...')
+    else:
+        print('[INFO] All the packages are available')
 
 
 def do_check6():
