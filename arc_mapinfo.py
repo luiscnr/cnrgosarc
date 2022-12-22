@@ -14,7 +14,8 @@ class ArcMapInfo:
     def __init__(self, fconfig, verbose):
         # DEFAULTS
         area_id = 'polar_stereographic'
-        self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
+        #self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
+        self.ifile_base = '/store/COP2-OC-TAC/arc/code/ArcGrid_65_90_300mNOGEO.nc'
 
         if fconfig is None:
             fconfig = 'arc_config.ini'
