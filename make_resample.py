@@ -1,16 +1,17 @@
 import math
 import os
 import argparse
-#import netCDF4
-#import numpy as np
-#import zipfile as zp
+
+# import netCDF4
+# import numpy as np
+# import zipfile as zp
 # from arc_mapinfo import ArcMapInfo
 # from arc_integration import ArcIntegration
 # from olci_l2 import OLCI_L2
-#import simplekml
+# import simplekml
 
 parser = argparse.ArgumentParser(description="Artic resampler")
-parser.add_argument("-m", "--mode", help="Mode", choices=["CHECKPY","CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "QL"],
+parser.add_argument("-m", "--mode", help="Mode", choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "QL"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -33,9 +34,9 @@ def main():
 
     from olci_l2 import OLCI_L2
 
-
     if args.mode == "CHECK":
-        do_check5()
+        do_resampled_vm_christmas()
+        #do_check6()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
         # make_resample_dir(dirorig, unzip_path, True, False)
@@ -66,7 +67,7 @@ def main():
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
-        line_output = ami.make_resample_impl(olimage, file_out, 1,-1)
+        line_output = ami.make_resample_impl(olimage, file_out, 1, -1)
         print(line_output)
 
     if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a PML file
@@ -96,6 +97,7 @@ def main():
     # fdata = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
     # ami.save_quick_look_fdata(fout,fdata)
+
 
 def check_py():
     print('[INFO] Checking py imports...')
@@ -148,7 +150,6 @@ def check_py():
 
 
 def do_check6():
-
     import numpy as np
 
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/NERC_EXAMPLES/202207_mm-metno-MODEL-topaz4-ARC-fv02.0.nc'
@@ -213,6 +214,41 @@ def do_check6():
     # print(np.min(latdif),np.max(latdif),np.min(londif),np.max(londif))
 
 
+def do_resampled_vm_christmas():
+    input_dir_base = '/store/COP2-OC-TAC/arc/'
+    output_dir_base = '/store/COP2-OC-TAC/arc/resampled'
+    unzip_path = '/store/COP2-OC-TAC/arc/unzip'
+    from datetime import datetime as dt
+    from datetime import timedelta
+    date_ref = dt(2016, 4, 25)
+    date_fin = dt(2022, 7, 30)
+    while date_ref < date_fin:
+        print(f'[INFO]******************************************************************************->{date_ref}')
+        input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
+        do_resample = True
+        if not os.path.exists(input_dir):
+            print(f'[WARNING] Input directory {input_dir} is not available. Skiping...')
+            do_resample = False
+        output_dir_year = os.path.join(output_dir_base, date_ref.strftime('%Y'))
+        output_dir_month = os.path.join(output_dir_year, date_ref.strftime('%m'))
+        date_ref_str = date_ref.strftime('%Y%m%d')
+        output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
+        file_output = os.path.join(output_dir_month, output_name)
+        if os.path.exists(file_output):
+            print(f'[WARNING] Output file {file_output} already exist. Skiping...')
+            do_resample = False
+        if not do_resample:
+            date_ref = date_ref + timedelta(hours=24)
+            continue
+        if not os.path.exists(output_dir_year):
+            os.mkdir(output_dir_year)
+
+        if not os.path.exists(output_dir_month):
+            os.mkdir(output_dir_month)
+        make_resample_dir(input_dir, unzip_path, True, False)
+        date_ref = date_ref + timedelta(hours=24)
+
+
 def do_check5():
     print('do check 5')
     input_dir = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
@@ -220,7 +256,7 @@ def do_check5():
     from arc_integration import ArcIntegration
     arc_integration = ArcIntegration(None, args.verbose, input_dir)
     arc_integration.make_integration_avg(fout)
-    #arc_integration.get_info()
+    # arc_integration.get_info()
 
     # for name in arc_integration.info:
     #     print(name,'-------------------------------------------')
@@ -240,6 +276,7 @@ def do_check5():
     # print(dt.fromtimestamp(arc_integration.time_max))
     # print(dt.fromtimestamp(arc_integration.time_min-1))
     # print((dt.fromtimestamp(arc_integration.time_max)-dt.fromtimestamp(arc_integration.time_min)).total_seconds()/3600)
+
 
 def do_check44():
     file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/inforesampling.txt'
@@ -261,7 +298,7 @@ def do_check44():
 def make_resample_dir(dirorig, unzip_path, doresample, dokml):
     import simplekml
     # import netCDF4
-    #import numpy as np
+    # import numpy as np
     import zipfile as zp
     # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
     # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
@@ -280,9 +317,9 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
     idref = -1
     foutkml = None
     kml = None
-    red = [166,31,178,51,251,227,253,256,202,106,255,177,0]
-    green = [206,120,223,160,154,26,191,127,178,61,255,89,0]
-    blue = [227,180,138,44,153,28,111,0,214,154,153,40,0]
+    red = [166, 31, 178, 51, 251, 227, 253, 256, 202, 106, 255, 177, 0]
+    green = [206, 120, 223, 160, 154, 26, 191, 127, 178, 61, 255, 89, 0]
+    blue = [227, 180, 138, 44, 153, 28, 111, 0, 214, 154, 153, 40, 0]
     idcolor = 0
 
     idx = 1
@@ -324,7 +361,7 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
                 if foutkml is not None and kml is not None:
                     kml.save(foutkml)
                     idcolor = idcolor + 1
-                    if idcolor>=len(red):
+                    if idcolor >= len(red):
                         idcolor = 0
                 foutkml = os.path.join(dirorig, f'Passes_RelativeOrbit_{rel_pass}.kml')
                 kml = simplekml.Kml()
@@ -348,7 +385,7 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
             if start_date is not None:
                 start_date_s = start_date.strftime('%Y%m%dT%H%M:%S')
             lin = kml.newlinestring(name=start_date_s, description=name, coords=olimage.coords_image)
-            lin.style.linestyle.color = simplekml.Color.rgb(red[idcolor],green[idcolor],blue[idcolor],255)
+            lin.style.linestyle.color = simplekml.Color.rgb(red[idcolor], green[idcolor], blue[idcolor], 255)
             lin.style.linestyle.width = 3
             # name = name_list[7], description = name, coords = coordinates
 
@@ -358,10 +395,10 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
                     os.remove(os.path.join(path_prod_u, fn))
 
     if doresample:
-        fcsvout = os.path.join(dirorig,'ResampleInfo.csv')
+        fcsvout = os.path.join(dirorig, 'ResampleInfo.csv')
         if args.verbose:
             print(f'[INFO] Creating info file:{fcsvout}')
-        fw = open(fcsvout,'w')
+        fw = open(fcsvout, 'w')
         for line in lines_out:
             fw.write(line)
             fw.write('\n')
