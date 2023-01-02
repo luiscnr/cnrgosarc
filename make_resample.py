@@ -222,7 +222,7 @@ def do_resampled_vm_christmas():
     from datetime import timedelta
     date_ref = dt(2016, 5, 1)
     date_fin = dt(2016, 5, 1)
-    while date_ref < date_fin:
+    while date_ref <= date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')
         input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
         do_resample = True
