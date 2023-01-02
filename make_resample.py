@@ -39,7 +39,7 @@ def main():
         #do_check6()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
-        # make_resample_dir(dirorig, unzip_path, True, False)
+        # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
         return
 
     fconfig = None
@@ -220,8 +220,8 @@ def do_resampled_vm_christmas():
     unzip_path = '/store/COP2-OC-TAC/arc/unzip'
     from datetime import datetime as dt
     from datetime import timedelta
-    date_ref = dt(2016, 4, 25)
-    date_fin = dt(2022, 7, 30)
+    date_ref = dt(2016, 5, 1)
+    date_fin = dt(2016, 5, 1)
     while date_ref < date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')
         input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
@@ -245,7 +245,7 @@ def do_resampled_vm_christmas():
 
         if not os.path.exists(output_dir_month):
             os.mkdir(output_dir_month)
-        make_resample_dir(input_dir, unzip_path, True, False)
+        make_resample_dir(input_dir,output_dir_month, unzip_path, True, False)
         date_ref = date_ref + timedelta(hours=24)
 
 
@@ -295,13 +295,16 @@ def do_check44():
         print(lines[idx])
 
 
-def make_resample_dir(dirorig, unzip_path, doresample, dokml):
+def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
     import simplekml
     # import netCDF4
     # import numpy as np
     import zipfile as zp
     # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
     # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
+    if dirdest is None:
+        dirdest = dirorig
+
     fconfig = None
     if args.config_file:
         fconfig = args.config_file
@@ -363,7 +366,7 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
                     idcolor = idcolor + 1
                     if idcolor >= len(red):
                         idcolor = 0
-                foutkml = os.path.join(dirorig, f'Passes_RelativeOrbit_{rel_pass}.kml')
+                foutkml = os.path.join(dirdest, f'Passes_RelativeOrbit_{rel_pass}.kml')
                 kml = simplekml.Kml()
 
         else:
@@ -371,7 +374,9 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
         sensor_id = math.pow(2, rel_pass_dict[rel_pass]) + idref
 
         if doresample:
-            file_out = os.path.join(dirorig, f'{output_name}_resampled.nc')
+            file_out = os.path.join(dirdest, f'{output_name}_resampled.nc')
+            if os.path.exists(file_out):
+                print(f'[INFO] File {file_out} already exist. Skyping...')
             line_out = ami.make_resample_impl(olimage, file_out, sensor_id, idref)
             lines_out.append(line_out)
             if zp.is_zipfile(prod_path):
@@ -395,7 +400,7 @@ def make_resample_dir(dirorig, unzip_path, doresample, dokml):
                     os.remove(os.path.join(path_prod_u, fn))
 
     if doresample:
-        fcsvout = os.path.join(dirorig, 'ResampleInfo.csv')
+        fcsvout = os.path.join(dirdest, 'ResampleInfo.csv')
         if args.verbose:
             print(f'[INFO] Creating info file:{fcsvout}')
         fw = open(fcsvout, 'w')

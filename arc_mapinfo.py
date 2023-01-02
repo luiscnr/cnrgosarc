@@ -521,7 +521,7 @@ class ArcMapInfo:
         result_m = np.zeros(result.shape, dtype=np.int)
         result_m[result == 10] = -999
         result_m[result == 0] = 1
-        r_n_t = result_m.shape[0]*result_m.shape[1]
+        #r_n_t = result_m.shape[0]*result_m.shape[1]
         resampled_n_total = np.count_nonzero(result_m >= 0)
         resampled_n_valid = np.count_nonzero(result_m == 1)
         var = datasetout.variables['mask']
@@ -555,6 +555,8 @@ class ArcMapInfo:
         datasetout.resampled_width = sub_area_def.width
         datasetout.resampled_height = sub_area_def.height
         datasetout.resampled_n_total = resampled_n_total
+        if resampled_n_total==0:
+            print(f'WARNING: resampled n total es 0->{sub_area_def.height} {sub_area_def.height}')
         datasetout.resampled_n_valid = resampled_n_valid
         resampled_p_valid = (resampled_n_valid / resampled_n_total) * 100
         datasetout.resampled_p_valid = resampled_p_valid
