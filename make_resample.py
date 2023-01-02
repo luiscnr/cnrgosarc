@@ -221,7 +221,7 @@ def do_resampled_vm_christmas():
     from datetime import datetime as dt
     from datetime import timedelta
     date_ref = dt(2016, 5, 1)
-    date_fin = dt(2016, 5, 1)
+    date_fin = dt(2016, 5, 31)
     while date_ref <= date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')
         input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
@@ -231,9 +231,10 @@ def do_resampled_vm_christmas():
             do_resample = False
         output_dir_year = os.path.join(output_dir_base, date_ref.strftime('%Y'))
         output_dir_month = os.path.join(output_dir_year, date_ref.strftime('%m'))
+        output_dir_day = os.path.join(output_dir_month,date_ref.strftime('%d'))
         date_ref_str = date_ref.strftime('%Y%m%d')
         output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
-        file_output = os.path.join(output_dir_month, output_name)
+        file_output = os.path.join(output_dir_day, output_name)
         if os.path.exists(file_output):
             print(f'[WARNING] Output file {file_output} already exist. Skiping...')
             do_resample = False
@@ -242,10 +243,12 @@ def do_resampled_vm_christmas():
             continue
         if not os.path.exists(output_dir_year):
             os.mkdir(output_dir_year)
-
         if not os.path.exists(output_dir_month):
             os.mkdir(output_dir_month)
-        make_resample_dir(input_dir, output_dir_month, unzip_path, True, False)
+        if not os.path.exists(output_dir_day):
+            os.mkdir(output_dir_day)
+
+        make_resample_dir(input_dir, output_dir_day, unzip_path, True, False)
         date_ref = date_ref + timedelta(hours=24)
 
 
