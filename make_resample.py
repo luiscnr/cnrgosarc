@@ -36,7 +36,7 @@ def main():
 
     if args.mode == "CHECK":
         do_resampled_vm_christmas()
-        #do_check6()
+        # do_check6()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
         # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
@@ -245,7 +245,7 @@ def do_resampled_vm_christmas():
 
         if not os.path.exists(output_dir_month):
             os.mkdir(output_dir_month)
-        make_resample_dir(input_dir,output_dir_month, unzip_path, True, False)
+        make_resample_dir(input_dir, output_dir_month, unzip_path, True, False)
         date_ref = date_ref + timedelta(hours=24)
 
 
@@ -333,13 +333,11 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
             print(f'File: {name} ({idx}/{nfiles})')
             idx = idx + 1
         prod_path = os.path.join(dirorig, name)
+        do_zip_here = False
         if name.endswith('.SEN3'):
             path_prod_u = prod_path
         elif zp.is_zipfile(prod_path):
-            with zp.ZipFile(prod_path, 'r') as zprod:
-                if args.verbose:
-                    print(f'[INFO] Unziping {name} to {unzip_path}')
-                zprod.extractall(path=unzip_path)
+            do_zip_here = True
             path_prod_u = prod_path.split('/')[-1][0:-4]
             path_prod_u = os.path.join(unzip_path, path_prod_u)
         else:
@@ -349,6 +347,19 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
             output_name = path_prod_u.split('/')[-1][0:-5]
         else:
             output_name = path_prod_u.split('/')[-1]
+
+        if doresample:
+            file_out = os.path.join(dirdest, f'{output_name}_resampled.nc')
+            if os.path.exists(file_out):
+                print(f'[INFO] File {file_out} already exist. Skyping resample...')
+                if not dokml:
+                    continue
+            if do_zip_here:
+                with zp.ZipFile(prod_path, 'r') as zprod:
+                    if args.verbose:
+                        print(f'[INFO] Unziping {name} to {unzip_path}')
+                    zprod.extractall(path=unzip_path)
+
         from olci_l2 import OLCI_L2
         olimage = OLCI_L2(path_prod_u, args.verbose)
         olimage.get_geo_and_params()
@@ -374,9 +385,10 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
         sensor_id = math.pow(2, rel_pass_dict[rel_pass]) + idref
 
         if doresample:
-            file_out = os.path.join(dirdest, f'{output_name}_resampled.nc')
-            if os.path.exists(file_out):
-                print(f'[INFO] File {file_out} already exist. Skyping...')
+            # file_out = os.path.join(dirdest, f'{output_name}_resampled.nc')
+            # if os.path.exists(file_out):
+            #     print(f'[INFO] File {file_out} already exist. Skyping...')
+            #     continue
             line_out = ami.make_resample_impl(olimage, file_out, sensor_id, idref)
             lines_out.append(line_out)
             if zp.is_zipfile(prod_path):
