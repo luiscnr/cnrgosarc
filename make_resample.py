@@ -395,9 +395,10 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
             line_out = ami.make_resample_impl(olimage, file_out, sensor_id, idref)
             lines_out.append(line_out)
             if zp.is_zipfile(prod_path):
-                os.remove(prod_path)
-            for fn in os.listdir(path_prod_u):
-                os.remove(os.path.join(path_prod_u, fn))
+                #os.remove(prod_path)
+                for fn in os.listdir(path_prod_u):
+                    os.remove(os.path.join(path_prod_u, fn))
+               
 
         if dokml:
             start_date = olimage.get_start_date()
