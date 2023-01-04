@@ -14,7 +14,7 @@ class ArcMapInfo:
     def __init__(self, fconfig, verbose):
         # DEFAULTS
         area_id = 'polar_stereographic'
-        #self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
+        # self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
         self.ifile_base = '/store/COP2-OC-TAC/arc/code/ArcGrid_65_90_300mNOGEO.nc'
 
         if fconfig is None:
@@ -464,8 +464,7 @@ class ArcMapInfo:
         valid_input_index, valid_output_index, index_array, distance_array = get_neighbour_info(swath_def, sub_area_def,
                                                                                                 500, neighbours=1)
 
-        mask,res_original = olimage.get_mask_default()
-
+        mask, res_original = olimage.get_mask_default()
 
         if self.verbose:
             print(f'[INFO] Creating output file from file grid...')
@@ -479,9 +478,27 @@ class ArcMapInfo:
         xmin = int(limits[0])
         xmax = int(limits[1])
 
-
         if self.verbose:
             print(f'[INFO] Resampling variables...')
+            print(f'[INFO] --->Mask')
+        output_shape = (sub_area_def.height, sub_area_def.width)
+        # mask (using fill_value=10 becuase of the problems resampling with fill_value=-999)
+        result = get_sample_from_neighbour_info('nn', output_shape, mask, valid_input_index,
+                                                valid_output_index, index_array,
+                                                distance_array=distance_array, fill_value=10)
+        result_m = np.zeros(result.shape, dtype=np.int)
+        result_m[result == 10] = -999
+        result_m[result == 0] = 1
+        # r_n_t = result_m.shape[0]*result_m.shape[1]
+        resampled_n_total = np.count_nonzero(result_m >= 0)
+        if resampled_n_total==0:
+            print(f'[WARNING] No valid pixels were resampled for granule {olimage.path_source}. Removing file and skipping')
+            datasetout.close()
+            os.remove(fileout)
+            return
+        resampled_n_valid = np.count_nonzero(result_m == 1)
+        var = datasetout.variables['mask']
+        var[ymin:ymax, xmin:xmax] = [result_m[:, :]]
 
         for var in datasetout.variables:
             if var.startswith('RRS'):
@@ -514,35 +531,9 @@ class ArcMapInfo:
             # print(np.min(array), np.max(array), np.min(result), np.max(result))
             var[ymin:ymax, xmin:xmax] = [result[:, :]]
 
-        # mask (using fill_value=10 becuase of the problems resampling with fill_value=-999)
-        result = get_sample_from_neighbour_info('nn', output_shape, mask, valid_input_index,
-                                                valid_output_index, index_array,
-                                                distance_array=distance_array, fill_value=10)
-        result_m = np.zeros(result.shape, dtype=np.int)
-        result_m[result == 10] = -999
-        result_m[result == 0] = 1
-        #r_n_t = result_m.shape[0]*result_m.shape[1]
-        resampled_n_total = np.count_nonzero(result_m >= 0)
-        print(f'WARNING: RESAMPLED N TOTAL: ',resampled_n_total)
-        if resampled_n_total==0:
-            print(len(valid_input_index))
-            print(len(valid_output_index))
-            print(len(index_array))
-            nmask = np.count_nonzero(mask>=0)
-            print('n mask total: ',nmask)
-            nmaskvalid = np.count_nonzero(mask==1)
-            print('n mask valid: ',nmaskvalid)
-            ntal = np.count_nonzero(result!=10)
-            print('n tal',ntal)
-            ncual = np.count_nonzero(result==10)
-            print('n cual ',ncual)
-            print(result.shape)
-            print('AAAAAAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
-        resampled_n_valid = np.count_nonzero(result_m == 1)
-        var = datasetout.variables['mask']
-        var[ymin:ymax, xmin:xmax] = [result_m[:, :]]
-
         # sensor mask
+        if self.verbose:
+            print(f'[INFO] --->Sensor mask')
         var = datasetout.variables['sensor_mask']
         array = np.array(datasetout.variables['sensor_mask'][ymin:ymax, xmin:xmax])
         sensorflag = granuleindex
@@ -584,12 +575,10 @@ class ArcMapInfo:
         datasetout.close()
 
         line_original = ';'.join(str(l) for l in res_original)
-        res_resampled = [ymin,ymax,xmin,xmax,sub_area_def.width,sub_area_def.height,resampled_n_total,resampled_n_valid,resampled_p_valid]
+        res_resampled = [ymin, ymax, xmin, xmax, sub_area_def.width, sub_area_def.height, resampled_n_total,
+                         resampled_n_valid, resampled_p_valid]
         line_resampled = ';'.join(str(l) for l in res_resampled)
         line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};{sensorflag};{line_original};{line_resampled}'
-
-
-
 
         if self.verbose:
             print(f'[INFO] Completed. Output file: {fileout}')
