@@ -393,7 +393,8 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
             #     print(f'[INFO] File {file_out} already exist. Skyping...')
             #     continue
             line_out = ami.make_resample_impl(olimage, file_out, sensor_id, idref)
-            lines_out.append(line_out)
+            if line_out is not None:
+                lines_out.append(line_out)
             if zp.is_zipfile(prod_path):
                 #os.remove(prod_path)
                 for fn in os.listdir(path_prod_u):
