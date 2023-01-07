@@ -35,7 +35,8 @@ def main():
     from olci_l2 import OLCI_L2
 
     if args.mode == "CHECK":
-        do_resampled_vm_christmas()
+        do_resampled_vm_list()
+        #do_resampled_vm_christmas()
         # do_check6()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
@@ -250,6 +251,46 @@ def do_resampled_vm_christmas():
 
         make_resample_dir(input_dir, output_dir_day, unzip_path, True, False)
         date_ref = date_ref + timedelta(hours=24)
+
+def do_resampled_vm_list():
+    flista = '/store/COP2-OC-TAC/arc/matchups_Rrs/match-up_dates.csv'
+    #flista = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MATCH-UPS/match-up_dates.csv'
+    input_dir_base = '/store/COP2-OC-TAC/arc/'
+    output_dir_base = '/store/COP2-OC-TAC/arc/resampled'
+    unzip_path = '/store/COP2-OC-TAC/arc/unzip'
+    from datetime import datetime as dt
+    dates = []
+    f1 = open(flista)
+    for line in f1:
+        date_ref = dt.strptime(line.strip(), '%Y-%m-%d')
+        dates.append(date_ref)
+    f1.close()
+
+    for date_ref in dates:
+        print(f'[INFO]******************************************************************************->{date_ref}')
+        input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
+        do_resample = True
+        if not os.path.exists(input_dir):
+            print(f'[WARNING] Input directory {input_dir} is not available. Skiping...')
+            do_resample = False
+        output_dir_year = os.path.join(output_dir_base, date_ref.strftime('%Y'))
+        output_dir_month = os.path.join(output_dir_year, date_ref.strftime('%m'))
+        output_dir_day = os.path.join(output_dir_month, date_ref.strftime('%d'))
+        date_ref_str = date_ref.strftime('%Y%m%d')
+        output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
+        file_output = os.path.join(output_dir_day, output_name)
+        if os.path.exists(file_output):
+            print(f'[WARNING] Output file {file_output} already exist. Skiping...')
+            do_resample = False
+        if not do_resample:
+            continue
+        if not os.path.exists(output_dir_year):
+            os.mkdir(output_dir_year)
+        if not os.path.exists(output_dir_month):
+            os.mkdir(output_dir_month)
+        if not os.path.exists(output_dir_day):
+            os.mkdir(output_dir_day)
+        make_resample_dir(input_dir, output_dir_day, unzip_path, True, False)
 
 
 def do_check5():
