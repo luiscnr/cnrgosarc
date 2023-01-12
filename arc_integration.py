@@ -11,26 +11,47 @@ import simplekml
 
 class ArcIntegration():
 
-    def __init__(self, fconfig, verbose, dir_input):
+    def __init__(self, arc_opt, verbose, dir_input):
 
-        if fconfig is None:
-            fconfig = 'arc_config.ini'
         self.verbose = verbose
         self.dir_input = dir_input
-        self.ami = ArcMapInfo(fconfig, False)
+        self.ami = ArcMapInfo(arc_opt, self.verbose)
         self.width = self.ami.area_def.width
         self.height = self.ami.area_def.height
-        self.ystep = 6500
-        self.xstep = 6500
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
         self.info = {}
         self.time_min = -1
         self.time_max = -1
-        self.average_variables = ['RRS510']
+
+        # self.arc_integration_method = 'Average'
+        # self.ystep = 6500
+        # self.xstep = 6500
+        # self.platform = 'S3'
+        self.average_variables_all = []
+        for wl in self.olci_l2_bands:
+            wls = str(wl)
+            wls = wls.replace('.', '_')
+            bname = f'RRS{wls}'
+            self.average_variables_all.append(bname)
+
+        section = 'INTEGRATE'
+        self.arc_integration_method = arc_opt.get_value_param(section, 'method', 'average', 'str')
+        self.ystep = arc_opt.get_value_param(section,'ystep', 6500, 'int')
+        self.xstep = arc_opt.get_value_param(section,'xstep', 6500, 'int')
+        self.platform = arc_opt.get_value_param(section,'platform', 'S3', 'str')
+        self.average_variables = arc_opt.get_value_param(section,'avg_bands', self.average_variables_all, 'rrslist')
+
+        if self.verbose:
+            print(f'[INFO] Integration method: {self.arc_integration_method}')
+            print(f'[INFO] YStep: {self.ystep} XStep: {self.xstep}')
+            print(f'[INFO] Platform: {self.platform}')
+            print(f'[INFO] Variables: {self.average_variables}')
+
+
 
     def create_nc_file_out(self, ofname):
         if self.verbose:
-            print(f'[INFO] Copying file base to start output file {ofname} ...')
+            print(f'[INFO] Copying file base to start output file...')
         datasetout = self.ami.copy_nc_base(ofname)
         if datasetout is None:
             return datasetout
@@ -39,7 +60,7 @@ class ArcIntegration():
         for wl in self.olci_l2_bands:
             wlstr = str(wl).replace('.', '_')
             bandname = f'RRS{wlstr}'
-            #self.average_variables.append(bandname)
+            # self.average_variables.append(bandname)
             var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var[:] = 0
             var.wavelength = wl
@@ -74,10 +95,24 @@ class ArcIntegration():
 
         return datasetout
 
+    def make_integration(self, file_out):
+        if self.verbose:
+            print('[INFO] Checking bands: ')
+        for band in self.average_variables:
+            if band not in self.average_variables_all:
+                print(f'[ERROR] RRS variable {band} is not available. Exiting...')
+                return
+        if self.arc_integration_method == 'average':
+            self.make_integration_avg(file_out)
+
     def make_integration_avg(self, file_out):
         if self.verbose:
             print('[INFO] Retrieving info from granules...')
         self.get_info()
+        ngranules = len(self.info)
+        if ngranules==0:
+            print(f'[WARNING] No valid granules were found. Check date and platform values. Skiping...')
+            return
         if self.verbose:
             print(f'[INFO] Creating ouptput file: {file_out}')
         datasetout = self.create_nc_file_out(file_out)
@@ -93,7 +128,7 @@ class ArcIntegration():
 
         for name in self.info:
             if self.verbose:
-                print(f'Working with granule: {name}')
+                print(f'[INFO]Working with granule: {name}')
             file = os.path.join(self.dir_input, name)
             yini = self.info[name]['y_min']
             yfin = self.info[name]['y_max']
@@ -124,12 +159,14 @@ class ArcIntegration():
             var_weighted_mask[yini:yfin, xini:xfin] = [weigthed_mask[:, :]]
 
             if self.info[name]['n_valid'] == 0:
+                if self.verbose:
+                    print('[INFO] Granule without valid pixels...')
                 dataset.close()
                 continue
 
             for var_avg_name in self.average_variables:
                 if self.verbose:
-                    print(f'--> {var_avg_name}')
+                    print(f'[INFO]--> {var_avg_name}')
                 var_avg = datasetout.variables[var_avg_name]
                 avg_array = var_avg[yini:yfin, xini:xfin]
                 avg_granule = np.array(dataset.variables[var_avg_name][yini:yfin, xini:xfin])
@@ -144,7 +181,8 @@ class ArcIntegration():
             print('[INFO] Computing average...')
 
         for y in range(0, self.height, self.ystep):
-            print(f'[INFO] Line-> {y}')
+            if self.verbose:
+                print(f'[INFO] -> {y}')
             for x in range(0, self.width, self.xstep):
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
                 weigthed_mask = np.array(var_weighted_mask[limits[0]:limits[1], limits[2]:limits[3]])
@@ -159,7 +197,6 @@ class ArcIntegration():
                     avg_array[indices_good] = avg_array[indices_good] / weigthed_mask[indices_good]
                     avg_array[indices_mask] = -999
                     var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [avg_array[:, :]]
-
 
         datasetout.close()
 
@@ -201,9 +238,11 @@ class ArcIntegration():
         return limits
 
     def get_info(self):
-
+        self.info = {}
         for name in os.listdir(self.dir_input):
             if not name.endswith('.nc'):
+                continue
+            if not name.startswith(self.platform):
                 continue
 
             finput = os.path.join(self.dir_input, name)

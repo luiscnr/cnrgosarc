@@ -1,6 +1,7 @@
 import math
 import os
 import argparse
+from datetime import timedelta
 
 # import netCDF4
 # import numpy as np
@@ -11,7 +12,8 @@ import argparse
 # import simplekml
 
 parser = argparse.ArgumentParser(description="Artic resampler")
-parser.add_argument("-m", "--mode", help="Mode", choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "QL"],
+parser.add_argument("-m", "--mode", help="Mode",
+                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "QL"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -36,18 +38,18 @@ def main():
 
     if args.mode == "CHECK":
         do_resampled_vm_list()
-        #do_resampled_vm_christmas()
+        # do_resampled_vm_christmas()
         # do_check6()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
         # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
         return
 
-    fconfig = None
-    if args.config_file:
-        fconfig = args.config_file
+    # fconfig = None
+    # if args.config_file:
+    #     fconfig = args.config_file
 
-    ami = ArcMapInfo(fconfig, args.verbose)
+    ami = ArcMapInfo(None, args.verbose)
 
     if args.mode == "CHECK":
         return
@@ -56,28 +58,44 @@ def main():
 
     if args.mode == 'GRID':  ##creating grid
         print('create grid')
-        # lon,lat = ami.area_def.get_lonlat_from_projection_coordinates(0,0)
-        # file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mORIGts70.nc'
-        # from netCDF4 import Dataset
-        # ncsat = Dataset(file,'w')
-        # ncsat.variables['sensor_mask'].grid_mapping = 'latitude_longitude'
-        # ncsat.close()
         ami.create_nc_filegrid(file_out, True, False)
+        return
 
-    if args.mode == "RESAMPLE" and not args.inputpath and args.product:  ##testing, resampling of a single granule
+    if args.mode == "RESAMPLE" and args.product:  ##testing, resampling of a single granule
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
         line_output = ami.make_resample_impl(olimage, file_out, 1, -1)
         print(line_output)
+        return
 
-    if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a PML file
+    if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a single PML file
         fpml = args.product
         ami.make_resample_pml(fpml, file_out)
+        return
 
     if args.mode == 'QL' and args.product:
         fdataset = args.product
         ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
+        return
+
+    if not args.config_file:
+        print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
+        return
+    if not os.path.exists(args.config_file):
+        print(f'[ERROR] Config file {args.config_file} does not exist. Exiting...')
+        return
+    try:
+        import configparser
+        options = configparser.ConfigParser()
+        options.read(args.config_file)
+    except:
+        print(f'[ERROR] Config file {args.config_file} could not be read. Exiting...')
+
+    from arc_options import ARC_OPTIONS
+    arc_opt = ARC_OPTIONS(options)
+    if args.mode == 'INTEGRATE':
+        run_integration(arc_opt)
 
         # olimage = OLCI_L2(folci, args.verbose)
         # ami.make_resample_impl(olimage, file_out, 1)
@@ -98,6 +116,7 @@ def main():
     # fdata = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
     # ami.save_quick_look_fdata(fout,fdata)
+
 
 
 def check_py():
@@ -148,6 +167,52 @@ def check_py():
         print('[ERROR] Some packages are not available...')
     else:
         print('[INFO] All the packages are available')
+
+
+def run_integration(arc_opt):
+    options = arc_opt.get_integrate_options()
+    if options is None:
+        return
+    if args.verbose:
+        print('[INFO] INTEGRATE OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+    start_date = options['start_date']
+    end_date = options['end_date']
+    platform = options['platform']
+    date_run = start_date
+
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run}')
+        make_integration = True
+        input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
+        if not os.path.exists(input_path):
+            print(f'[WARNING] Input path {input_path} for date {date_run} is not available. Skiping...')
+            make_integration = False
+        output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
+                                              True)
+        if output_path is None:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+            make_integration = False
+
+        if make_integration:
+            datestr = date_run.strftime('%Y%j')
+            pl = platform[-1]
+            if pl == '3':
+                pl = ''
+            name_out = f'O{pl}{datestr}_rrs-arc-fr.nc'
+            fout = os.path.join(output_path, name_out)
+            if args.verbose:
+                print(f'[INFO] Input path: {input_path}')
+                print(f'[INFO] Output file: {fout}')
+            from arc_integration import ArcIntegration
+            arc_integration = ArcIntegration(arc_opt, args.verbose, input_path)
+            arc_integration.make_integration(fout)
+
+        date_run = date_run + timedelta(hours=24)
 
 
 def do_check6():
@@ -232,7 +297,7 @@ def do_resampled_vm_christmas():
             do_resample = False
         output_dir_year = os.path.join(output_dir_base, date_ref.strftime('%Y'))
         output_dir_month = os.path.join(output_dir_year, date_ref.strftime('%m'))
-        output_dir_day = os.path.join(output_dir_month,date_ref.strftime('%d'))
+        output_dir_day = os.path.join(output_dir_month, date_ref.strftime('%d'))
         date_ref_str = date_ref.strftime('%Y%m%d')
         output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
         file_output = os.path.join(output_dir_day, output_name)
@@ -252,9 +317,10 @@ def do_resampled_vm_christmas():
         make_resample_dir(input_dir, output_dir_day, unzip_path, True, False)
         date_ref = date_ref + timedelta(hours=24)
 
+
 def do_resampled_vm_list():
     flista = '/store/COP2-OC-TAC/arc/matchups_Rrs/match-up_dates.csv'
-    #flista = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MATCH-UPS/match-up_dates.csv'
+    # flista = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MATCH-UPS/match-up_dates.csv'
     input_dir_base = '/store/COP2-OC-TAC/arc/'
     output_dir_base = '/store/COP2-OC-TAC/arc/resampled'
     unzip_path = '/store/COP2-OC-TAC/arc/unzip'
@@ -437,10 +503,9 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
             if line_out is not None:
                 lines_out.append(line_out)
             if zp.is_zipfile(prod_path):
-                #os.remove(prod_path)
+                # os.remove(prod_path)
                 for fn in os.listdir(path_prod_u):
                     os.remove(os.path.join(path_prod_u, fn))
-               
 
         if dokml:
             start_date = olimage.get_start_date()

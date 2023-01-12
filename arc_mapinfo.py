@@ -11,22 +11,16 @@ from netCDF4 import Dataset
 
 
 class ArcMapInfo:
-    def __init__(self, fconfig, verbose):
+    def __init__(self, arc_options, verbose):
         # DEFAULTS
         area_id = 'polar_stereographic'
         # self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
-        self.ifile_base = '/store/COP2-OC-TAC/arc/code/ArcGrid_65_90_300mNOGEO.nc'
+        ifile_base_default = '/store/COP2-OC-TAC/arc/code/ArcGrid_65_90_300mNOGEO.nc'
+        self.ifile_base = ifile_base_default
 
-        if fconfig is None:
-            fconfig = 'arc_config.ini'
-
-        if os.path.exists(fconfig):
-            options = configparser.ConfigParser()
-            options.read(fconfig)
-            if options.has_option('GENERAL', 'area_id'):
-                area_id = options['GENERAL']['area_id']
-            if options.has_option('GENERAL', 'grid_base'):
-                self.ifile_base = options['GENERAL']['grid_base']
+        if arc_options is not None:
+            area_id = arc_options.get_value_param('GENERAL', 'area_id', 'polar_stereographic', 'str')
+            self.ifile_base = arc_options.get_value_param('GENERAL', 'grid_base', ifile_base_default, 'str')
 
         self.area_def = self.get_area_definition(area_id)
         self.verbose = verbose
@@ -491,8 +485,9 @@ class ArcMapInfo:
         result_m[result == 0] = 1
         # r_n_t = result_m.shape[0]*result_m.shape[1]
         resampled_n_total = np.count_nonzero(result_m >= 0)
-        if resampled_n_total==0:
-            print(f'[WARNING] No valid pixels were resampled for granule {olimage.path_source}. Removing file and skipping')
+        if resampled_n_total == 0:
+            print(
+                f'[WARNING] No valid pixels were resampled for granule {olimage.path_source}. Removing file and skipping')
             datasetout.close()
             os.remove(fileout)
             return
