@@ -235,8 +235,9 @@ def do_check8():
     from arc_analysis import ArcAnalysis
     arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
 
-    c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_12_23_1'
-    arcAna.compute_average_spectra(c_folder)
+    arcAna.get_info_valid(None)
+    #c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_12_23_1'
+    #arcAna.compute_average_spectra(c_folder)
 
     # c_foder_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175'
     # for name in os.listdir(c_foder_base):

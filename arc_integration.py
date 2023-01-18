@@ -56,14 +56,20 @@ class ArcIntegration():
             return datasetout
 
         ##create rrs variables
+
+
         for wl in self.olci_l2_bands:
             wlstr = str(wl).replace('.', '_')
             bandname = f'RRS{wlstr}'
+            if self.verbose:
+                print(f'[INFO] Creating RRS band: {bandname}')
             # self.average_variables.append(bandname)
             var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var[:] = 0
             var.wavelength = wl
 
+        if self.verbose:
+            print(f'[INFO] Creating other bands...')
         ##create sum_weights variable
         var = datasetout.createVariable('sum_weights', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
         var[:] = 0

@@ -19,6 +19,34 @@ class ArcAnalysis():
         self.line_size_multiple = 1
         self.marker_size_multiple = 5
 
+    def get_info_valid(self,fout):
+        ln = self.check_n_overlappping()
+        ln = [1] + ln
+
+        dataset = Dataset(self.avg_file, 'r')
+        varnum = np.array(dataset.variables['sum_weights'][:])
+        dataset.close()
+
+        firstLine = 'NOverlap;NPixels'
+        lines = [firstLine]
+        ntot = 0
+        nover = 0
+        for n in ln:
+            vartal = varnum==n
+            npixels = np.count_nonzero(vartal)
+            print(n,'->',npixels)
+            line = f'{n};{npixels}'
+            lines.append(line)
+            ntot = ntot+npixels
+            if n>=2:
+                nover = nover + npixels
+        line = f'Valid;{ntot}'
+        lines.append(line)
+        line
+
+
+
+
     def check_n_overlappping(self):
         dataset = Dataset(self.avg_file, 'r')
         varnum = np.array(dataset.variables['sum_weights'][:])
