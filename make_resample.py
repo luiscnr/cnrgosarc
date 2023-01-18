@@ -37,7 +37,9 @@ def main():
     from olci_l2 import OLCI_L2
 
     if args.mode == "CHECK":
-        do_resampled_vm_list()
+        # do_check7()  # gettig combinatons
+        do_check8() #information about combinations
+        # do_resampled_vm_list()
         # do_resampled_vm_christmas()
         # do_check6()
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
@@ -116,7 +118,6 @@ def main():
     # fdata = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
     # ami.save_quick_look_fdata(fout,fdata)
-
 
 
 def check_py():
@@ -203,16 +204,46 @@ def run_integration(arc_opt):
             pl = platform[-1]
             if pl == '3':
                 pl = ''
+            from arc_integration import ArcIntegration
+            arc_integration = ArcIntegration(arc_opt, args.verbose, input_path)
             name_out = f'O{pl}{datestr}_rrs-arc-fr.nc'
+            if arc_integration.th_nvalid>=0:
+                name_out = f'O{pl}{datestr}_rrs-arc-fr_THVALID_{arc_integration.th_nvalid}.nc'
             fout = os.path.join(output_path, name_out)
             if args.verbose:
                 print(f'[INFO] Input path: {input_path}')
                 print(f'[INFO] Output file: {fout}')
-            from arc_integration import ArcIntegration
-            arc_integration = ArcIntegration(arc_opt, args.verbose, input_path)
+
             arc_integration.make_integration(fout)
 
         date_run = date_run + timedelta(hours=24)
+
+
+def do_check7():
+    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
+    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
+    from arc_analysis import ArcAnalysis
+    arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
+    # nvalues = arcAna.check_n_overlappping()
+    # print(nvalues)
+    arcAna.check_overlapping_index(5)
+
+
+def do_check8():
+    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
+    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
+    from arc_analysis import ArcAnalysis
+    arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
+
+    c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_12_23_1'
+    arcAna.compute_average_spectra(c_folder)
+
+    # c_foder_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175'
+    # for name in os.listdir(c_foder_base):
+    #     if name.startswith('C_2'):
+    #         c_folder = os.path.join(c_foder_base,name)
+    #         #c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_12_23_1'
+    #         arcAna.compute_average_spectra(c_folder)
 
 
 def do_check6():

@@ -14,7 +14,6 @@ def create_folder(folder):
 
 
 def get_dates_from_stroptions(start_date_str, end_date_str):
-
     start_date = None
     end_date = None
     try:
@@ -85,7 +84,7 @@ class ARC_OPTIONS:
         platform = 'S3'
         if self.options.has_option('INTEGRATE', 'platform'):
             platform = self.options['INTEGRATE']['platform']
-            valid_values = ['S3','S3A','S3B']
+            valid_values = ['S3', 'S3A', 'S3B']
             if not platform in valid_values:
                 print(f'[ERROR] Platform value {platform} is not valid (valid options: S3, S3A, S3B')
                 return None
@@ -101,15 +100,14 @@ class ARC_OPTIONS:
         }
         return options_out
 
-    def get_value(self,section,key):
+    def get_value(self, section, key):
         value = None
         if self.options.has_option(section, key):
             value = self.options[section][key]
         return value
 
-
     def get_value_param(self, section, key, default, type):
-        value = self.get_value(section,key)
+        value = self.get_value(section, key)
         if value is None:
             return default
         if type == 'str':
@@ -123,8 +121,6 @@ class ARC_OPTIONS:
                 vals = vals.strip().replace('.', '_')
                 list.append(f'RRS{vals}')
             return list
-
-
 
     def get_folder_date(self, path_base, org, date_here, create):
         if org is None:

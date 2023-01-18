@@ -15,7 +15,7 @@ class ArcIntegration():
 
         self.verbose = verbose
         self.dir_input = dir_input
-        self.ami = ArcMapInfo(arc_opt, self.verbose)
+        self.ami = ArcMapInfo(arc_opt, False)
         self.width = self.ami.area_def.width
         self.height = self.ami.area_def.height
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
@@ -36,18 +36,17 @@ class ArcIntegration():
 
         section = 'INTEGRATE'
         self.arc_integration_method = arc_opt.get_value_param(section, 'method', 'average', 'str')
-        self.ystep = arc_opt.get_value_param(section,'ystep', 6500, 'int')
-        self.xstep = arc_opt.get_value_param(section,'xstep', 6500, 'int')
-        self.platform = arc_opt.get_value_param(section,'platform', 'S3', 'str')
-        self.average_variables = arc_opt.get_value_param(section,'avg_bands', self.average_variables_all, 'rrslist')
+        self.th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
+        self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
+        self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
+        self.platform = arc_opt.get_value_param(section, 'platform', 'S3', 'str')
+        self.average_variables = arc_opt.get_value_param(section, 'avg_bands', self.average_variables_all, 'rrslist')
 
         if self.verbose:
             print(f'[INFO] Integration method: {self.arc_integration_method}')
             print(f'[INFO] YStep: {self.ystep} XStep: {self.xstep}')
             print(f'[INFO] Platform: {self.platform}')
             print(f'[INFO] Variables: {self.average_variables}')
-
-
 
     def create_nc_file_out(self, ofname):
         if self.verbose:
@@ -110,7 +109,7 @@ class ArcIntegration():
             print('[INFO] Retrieving info from granules...')
         self.get_info()
         ngranules = len(self.info)
-        if ngranules==0:
+        if ngranules == 0:
             print(f'[WARNING] No valid granules were found. Check date and platform values. Skiping...')
             return
         if self.verbose:
@@ -127,6 +126,13 @@ class ArcIntegration():
         # var_max_oza = datasetout.variables['oza_max']
 
         for name in self.info:
+            if self.th_nvalid >= 0:
+                nvalid = self.info['n_valid']
+                if nvalid <= self.th_nvalid:
+                    print(
+                        f'[INFO] Number of valid pixels {nvalid} must be greater than {self.th_nvalid}. Granule {name} is skipped.')
+                    continue
+
             if self.verbose:
                 print(f'[INFO]Working with granule: {name}')
             file = os.path.join(self.dir_input, name)
@@ -134,6 +140,7 @@ class ArcIntegration():
             yfin = self.info[name]['y_max']
             xini = self.info[name]['x_min']
             xfin = self.info[name]['x_max']
+
             # sensor_flag = self.info[name]['sensor_flag']
             # h = yfin - yini
             # w = xfin - xini

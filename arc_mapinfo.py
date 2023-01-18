@@ -1,5 +1,6 @@
 import math, os
 import configparser
+import shutil
 
 from pyresample.geometry import AreaDefinition
 from pyresample import save_quicklook, SwathDefinition, utils, image
@@ -212,24 +213,39 @@ class ArcMapInfo:
             return dst
         if self.verbose:
             print(f'[INFO] Copying file grid: {self.ifile_base}...')
-        with Dataset(self.ifile_base) as src:
-            dst = Dataset(ofile, 'w', format='NETCDF4')
-            # copy global attributes all at once via dictionary
-            dst.setncatts(src.__dict__)
+        # with Dataset(self.ifile_base) as src:
+        #     dst = Dataset(ofile, 'w', format='NETCDF4')
+        #     # copy global attributes all at once via dictionary
+        #     dst.setncatts(src.__dict__)
+        #
+        #     # copy dimensions
+        #     for name, dimension in src.dimensions.items():
+        #         dst.createDimension(
+        #             name, (len(dimension) if not dimension.isunlimited() else None))
+        #
+        #     # copy all file data except for the excluded
+        #     for name, variable in src.variables.items():
+        #         dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
+        #                            shuffle=True, complevel=4)
+        #         # copy variable attributes all at once via dictionary
+        #         dst[name].setncatts(src[name].__dict__)
+        #
+        #         dst[name][:] = src[name][:]
+        # shutil.copy(self.ifile_base,ofile)
 
-            # copy dimensions
-            for name, dimension in src.dimensions.items():
-                dst.createDimension(
-                    name, (len(dimension) if not dimension.isunlimited() else None))
+        cmd = f'cp -a {self.ifile_base} {ofile}'
+        import subprocess
+        import time
+        prog = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+        #prog.wait()
+        originalSize = os.path.getsize(self.ifile_base)
+        historicalSize = -1
+        while historicalSize != originalSize:
+            historicalSize = os.path.getsize(ofile)
+            print('aqui...', historicalSize, originalSize)
+            time.sleep(1)
 
-            # copy all file data except for the excluded
-            for name, variable in src.variables.items():
-                dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
-                                   shuffle=True, complevel=4)
-                # copy variable attributes all at once via dictionary
-                dst[name].setncatts(src[name].__dict__)
-
-                dst[name][:] = src[name][:]
+        dst = Dataset(ofile, 'a', format='NETCDF4')
         return dst
 
     def save_quick_look_impl(self, fileout, data):
