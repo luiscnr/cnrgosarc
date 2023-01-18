@@ -241,8 +241,9 @@ class ArcMapInfo:
         originalSize = os.path.getsize(self.ifile_base)
         historicalSize = -1
         while historicalSize != originalSize:
-            historicalSize = os.path.getsize(ofile)
-            print('aqui...', historicalSize, originalSize)
+            if os.path.exists(ofile):
+                historicalSize = os.path.getsize(ofile)
+                print('aqui...', historicalSize, originalSize)
             time.sleep(1)
 
         dst = Dataset(ofile, 'a', format='NETCDF4')
