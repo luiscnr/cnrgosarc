@@ -19,7 +19,7 @@ class ArcAnalysis():
         self.line_size_multiple = 1
         self.marker_size_multiple = 5
 
-    def get_info_valid(self,fout):
+    def get_info_valid(self, fout):
         ln = self.check_n_overlappping()
         ln = [1] + ln
 
@@ -32,20 +32,26 @@ class ArcAnalysis():
         ntot = 0
         nover = 0
         for n in ln:
-            vartal = varnum==n
+            vartal = varnum == n
             npixels = np.count_nonzero(vartal)
-            print(n,'->',npixels)
+            print(n, '->', npixels)
             line = f'{n};{npixels}'
             lines.append(line)
-            ntot = ntot+npixels
-            if n>=2:
+            ntot = ntot + npixels
+            if n >= 2:
                 nover = nover + npixels
         line = f'Valid;{ntot}'
         lines.append(line)
-        line
-
-
-
+        porc_overlap = (nover / ntot) * 100
+        line = f'%Overlap;{porc_overlap}'
+        lines.append(line)
+        if fout is None:
+            fout = self.avg_file[:-3] + '.csv'
+        fid = open(fout, 'w')
+        for line in lines:
+            fid.write(line)
+            fid.write('\n')
+        fid.close()
 
     def check_n_overlappping(self):
         dataset = Dataset(self.avg_file, 'r')
@@ -418,6 +424,12 @@ class ArcAnalysis():
             self.fontsizemultiple = 8
             self.line_size_multiple = 0.5
 
+        if ngranules == 2:
+            nfil = 2
+            ncol = 2
+            self.fontsizemultiple = 8
+            self.line_size_multiple = 0.5
+
         maxYvalue = 0
         fig, axs = ptl.subplots(nfil, ncol)
 
@@ -484,8 +496,12 @@ class ArcAnalysis():
 
         # save figure with multiple granules
         nticks = int((maxYvalue / 0.02) + 1)
+        if nticks>10:
+            nticks = int(nticks/2)
         yticks = np.linspace(0, maxYvalue, nticks)
         xticks = [400, 500, 600, 700, 800]
+        if ngranules == 2:
+            nfil = 1
         for fil in range(nfil):
             for col in range(ncol):
                 axs[fil, col].set_ylim(0, maxYvalue)
@@ -493,10 +509,11 @@ class ArcAnalysis():
                 axs[fil, col].set_xticks(xticks)
                 axs[fil, col].grid(b=True, which='major', axis='y', color='gray', linestyle='--')
                 axs[fil, col].tick_params(axis='both', which='major', labelsize=self.fontsizemultiple)
-        plt.gcf().tight_layout()
-        fspectraimg = os.path.join(folderc, f'SpectraGranule_{name}.jpg')
-        plt.savefig(fspectraimg, dpi=300)
-        plt.close()
+        if ngranules>2:
+            plt.gcf().tight_layout()
+            fspectraimg = os.path.join(folderc, f'SpectraGranule_{name}.jpg')
+            plt.savefig(fspectraimg, dpi=300)
+            plt.close()
 
         # save average spectra as csv
         fspectra = os.path.join(folderc, f'AvgSpectra_{name}.csv')
@@ -510,28 +527,50 @@ class ArcAnalysis():
         self.save_spectra_csv(avg_spectra, average_variables_all, fspectra, prevalues, prenames)
 
         # save figure with average spectra
-        self.fontsizemultiple = 12
-        self.line_size_multiple = 0.80
-        fig2, axs2 = ptl.subplots(2, 1)
+        if ngranules == 2:
+            fig2 = fig
+            axs2 = axs
+            rowg1 = 1
+            rowg2 = 1
+            colg1 = 0
+            colg2 = 1
+        else:
+            self.fontsizemultiple = 12
+            self.line_size_multiple = 0.80
+            fig2, axs2 = ptl.subplots(2, 1)
+            rowg1 = 1
+            rowg2 = 0
+            colg1 = -1
+            colg2 = -1
         xdata = np.array(olci_l2_bands)
         avg_spectra_pixel = avg_spectra_pixel / ngranules
-        title = f'Avg. Spectra by pixel: {ngranules} N. Pixels: {npixels} Dif. Time: {diftime:.2f}'
-        self.plot_spectra_granule(axs2, avg_spectra_pixel, xdata, 1, -1, title)
+        title = f'N. Granules: {ngranules} N. Pixels: {npixels} Dif. Time: {diftime:.2f}'
+        self.plot_spectra_granule(axs2, avg_spectra_pixel, xdata, rowg1, colg1, title)
 
         columns.append(f'Average_{diftime:.2f}')
-        title = f'Avg. Spectra by granule N. Granules: {ngranules} N. Pixels: {npixels} Dif. Time: {diftime:.2f}'
-        self.plot_spetra(axs2, avg_spectra, xdata, columns, prevalues, prenames, 0, -1, title)
+        title = f'N. Granules: {ngranules} N. Pixels: {npixels} Dif. Time: {diftime:.2f}'
+        # if ngranules==2:
+        #     title = None
+        self.plot_spetra(axs2, avg_spectra, xdata, columns, prevalues, prenames, rowg2, colg2, title)
         # dirimage = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SpectraExamples
 
         for fil in range(2):
-            axs2[fil].set_ylim(0, maxYvalue)
-            axs2[fil].set_yticks(yticks)
-            #axs2[fil].set_xticks(xticks)
-            axs2[fil].grid(b=True, which='major', axis='y', color='gray', linestyle='--')
-            axs2[fil].tick_params(axis='both', which='major', labelsize=self.fontsizemultiple)
-        #plt.gcf().legend(columns,loc=8,ncols=ncol)
+            if ngranules == 2:
+                axs2[1, fil].set_ylim(0, maxYvalue)
+                axs2[1, fil].set_yticks(yticks)
+                axs2[1, fil].set_xticks(xticks)
+                axs2[1, fil].grid(b=True, which='major', axis='y', color='gray', linestyle='--')
+                axs2[1, fil].tick_params(axis='both', which='major', labelsize=self.fontsizemultiple)
+            else:
+                axs2[fil].set_ylim(0, maxYvalue)
+                axs2[fil].set_yticks(yticks)
+                axs2[fil].grid(b=True, which='major', axis='y', color='gray', linestyle='--')
+                axs2[fil].tick_params(axis='both', which='major', labelsize=self.fontsizemultiple)
+
         plt.gcf().tight_layout()
-        fout = os.path.join(folderc, f'AvgSpectra_{name}.jpg')
+        dirimage = folderc
+        dirimage = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SpectraExamples/2GranulesOverlap/A_B'
+        fout = os.path.join(dirimage, f'AvgSpectra_{name}.jpg')
         plt.savefig(fout, dpi=300)
         plt.close()
 
@@ -550,14 +589,15 @@ class ArcAnalysis():
 
         # plotting average and std
         avg = np.mean(output_spectra, axis=0)
-        std = np.std(output_spectra, axis=0)
-        avgminus = avg - std
-        avgplus = avg + std
         lavgsize = self.line_size_multiple * 2
 
         axes_here.plot(xdata, avg, color='black', lw=lavgsize)
-        axes_here.plot(xdata, avgminus, color='black', ls='--', lw=self.line_size_multiple)
-        axes_here.plot(xdata, avgplus, color='black', ls='--', lw=self.line_size_multiple)
+        if nspectra>=6:
+            std = np.std(output_spectra, axis=0)
+            avgminus = avg - std
+            avgplus = avg + std
+            axes_here.plot(xdata, avgminus, color='black', ls='--', lw=self.line_size_multiple)
+            axes_here.plot(xdata, avgplus, color='black', ls='--', lw=self.line_size_multiple)
         if title is not None:
             axes_here.set_title(title)
             axes_here.title.set_size(self.fontsizemultiple)
@@ -581,7 +621,7 @@ class ArcAnalysis():
         df_prev_avg = df_prev_avg.sort_values(['Sensor', 'OZA'])
         colrrs = df_prev_avg.columns[6:19]
         df_fin = df_prev_avg[colrrs]
-        #print(df_fin.index)
+        # print(df_fin.index)
         df = df_fin.transpose()
 
         # plotin single avg averages
@@ -592,10 +632,10 @@ class ArcAnalysis():
         avg_size = self.line_size_multiple * 2
         axes_here.plot(xdata, avg_avg_spectra, lw=avg_size, marker='.', markersize=self.marker_size_multiple,
                        color='black')
-        #axes_here.legend = columnsh
+        # axes_here.legend = columnsh
         legend_sorted = df_fin.index.tolist()
-        legend_sorted.append(columnsh[ngranules-1])
-        axes_here.legend(legend_sorted,ncol=1,bbox_to_anchor=(0.0,0.0,1,1),fontsize=5,fancybox=False)
+        legend_sorted.append(columnsh[ngranules - 1])
+        axes_here.legend(legend_sorted, ncol=1, bbox_to_anchor=(0.0, 0.0, 1, 1), fontsize=5, fancybox=False)
 
         if title is not None:
             axes_here.set_title(title)

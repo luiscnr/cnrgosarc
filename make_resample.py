@@ -235,16 +235,28 @@ def do_check8():
     from arc_analysis import ArcAnalysis
     arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
 
-    arcAna.get_info_valid(None)
-    #c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_12_23_1'
-    #arcAna.compute_average_spectra(c_folder)
+    #arcAna.get_info_valid(None)
 
-    # c_foder_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175'
-    # for name in os.listdir(c_foder_base):
-    #     if name.startswith('C_2'):
-    #         c_folder = os.path.join(c_foder_base,name)
-    #         #c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_12_23_1'
-    #         arcAna.compute_average_spectra(c_folder)
+    # c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_2_1_1'
+    # arcAna.compute_average_spectra(c_folder)
+
+    c_foder_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175'
+    import json
+    for name in os.listdir(c_foder_base):
+        if name.startswith('C_2'):
+            c_folder = os.path.join(c_foder_base,name)
+            finfo = os.path.join(c_folder,name+'.json')
+            with open(finfo) as j:
+                info = json.load(j)
+
+            granules = info['granules']
+            doimages = False
+            if granules[0].startswith('S3A') and granules[1].startswith('S3B'):
+                doimages = True
+            if granules[0].startswith('S3B') and granules[1].startswith('S3A'):
+                doimages = True
+            if doimages:
+                arcAna.compute_average_spectra(c_folder)
 
 
 def do_check6():

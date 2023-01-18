@@ -133,7 +133,7 @@ class ArcIntegration():
 
         for name in self.info:
             if self.th_nvalid >= 0:
-                nvalid = self.info['n_valid']
+                nvalid = self.info[name]['n_valid']
                 if nvalid <= self.th_nvalid:
                     print(
                         f'[INFO] Number of valid pixels {nvalid} must be greater than {self.th_nvalid}. Granule {name} is skipped.')
