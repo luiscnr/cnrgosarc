@@ -1,6 +1,7 @@
 import math
 import os
 import argparse
+import shutil
 from datetime import timedelta
 
 # import netCDF4
@@ -35,10 +36,12 @@ def main():
     from arc_mapinfo import ArcMapInfo
 
     from olci_l2 import OLCI_L2
+    import os
 
     if args.mode == "CHECK":
+        run_resampling_info()
         # do_check7()  # gettig combinatons
-        do_check8() #information about combinations
+        # do_check8() #information about combinations
         # do_resampled_vm_list()
         # do_resampled_vm_christmas()
         # do_check6()
@@ -170,6 +173,61 @@ def check_py():
         print('[INFO] All the packages are available')
 
 
+def run_resampling_info():
+
+
+    lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
+
+    ##SINGLE IMAGE: LOCAL
+    # import zipfile as zp
+    # from olci_l2 import OLCI_L2
+    # import os
+    # path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20190624T004648_20190624T004948_20211129T080410_0180_046_145______MAR_R_NT_003.SEN3'
+    # oimage = OLCI_L2(path, True)
+    # flag_mask, line = oimage.get_mask_default()
+    # lines.append(line)
+    # path_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/inforesampling_new.csv'
+
+    ##VM(SINGLE PATH)
+    base_path = '/store/COP2-OC-TAC/arc/sources/20190624'
+    run_resampling_info_dir(base_path)
+
+
+def run_resampling_info_dir(base_path):
+    import zipfile as zp
+    from olci_l2 import OLCI_L2
+    import os
+    lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
+    path_out = os.path.join(base_path, 'INFO_RESAMPLING.csv')
+    unzip_path = '/store/COP2-OC-TAC/arc/'
+    for name in os.listdir(base_path):
+        if not name.endswith('.zip'):
+            continue
+        prod_path = os.path.join(base_path, name)
+        if zp.is_zipfile(prod_path):
+            do_zip_here = True
+            path_prod_u = prod_path.split('/')[-1][0:-4]
+            path_prod_u = os.path.join(unzip_path, path_prod_u)
+        if do_zip_here:
+            with zp.ZipFile(prod_path, 'r') as zprod:
+                if args.verbose:
+                    print(f'[INFO] Unziping {name} to {unzip_path}')
+                zprod.extractall(path=unzip_path)
+        olimage = OLCI_L2(path_prod_u, args.verbose)
+        flag_mask, line = olimage.get_mask_default()
+        lines.append(line)
+        if do_zip_here:
+            # os.remove(prod_path)
+            for fn in os.listdir(path_prod_u):
+                os.remove(os.path.join(path_prod_u, fn))
+
+
+    f1 = open(path_out, 'w')
+    for line in lines:
+        f1.write(line)
+        f1.write('\n')
+    f1.close()
+
 def run_integration(arc_opt):
     options = arc_opt.get_integrate_options()
     if options is None:
@@ -207,7 +265,7 @@ def run_integration(arc_opt):
             from arc_integration import ArcIntegration
             arc_integration = ArcIntegration(arc_opt, args.verbose, input_path)
             name_out = f'O{pl}{datestr}_rrs-arc-fr.nc'
-            if arc_integration.th_nvalid>=0:
+            if arc_integration.th_nvalid >= 0:
                 name_out = f'O{pl}{datestr}_rrs-arc-fr_THVALID_{arc_integration.th_nvalid}.nc'
             fout = os.path.join(output_path, name_out)
             if args.verbose:
@@ -229,34 +287,91 @@ def do_check7():
     arcAna.check_overlapping_index(5)
 
 
-def do_check8():
+def do_check88():
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
+
     dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
     from arc_analysis import ArcAnalysis
     arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
 
-    #arcAna.get_info_valid(None)
+    arcAna.get_info_valid(None)
+
+
+def do_check8():
+    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
+
+    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
+    from arc_analysis import ArcAnalysis
+    arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
 
     # c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_2_1_1'
     # arcAna.compute_average_spectra(c_folder)
 
     c_foder_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175'
     import json
+    nremaining = 0
     for name in os.listdir(c_foder_base):
         if name.startswith('C_2'):
-            c_folder = os.path.join(c_foder_base,name)
-            finfo = os.path.join(c_folder,name+'.json')
+            c_folder = os.path.join(c_foder_base, name)
+            finfo = os.path.join(c_folder, name + '.json')
             with open(finfo) as j:
                 info = json.load(j)
 
             granules = info['granules']
-            doimages = False
-            if granules[0].startswith('S3A') and granules[1].startswith('S3B'):
-                doimages = True
-            if granules[0].startswith('S3B') and granules[1].startswith('S3A'):
-                doimages = True
-            if doimages:
-                arcAna.compute_average_spectra(c_folder)
+            npixels = info['npixels']
+            datestr1 = granules[0].split('_')[7]
+            datestr2 = granules[1].split('_')[7]
+            from datetime import datetime as dt
+            time1 = dt.strptime(datestr1, '%Y%m%dT%H%M%S')
+            time2 = dt.strptime(datestr2, '%Y%m%dT%H%M%S')
+            timedif = abs((time1 - time2).total_seconds() / 3600)
+            print(npixels, timedif)
+            if npixels < 100:
+                dirpixels = 'Pixels100'
+            elif 100 <= npixels < 1000:
+                dirpixels = 'Pixels1000'
+            else:
+                dirpixels = 'PixelsOver1000'
+
+            if timedif < 1.5:
+                dirtime = 'Time_to_1_5'
+            elif 1.5 < timedif < 3.0:
+                dirtime = 'Time_1_5_to_3'
+            elif 3.0 < timedif < 12.0:
+                dirtime = 'Time_3_to_12'
+            elif 12.0 < timedif < 24.0:
+                dirtime = 'Time_12_to_24'
+
+            dirimage = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SpectraExamples/2GranulesOverlap/A_B'
+            dirimagepixels = os.path.join(dirimage, dirpixels)
+            dirimagetime = os.path.join(dirimagepixels, dirtime)
+            if not os.path.exists(dirimagepixels):
+                os.mkdir(dirimagepixels)
+            if not os.path.exists(dirimagetime):
+                os.mkdir(dirimagetime)
+
+            # fimage = os.path.join(dirimage)
+            fout = os.path.join(dirimage, f'AvgSpectra_{name}.jpg')
+            if os.path.exists(fout):
+                print('COPYING...')
+                foutnew = os.path.join(dirimagetime, f'AvgSpectra_{name}.jpg')
+                shutil.copy(fout, foutnew)
+                # os.remove(fout)
+            else:
+                foutnew = os.path.join(dirimagetime, f'AvgSpectra_{name}.jpg')
+                if os.path.exists(foutnew):
+                    print('ALREADY DONE')
+                    continue
+                doimages = False
+                if granules[0].startswith('S3A') and granules[1].startswith('S3B'):
+                    doimages = True
+                if granules[0].startswith('S3B') and granules[1].startswith('S3A'):
+                    doimages = True
+                if doimages:
+                    print('DOING: ')
+                    arcAna.compute_average_spectra(c_folder)
+                    nremaining = nremaining + 1
+                    print('REMANINNG: ', nremaining, '/241')
 
 
 def do_check6():
@@ -490,7 +605,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
         do_zip_here = False
         if name.endswith('.SEN3'):
             path_prod_u = prod_path
-        elif zp.is_zipfile(prod_path):
+        elif zp.is_zipzp.is_zipfile(prod_path):
             do_zip_here = True
             path_prod_u = prod_path.split('/')[-1][0:-4]
             path_prod_u = os.path.join(unzip_path, path_prod_u)
