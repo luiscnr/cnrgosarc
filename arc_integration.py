@@ -37,6 +37,7 @@ class ArcIntegration():
         section = 'INTEGRATE'
         self.arc_integration_method = arc_opt.get_value_param(section, 'method', 'average', 'str')
         self.th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
+        self.mask_negatives = arc_opt.get_value_param(section,'mask_negatives',True,'boolean')
         self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
         self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
         self.platform = arc_opt.get_value_param(section, 'platform', 'S3', 'str')
@@ -154,6 +155,13 @@ class ArcIntegration():
             dataset = Dataset(file)
             sensor_mask_granule = np.array(dataset.variables['sensor_mask'][yini:yfin, xini:xfin])
             weigthed_mask_granule = np.array(dataset.variables['mask'][yini:yfin, xini:xfin])
+
+            if self.mask_negatives:
+                for idx in range(1,7):
+                    var_rrs = self.average_variables_all[idx]
+                    var_rrs_array = np.array(dataset.variables[var_rrs][yini:yfin, xini:xfin])
+                    weigthed_mask_granule = np.where(var_rrs_array>0,weigthed_mask_granule,0)
+
 
             sensor_mask = np.array(var_sensor_mask[yini:yfin, xini:xfin])
             ngranules = np.array(var_n_granules[yini:yfin, xini:xfin])

@@ -174,23 +174,26 @@ def check_py():
 
 
 def run_resampling_info():
-
-
     lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
 
     ##SINGLE IMAGE: LOCAL
-    # import zipfile as zp
-    # from olci_l2 import OLCI_L2
-    # import os
-    # path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20190624T004648_20190624T004948_20211129T080410_0180_046_145______MAR_R_NT_003.SEN3'
-    # oimage = OLCI_L2(path, True)
-    # flag_mask, line = oimage.get_mask_default()
-    # lines.append(line)
-    # path_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/inforesampling_new.csv'
-
+    import zipfile as zp
+    from olci_l2 import OLCI_L2
+    import os
+    #path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20190624T004648_20190624T004948_20211129T080410_0180_046_145______MAR_R_NT_003.SEN3'
+    path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3B_OL_2_WFR____20190624T164944_20190624T165103_20210813T114041_0078_027_012______MAR_R_NT_003.SEN3'
+    oimage = OLCI_L2(path, True)
+    flag_mask, line = oimage.get_mask_default()
+    lines.append(line)
+    path_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/inforesampling_new.csv'
+    f1 = open(path_out, 'w')
+    for line in lines:
+        f1.write(line)
+        f1.write('\n')
+    f1.close()
     ##VM(SINGLE PATH)
-    base_path = '/store/COP2-OC-TAC/arc/sources/20190624'
-    run_resampling_info_dir(base_path)
+    # base_path = '/store/COP2-OC-TAC/arc/sources/20190624'
+    # run_resampling_info_dir(base_path)
 
 
 def run_resampling_info_dir(base_path):
@@ -221,12 +224,12 @@ def run_resampling_info_dir(base_path):
             for fn in os.listdir(path_prod_u):
                 os.remove(os.path.join(path_prod_u, fn))
 
-
     f1 = open(path_out, 'w')
     for line in lines:
         f1.write(line)
         f1.write('\n')
     f1.close()
+
 
 def run_integration(arc_opt):
     options = arc_opt.get_integrate_options()

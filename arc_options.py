@@ -114,6 +114,13 @@ class ARC_OPTIONS:
             return value
         if type == 'int':
             return int(value)
+        if type == 'boolean':
+            if value == '1' or value.upper() == 'TRUE':
+                return True
+            elif value == '0' or value.upper() == 'FALSE':
+                return False
+            else:
+                return True
         if type == 'rrslist':
             list_str = value.split(',')
             list = []
