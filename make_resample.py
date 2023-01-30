@@ -284,13 +284,13 @@ def run_resample(arc_opt):
             date_ref = date_ref + timedelta(hours=24)
             continue
         output_dir_day = arc_opt.get_folder_date_o(options, 'output_path', 'output_path_organization', date_ref, True)
-        date_ref_str = date_ref.strftime('%Y%m%d')
-        output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
-        file_output = os.path.join(output_dir_day, output_name)
-        if os.path.exists(file_output):
-            print(f'[WARNING] Output file {file_output} already exist. Skiping...')
-            date_ref = date_ref + timedelta(hours=24)
-            continue
+        # date_ref_str = date_ref.strftime('%Y%m%d')
+        # output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
+        # file_output = os.path.join(output_dir_day, output_name)
+        # if os.path.exists(file_output):
+        #     print(f'[WARNING] Output file {file_output} already exist. Skiping...')
+        #     date_ref = date_ref + timedelta(hours=24)
+        #     continue
         unzip_path = options['unzip_path']
         make_resample_dir(input_dir, output_dir_day, unzip_path, arc_opt)
         date_ref = date_ref + timedelta(hours=24)
@@ -636,15 +636,10 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     section = 'RESAMPLE'
     doresample = arc_opt.get_value_param(section, 'do_resample', True, 'boolean')
     dokml = arc_opt.get_value_param(section, 'do_kml', False, 'boolean')
-
-    import simplekml
-    import zipfile as zp
     if dirdest is None:
         dirdest = dirorig
-
-    # fconfig = None
-    # if args.config_file:
-    #     fconfig = args.config_file
+    import simplekml
+    import zipfile as zp
     from arc_mapinfo import ArcMapInfo
     from olci_l2 import OLCI_L2
 
@@ -688,17 +683,18 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         else:
             output_name = path_prod_u.split('/')[-1]
 
+        resample_done = False
         if doresample:
             file_out = os.path.join(dirdest, f'{output_name}_resampled.nc')
             if os.path.exists(file_out):
-                print(f'[INFO] File {file_out} already exist. Skyping resample...')
-                if not dokml:
-                    continue
-            if do_zip_here:
-                with zp.ZipFile(prod_path, 'r') as zprod:
-                    if args.verbose:
-                        print(f'[INFO] Unziping {name} to {unzip_path}')
-                    zprod.extractall(path=unzip_path)
+                print(f'[INFO] File {file_out} already exist. Skipping resample...')
+                resample_done = True
+
+        if do_zip_here:
+            with zp.ZipFile(prod_path, 'r') as zprod:
+                if args.verbose:
+                    print(f'[INFO] Unziping {name} to {unzip_path}')
+                zprod.extractall(path=unzip_path)
 
         olimage = OLCI_L2(path_prod_u, args.verbose)
         olimage.get_geo_and_params()
@@ -721,7 +717,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 kml = simplekml.Kml()
         orbit_index = rel_pass_dict[rel_pass]
 
-        if doresample:
+        if doresample and not resample_done:
             line_out = ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
             if line_out is not None:
                 lines_out.append(line_out)
@@ -732,7 +728,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
 
         if dokml:
             start_date = olimage.get_start_date()
-            start_date_s = 'UKNOWN START DATE'
+            start_date_s = 'UNKNOWN START DATE'
             if start_date is not None:
                 start_date_s = start_date.strftime('%Y%m%dT%H%M:%S')
             lin = kml.newlinestring(name=start_date_s, description=name, coords=olimage.coords_image)
