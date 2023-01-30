@@ -144,6 +144,21 @@ class ArcMapInfo:
 
         return True
 
+    def create_nc_file_resample_base(self,olimage,fileout,arc_opt):
+        if self.verbose:
+            print('--------------------')
+            print(f'[INFO] Starting creating resampling file base using: {olimage.path_source}')
+        if self.verbose:
+            print(f'[INFO] Creating output file from file grid...')
+        all_band_names = self.get_all_data_bands_names(arc_opt)
+        for name in all_band_names:
+            print(f'[INFO] Band name -> {name}')
+        datasetout = self.create_nc_file_resampled(fileout, olimage, arc_opt)
+
+        if datasetout is None:
+            print(f'[ERROR] Output file {fileout} could not be created')
+
+
     def create_nc_file_resampled(self, ofname, olimage, arc_opt):
         section = 'RESAMPLE'
         datasetout = self.copy_nc_base(ofname)
@@ -156,6 +171,8 @@ class ArcMapInfo:
         for wl in rrs_bands:
             wlstr = str(wl).replace('.', '_')
             bandname = f'RRS{wlstr}'
+            if self.verbose:
+                print(f'[INFO] Creating band: {bandname}')
             var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var[:] = -999
             var.wavelength = wl
@@ -171,6 +188,8 @@ class ArcMapInfo:
         ##create angle variable
         name_angles = arc_opt.get_value_param(section, 'angle_bands', [], 'strlist')
         for angle in name_angles:
+            if self.verbose:
+                print(f'[INFO] Creating band: {angle}')
             info = olimage.get_angle_info(angle)
             var = datasetout.createVariable(angle, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var.grid_mapping = "stereographic"
@@ -185,6 +204,8 @@ class ArcMapInfo:
         # create transparence bands
         name_transp = arc_opt.get_value_param(section, 'transp_bands', [], 'strlist')
         for transp in name_transp:
+            if self.verbose:
+                print(f'[INFO] Creating band: {transp}')
             var = datasetout.createVariable(transp, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var.grid_mapping = "stereographic"
             var.coordinates = "longitude latitude"
@@ -477,6 +498,9 @@ class ArcMapInfo:
         limits = [xmin, xmax, ymin, ymax]
         return limits, area_def
 
+
+
+
     def make_resample_impl(self, olimage, fileout, granuleindex, orbitindex, arc_opt):
         if self.verbose:
             print('--------------------')
@@ -496,6 +520,9 @@ class ArcMapInfo:
             line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};-999;{line_original};{line_resampled}'
             print('[WARNING] No valid pixels were found. Skipping granule...')
             return line_output
+
+
+
 
         if self.verbose:
             print(f'[INFO] Defining subarea for the granule...')

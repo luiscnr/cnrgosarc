@@ -14,7 +14,7 @@ from datetime import timedelta
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "QL"],
+                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEBASE","RESAMPLEPML", "INTEGRATE", "QL"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -83,6 +83,8 @@ def main():
         print(line_output)
         return
 
+
+
     if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a single PML file
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
@@ -113,6 +115,17 @@ def main():
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
+
+    if args.mode == 'RESAMPLEBASE' and args.product:
+        folci = args.product
+        olimage = OLCI_L2(folci, args.verbose)
+        olimage.get_geo_and_params()
+        ami = ArcMapInfo(None, args.verbose)
+        file_out = args.outputpath
+        all_band_names = ami.get_all_data_bands_names(arc_opt)
+        for name in all_band_names:
+            print(f'[INFO] Band name -> {name}')
+        #ami.create_nc_file_resample_base(olimage,file_out,arc_opt)
 
     if args.mode == 'RESAMPLE':
         run_resample(arc_opt)
