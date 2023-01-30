@@ -676,7 +676,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     for name in os.listdir(dirorig):
         if args.verbose:
             print('------------------------------------------------------------------------')
-            print(f'File: {name} ({idx}/{nfiles})')
+            print(f'[INFO] File: {name} ({idx}/{nfiles})')
             idx = idx + 1
         prod_path = os.path.join(dirorig, name)
         do_zip_here = False
