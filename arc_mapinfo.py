@@ -178,7 +178,7 @@ class ArcMapInfo:
                     if self.verbose:
                         print(f'[INFO] All the variables are present. Working with file base.')
                     self.ifile_base = file_base
-                    datasetout = self.copy_nc_base()
+                    datasetout = self.copy_nc_base(ofname)
                     return datasetout
 
         datasetout = self.copy_nc_base(ofname)
