@@ -48,7 +48,7 @@ class ARC_OPTIONS:
         # input path, output path, path organizations, platform, start date, end date
         section = 'RESAMPLE'
         options = self.get_basic_options(section)
-        unzip_path = self.get_path(section, 'unzip_path')
+        unzip_path = self.get_path(section, 'unzip_path',False)
         if unzip_path is None:
             unzip_path = options['input_path']
             print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
