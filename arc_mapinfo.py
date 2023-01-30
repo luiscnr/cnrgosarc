@@ -277,6 +277,7 @@ class ArcMapInfo:
         if self.verbose:
             print(f'[INFO] Copying file grid: {self.ifile_base}...')
 
+        print('estamos aqui 280')
         # with Dataset(self.ifile_base) as src:
         #     dst = Dataset(ofile, 'w', format='NETCDF4')
         #     # copy global attributes all at once via dictionary
@@ -301,7 +302,7 @@ class ArcMapInfo:
         #         dst[name][:] = src[name][:]
 
         # shutil.copy(self.ifile_base,ofile)
-
+        print('estamos aqui 305')
         cmd = f'cp -a {self.ifile_base} {ofile}'
         if self.verbose:
             print(f'[INFO] cmd: {cmd}')
