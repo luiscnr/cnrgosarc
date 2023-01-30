@@ -488,7 +488,10 @@ class ArcMapInfo:
         start_date_str = start_date.strftime('%Y%m%dT%H%M%S')
 
         th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
+        print(th_nvalid)
+        print(res_original)
         if res_original[7] <= th_nvalid and th_nvalid >= 0:
+            print('me deberia llegar aqui')
             res_resampled = [-999] * 9
             line_resampled = ';'.join(str(l) for l in res_resampled)
             line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};-999;{line_original};{line_resampled}'
