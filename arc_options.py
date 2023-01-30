@@ -169,6 +169,7 @@ class ARC_OPTIONS:
             list = []
             for vals in list_str:
                 list.append(vals.strip())
+            return list
         if type == 'floatlist':
             list_str = value.split(',')
             list = []
