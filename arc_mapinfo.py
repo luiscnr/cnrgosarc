@@ -303,6 +303,8 @@ class ArcMapInfo:
         # shutil.copy(self.ifile_base,ofile)
 
         cmd = f'cp -a {self.ifile_base} {ofile}'
+        if self.verbose:
+            print(f'[INFO] cmd: {cmd}')
         import subprocess
         import time
         subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
