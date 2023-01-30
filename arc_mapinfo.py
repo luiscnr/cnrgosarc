@@ -144,7 +144,7 @@ class ArcMapInfo:
 
         return True
 
-    def create_nc_file_resample_base(self,olimage,fileout,arc_opt):
+    def create_nc_file_resample_base(self, olimage, fileout, arc_opt):
         if self.verbose:
             print('--------------------')
             print(f'[INFO] Starting creating resampling file base using: {olimage.path_source}')
@@ -158,9 +158,26 @@ class ArcMapInfo:
         if datasetout is None:
             print(f'[ERROR] Output file {fileout} could not be created')
 
-
     def create_nc_file_resampled(self, ofname, olimage, arc_opt):
         section = 'RESAMPLE'
+        file_base = arc_opt.get_value_param(section,'file_base',None,'str')
+        if file_base is not None:
+            if os.path.exists(file_base):
+                if self.verbose:
+                    print(f'[INFO] Check variables in file base: {file_base}')
+                check_variables = True
+                dataset = Dataset(file_base)
+                all_band_names = self.get_all_data_bands_names(arc_opt)
+                for name in all_band_names:
+                    if not name in dataset.variables:
+                        check_variables = False
+                if check_variables:
+                    if self.verbose:
+                        print(f'[INFO] All the variables are present. Working with file base.')
+                    self.ifile_base = file_base
+                    datasetout = self.copy_nc_base()
+                    return datasetout
+
         datasetout = self.copy_nc_base(ofname)
 
         if datasetout is None:
@@ -498,9 +515,6 @@ class ArcMapInfo:
         limits = [xmin, xmax, ymin, ymax]
         return limits, area_def
 
-
-
-
     def make_resample_impl(self, olimage, fileout, granuleindex, orbitindex, arc_opt):
         if self.verbose:
             print('--------------------')
@@ -520,9 +534,6 @@ class ArcMapInfo:
             line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};-999;{line_original};{line_resampled}'
             print('[WARNING] No valid pixels were found. Skipping granule...')
             return line_output
-
-
-
 
         if self.verbose:
             print(f'[INFO] Defining subarea for the granule...')
@@ -675,7 +686,7 @@ class ArcMapInfo:
         res_resampled = [ymin, ymax, xmin, xmax, sub_area_def.width, sub_area_def.height, resampled_n_total,
                          resampled_n_valid, resampled_p_valid]
         line_resampled = ';'.join(str(l) for l in res_resampled)
-        line_original = line_original[line_original.find(';'):]#remove source from line original
+        line_original = line_original[line_original.find(';'):]  # remove source from line original
         line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};{orbitindex};{line_original};{line_resampled}'
 
         if self.verbose:
