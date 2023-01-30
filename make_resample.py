@@ -640,7 +640,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     from arc_mapinfo import ArcMapInfo
     from olci_l2 import OLCI_L2
 
-    ami = ArcMapInfo(fconfig, args.verbose)
+    ami = ArcMapInfo(arc_opt, args.verbose)
 
     first_line = ['Source', 'StartDate', 'RelOrbit', 'GranuleIndex', 'OrbitIndex', 'OrigWidth', 'OrigHeight',
                   'OrigNTotal','OrigNFlagged', 'OrigNWater1', 'OrigNWatet2', 'OrigNValid', 'OrigPValid', 'YMin', 'YMax',
