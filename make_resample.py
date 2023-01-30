@@ -59,19 +59,23 @@ def main():
     # if args.config_file:
     #     fconfig = args.config_file
 
-    ami = ArcMapInfo(None, args.verbose)
+
 
     if args.mode == "CHECK":
         return
 
-    file_out = args.outputpath
 
-    if args.mode == 'GRID':  ##creating grid
+
+    if args.mode == 'GRID' and args.output:  ##creating grid
         print('create grid')
+        ami = ArcMapInfo(None, args.verbose)
+        file_out = args.outputpath
         ami.create_nc_filegrid(file_out, True, False)
         return
 
     if args.mode == "RESAMPLE" and args.product:  ##testing, resampling of a single granule
+        ami = ArcMapInfo(None, args.verbose)
+        file_out = args.outputpath
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
@@ -80,11 +84,15 @@ def main():
         return
 
     if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a single PML file
+        ami = ArcMapInfo(None, args.verbose)
+        file_out = args.outputpath
         fpml = args.product
         ami.make_resample_pml(fpml, file_out)
         return
 
     if args.mode == 'QL' and args.product:
+        ami = ArcMapInfo(None, args.verbose)
+        file_out = args.outputpath
         fdataset = args.product
         # ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
         ami.save_quick_look_fdata(file_out, fdataset, 'chla')
@@ -256,6 +264,7 @@ def run_resampling_info_dir(base_path):
 def run_resample(arc_opt):
     options = arc_opt.get_resample_options()
     if options is None:
+        print('[ERROR] Error getting the RESAMPLE options. Please review the config file')
         return
     date_ref = options['start_date']
     date_fin = options['end_date']
