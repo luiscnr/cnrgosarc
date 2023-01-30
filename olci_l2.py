@@ -309,7 +309,7 @@ class OLCI_L2():
             nvalid = ntotal - np.ma.count_masked(array_reflectance)
             if nvalid < nvalidrrs:
                 nvalidrrs = nvalid
-            print(f'[INFO] Valid RRS values for {band_name}:{nvalid}')
+            print(f'[INFO] Valid RRS values for {band_name}: {nvalid}')
             flag_mask[array_reflectance.mask] = 1
             nc_sat.close()
 
