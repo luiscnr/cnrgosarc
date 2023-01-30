@@ -170,7 +170,10 @@ class ArcMapInfo:
                 all_band_names = self.get_all_data_bands_names(arc_opt)
                 for name in all_band_names:
                     if not name in dataset.variables:
+                        if self.verbose:
+                            print(f'[INFO] Variable: {name} is not present in file base.')
                         check_variables = False
+                dataset.close()
                 if check_variables:
                     if self.verbose:
                         print(f'[INFO] All the variables are present. Working with file base.')
