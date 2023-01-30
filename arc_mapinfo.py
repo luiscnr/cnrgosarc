@@ -226,8 +226,11 @@ class ArcMapInfo:
     def get_all_data_bands_names(self, arc_opt):
         section = 'RESAMPLE'
         rrs_bands = arc_opt.get_value_param(section, 'rrs_bands', self.olci_l2_bands, 'rrslist')
+        print(rrs_bands)
         angles_bands = arc_opt.get_value_param(section, 'angle_bands', [], 'strlist')
+        print(angles_bands)
         transp_bands = arc_opt.get_value_param(section, 'transp_bands', [], 'strlist')
+        print(transp_bands)
         all_bands = rrs_bands + angles_bands + transp_bands
         return all_bands
 
