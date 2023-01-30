@@ -122,10 +122,8 @@ def main():
         olimage.get_geo_and_params()
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
-        all_band_names = ami.get_all_data_bands_names(arc_opt)
-        for name in all_band_names:
-            print(f'[INFO] Band name -> {name}')
-        #ami.create_nc_file_resample_base(olimage,file_out,arc_opt)
+
+        ami.create_nc_file_resample_base(olimage,file_out,arc_opt)
 
     if args.mode == 'RESAMPLE':
         run_resample(arc_opt)
