@@ -116,9 +116,11 @@ def main():
 
     if args.mode == 'RESAMPLE':
         run_resample(arc_opt)
+        return
 
     if args.mode == 'INTEGRATE':
         run_integration(arc_opt)
+        return
 
         # olimage = OLCI_L2(folci, args.verbose)
         # ami.make_resample_impl(olimage, file_out, 1)
@@ -266,6 +268,11 @@ def run_resample(arc_opt):
     if options is None:
         print('[ERROR] Error getting the RESAMPLE options. Please review the config file')
         return
+    if args.verbose:
+        print('[INFO] Resample options -------------------------------------------------------')
+        for option in options:
+            print(f'[INFO]  {option} -> {options[option]}')
+        print('[INFO] ------------------------------------------------------------------------')
     date_ref = options['start_date']
     date_fin = options['end_date']
     while date_ref <= date_fin:
@@ -634,9 +641,9 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     if dirdest is None:
         dirdest = dirorig
 
-    fconfig = None
-    if args.config_file:
-        fconfig = args.config_file
+    # fconfig = None
+    # if args.config_file:
+    #     fconfig = args.config_file
     from arc_mapinfo import ArcMapInfo
     from olci_l2 import OLCI_L2
 
