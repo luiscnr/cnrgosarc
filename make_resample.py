@@ -278,6 +278,7 @@ def run_resample(arc_opt):
     while date_ref <= date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')
         input_dir = arc_opt.get_folder_date_o(options, 'input_path', 'input_path_organization', date_ref, False)
+        print(f'[INFO] Input dir: {input_dir}')
         if not os.path.exists(input_dir):
             print(f'[WARNING] Input directory {input_dir} is not available. Skiping...')
             date_ref = date_ref + timedelta(hours=24)
