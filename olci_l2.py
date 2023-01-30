@@ -28,6 +28,16 @@ class OLCI_L2():
         self.params = cgeo.params
         self.coords_image = cgeo.coords_image
 
+    def get_platform(self):
+        if self.path_source.startswith('S3A'):
+            platform = 'A'
+        elif self.path_source.startswith('S3B'):
+            platform = 'B'
+        else:
+            self.get_geo_and_params()
+            platform = self.params['number']
+        return platform
+
     def get_rel_pass(self):
         if 'relativeOrbitNumber' in self.params.keys():
             return int(self.params['relativeOrbitNumber'])
@@ -73,6 +83,28 @@ class OLCI_L2():
             }
         return reflectance_bands, nbands
 
+    def get_other_bands_info(self):
+        other_bands = {
+            'KD490_M07': {
+                'file_path': os.path.join(self.path_source, 'trsp.nc')
+            },
+            'KD490_M07_err': {
+                'file_path': os.path.join(self.path_source, 'trsp.nc')
+            }
+
+        }
+        return other_bands
+
+    def get_general_array(self, band_name, fill_value):
+        other_bands = self.get_other_bands_info()
+        if band_name in other_bands:
+            file_path = other_bands[band_name]['file_path']
+            nc_sat = Dataset(file_path, 'r')
+            array = np.ma.array(nc_sat.variables[band_name][:, :])
+            array = np.ma.filled(array, fill_value=fill_value)
+            return array
+        return None
+
     def get_lat_long_arrays(self):
         coordinates_filename = 'geo_coordinates.nc'
         filepah = os.path.join(self.path_source, coordinates_filename)
@@ -95,13 +127,13 @@ class OLCI_L2():
             self.height = shape[0]
             self.width = shape[1]
 
-    def get_reflectance_band_array(self, wlref):
+    def get_reflectance_band_array(self, wlref, fvalue):
         for band_name in self.reflectance_bands:
             dif = abs(wlref - self.reflectance_bands[band_name]['wavelenght'])
             if dif < self.max_dif_wl:
                 nc_sat = Dataset(self.reflectance_bands[band_name]['file_path'], 'r')
                 array_reflectance = np.ma.array(nc_sat.variables[band_name][:, :])
-                array_reflectance = np.ma.filled(array_reflectance, fill_value=-999)
+                array_reflectance = np.ma.filled(array_reflectance, fill_value=fvalue)
                 return array_reflectance
         return None
 
@@ -233,6 +265,61 @@ class OLCI_L2():
         info = self.get_angle_info('SAA')
         return info
 
+    def get_mask_default(self):
+        print(f'[INFO] Creating default mask...')
+        file_path = os.path.join(self.path_source, 'wqsf.nc')
+        nc_sat = Dataset(file_path, 'r')
+        satellite_flag = nc_sat.variables['WQSF']
+        flagging = flag.Class_Flags_OLCI(satellite_flag.flag_masks, satellite_flag.flag_meanings)
+        flag_list = 'LAND,COASTLINE,CLOUD,CLOUD_AMBIGUOUS,CLOUD_MARGIN,INVALID,COSMETIC,SATURATED,SUSPECT,HISOLZEN,HIGHGLINT,SNOW_ICE,AC_FAIL,WHITECAPS,RWNEG_O2,RWNEG_O3,RWNEG_O4,RWNEG_O5,RWNEG_O6,RWNEG_O7,RWNEG_O8'
+        flag_list = flag_list.replace(" ", "")
+        flag_list = str.split(flag_list, ',')
+
+        mask_array = np.array(satellite_flag)
+        flag_mask = flagging.Mask(mask_array, flag_list)
+        flag_mask[np.where(flag_mask != 0)] = 1
+        self.width = flag_mask.shape[1]
+        self.height = flag_mask.shape[0]
+        ntotal = self.width * self.height
+        nflagged = np.count_nonzero(flag_mask)
+        nvalid = ntotal - nflagged
+        # pvalid = (nvalid / ntotal) * 100
+        nc_sat.close()
+        print(f'[INFO] Number of non-masked pixels: {nvalid}')
+
+        nvalidrrs = ntotal
+        for band_name in self.reflectance_bands:
+            nc_sat = Dataset(self.reflectance_bands[band_name]['file_path'], 'r')
+            array_reflectance = np.ma.array(nc_sat.variables[band_name][:, :])
+            nvalid = ntotal - np.ma.count_masked(array_reflectance)
+            if nvalid < nvalidrrs:
+                nvalidrrs = nvalid
+            print(f'[INFO] Valid RRS values for {band_name}:{nvalid}')
+            flag_mask[array_reflectance.mask] = 1
+            nc_sat.close()
+
+        ##WATER MASKS
+        flist = ['WATER']
+        water_mask = flagging.Mask(mask_array, flist)
+        nwater1 = np.count_nonzero(water_mask)
+        print('#WATER WITH WATER FLAG: ', nwater1)
+        flist = ['INVALID', 'LAND', 'COASTLINE', 'SNOW_ICE']
+        land_mask = flagging.Mask(mask_array, flist)
+        nwater2 = ntotal - np.count_nonzero(land_mask)
+        print('#WATER WITH NO LAND/ICE FLAGS: ', nwater2)
+
+        nmasked = np.count_nonzero(flag_mask)
+        nvalid = ntotal - nmasked
+        pvalid = (nvalid / nwater2) * 100
+        print(f'[INFO] Number of non-masked pixels: {nvalid} ({pvalid:.2f}%)')
+
+        # lines = ['Source;Width;Height;NTotal;NFlagged;NWater1;NWater2;NValid;PValid']
+        res = [self.name_source, self.width, self.height, ntotal, nflagged, nwater1, nwater2, nvalid, pvalid]
+        res_line = f'{self.name_source};{self.width};{self.height};{ntotal};{nflagged};{nwater1};{nwater2};{nvalid};{pvalid}'
+
+        return flag_mask, res, res_line
+
+    ##TESTING##########################################################################################################
     def test(self):
         print('TEST METHOD...')
         file_path = os.path.join(self.path_source, 'wqsf.nc')
@@ -264,7 +351,7 @@ class OLCI_L2():
 
         nc_sat.close()
 
-    def get_mask_default(self):
+    def get_mask_default_test(self):
         print(f'[INFO] Creating default mask...')
         file_path = os.path.join(self.path_source, 'wqsf.nc')
         nc_sat = Dataset(file_path, 'r')
@@ -301,7 +388,7 @@ class OLCI_L2():
             nneg_nodetected = len(indices[0])
             ##TEMPORAL end
 
-            #TEMPORAL for 0a02_reflectance, getting possible mask values with negative reflectances, for testing
+            # TEMPORAL for 0a02_reflectance, getting possible mask values with negative reflectances, for testing
             # if band_name == 'Oa02_reflectance':
             #     array_reflectance_neg_min = np.min(array_reflectance_valid[indices])
             #     array_reflectance_neg_max = np.max(array_reflectance_valid[indices])
@@ -326,11 +413,11 @@ class OLCI_L2():
         flist = ['WATER']
         water_mask = flagging.Mask(mask_array, flist)
         nwater1 = np.count_nonzero(water_mask)
-        print('#WATER WITH WATER FLAG: ',nwater1)
+        print('#WATER WITH WATER FLAG: ', nwater1)
         flist = ['LAND', 'COASTLINE', 'SNOW_ICE']
         land_mask = flagging.Mask(mask_array, flist)
         nwater2 = ntotal - np.count_nonzero(land_mask)
-        print('#WATER WITH NO LAND/ICE FLAGS: ',nwater2)
+        print('#WATER WITH NO LAND/ICE FLAGS: ', nwater2)
 
         nmasked = np.count_nonzero(flag_mask)
         nvalid = ntotal - nmasked
@@ -339,7 +426,7 @@ class OLCI_L2():
 
         res = [self.width, self.height, ntotal, nvalidrrs, nvalid, pvalid]
 
-        #TEMPORAL, WITH NEW MASK
+        # TEMPORAL, WITH NEW MASK
         nmasked_new = np.count_nonzero(flag_mask_new)
         nvalid_new = ntotal - nmasked_new
         pvalid_new = (nvalid_new / nwater2) * 100
@@ -378,9 +465,9 @@ class OLCI_L2():
         # print(np.binary_repr(val1,32))
         # print(np.binary_repr(val2,32))
 
-        #TEMPORAL LINE TO GET INFORMATION
-        nerrors = nvalid-nvalid_new
-        #lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
+        # TEMPORAL LINE TO GET INFORMATION
+        nerrors = nvalid - nvalid_new
+        # lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
         res = f'{self.name_source};{self.width};{self.height};{ntotal};{nwater1};{nwater2};{nvalid};{pvalid};{nvalid_new};{pvalid_new};{nerrors}'
 
         return flag_mask, res

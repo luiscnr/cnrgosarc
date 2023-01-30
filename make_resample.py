@@ -39,12 +39,17 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        run_resampling_info()
+        # check_model()
+        # run_resampling_info()
         # do_check7()  # gettig combinatons
         # do_check8() #information about combinations
         # do_resampled_vm_list()
         # do_resampled_vm_christmas()
         # do_check6()
+        path_olci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T005835_20180715T005917_20211121T192724_0042_033_245______MAR_R_NT_003.SEN3'
+        olimage = OLCI_L2(path_olci, True)
+        olimage.get_geo_and_params()
+        print(olimage.params)
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
         # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
@@ -81,7 +86,8 @@ def main():
 
     if args.mode == 'QL' and args.product:
         fdataset = args.product
-        ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
+        # ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
+        ami.save_quick_look_fdata(file_out, fdataset, 'chla')
         return
 
     if not args.config_file:
@@ -99,6 +105,10 @@ def main():
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
+
+    if args.mode == 'RESAMPLE':
+        run_resample(arc_opt)
+
     if args.mode == 'INTEGRATE':
         run_integration(arc_opt)
 
@@ -121,6 +131,18 @@ def main():
     # fdata = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
     # ami.save_quick_look_fdata(fout,fdata)
+
+
+def check_model():
+    jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/Out.json'
+    import json
+    f = open(jsonfile)
+    data = json.load(f)
+    f.close()
+
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    gmodel = GaussianProcessRegressor()
+    print(gmodel)
 
 
 def check_py():
@@ -180,7 +202,7 @@ def run_resampling_info():
     import zipfile as zp
     from olci_l2 import OLCI_L2
     import os
-    #path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20190624T004648_20190624T004948_20211129T080410_0180_046_145______MAR_R_NT_003.SEN3'
+    # path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20190624T004648_20190624T004948_20211129T080410_0180_046_145______MAR_R_NT_003.SEN3'
     path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3B_OL_2_WFR____20190624T164944_20190624T165103_20210813T114041_0078_027_012______MAR_R_NT_003.SEN3'
     oimage = OLCI_L2(path, True)
     flag_mask, line = oimage.get_mask_default()
@@ -229,6 +251,32 @@ def run_resampling_info_dir(base_path):
         f1.write(line)
         f1.write('\n')
     f1.close()
+
+
+def run_resample(arc_opt):
+    options = arc_opt.get_resample_options()
+    if options is None:
+        return
+    date_ref = options['start_date']
+    date_fin = options['end_date']
+    while date_ref <= date_fin:
+        print(f'[INFO]******************************************************************************->{date_ref}')
+        input_dir = arc_opt.get_folder_date_o(options, 'input_path', 'input_path_organization', date_ref, False)
+        if not os.path.exists(input_dir):
+            print(f'[WARNING] Input directory {input_dir} is not available. Skiping...')
+            date_ref = date_ref + timedelta(hours=24)
+            continue
+        output_dir_day = arc_opt.get_folder_date_o(options, 'output_path', 'output_path_organization', date_ref, True)
+        date_ref_str = date_ref.strftime('%Y%m%d')
+        output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
+        file_output = os.path.join(output_dir_day, output_name)
+        if os.path.exists(file_output):
+            print(f'[WARNING] Output file {file_output} already exist. Skiping...')
+            date_ref = date_ref + timedelta(hours=24)
+            continue
+        unzip_path = options['unzip_path']
+        make_resample_dir(input_dir, output_dir_day, unzip_path, arc_opt)
+        date_ref = date_ref + timedelta(hours=24)
 
 
 def run_integration(arc_opt):
@@ -567,13 +615,13 @@ def do_check44():
         print(lines[idx])
 
 
-def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
+def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
+    section = 'RESAMPLE'
+    doresample = arc_opt.get_value_param(section, 'do_resample', True, 'boolean')
+    dokml = arc_opt.get_value_param(section, 'do_kml', False, 'boolean')
+
     import simplekml
-    # import netCDF4
-    # import numpy as np
     import zipfile as zp
-    # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
-    # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
     if dirdest is None:
         dirdest = dirorig
 
@@ -581,15 +629,18 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
     if args.config_file:
         fconfig = args.config_file
     from arc_mapinfo import ArcMapInfo
+    from olci_l2 import OLCI_L2
+
     ami = ArcMapInfo(fconfig, args.verbose)
 
-    first_line = ['Source', 'StartDate', 'RelOrbit', 'GranuleId', 'SensorFlag', 'OrigWidth', 'OrigHeight', 'OrigNTotal',
-                  'OrigNRRS', 'OrigNValid', 'OrigPValid', 'YMin', 'YMax', 'XMin', 'XMax', 'Width', 'Height', 'NTotal',
-                  'NValid', 'PValid']
+    first_line = ['Source', 'StartDate', 'RelOrbit', 'GranuleIndex', 'OrbitIndex', 'OrigWidth', 'OrigHeight',
+                  'OrigNTotal','OrigNFlagged', 'OrigNWater1', 'OrigNWatet2', 'OrigNValid', 'OrigPValid', 'YMin', 'YMax',
+                  'XMin','XMax', 'Width', 'Height', 'NTotal','NValid', 'PValid']
     lines_out = [';'.join(first_line)]
-
     rel_pass_dict = {}
-    idref = -1
+    idref = -1  # it's used for defining orbit index in rel_pass_dict as pow(2,idref)
+    granule_index = 0  # 1,2,3...
+
     foutkml = None
     kml = None
     red = [166, 31, 178, 51, 251, 227, 253, 256, 202, 106, 255, 177, 0]
@@ -632,17 +683,17 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
                         print(f'[INFO] Unziping {name} to {unzip_path}')
                     zprod.extractall(path=unzip_path)
 
-        from olci_l2 import OLCI_L2
         olimage = OLCI_L2(path_prod_u, args.verbose)
         olimage.get_geo_and_params()
+        granule_index = granule_index + 1
 
+        # A new orbit_index is assigned to each platform + relative pass
         rel_pass = str(olimage.get_rel_pass())
+        platform = olimage.get_platform()
+        rel_pass = f'{platform}_{rel_pass}'
         if rel_pass not in rel_pass_dict.keys():
-            if idref == -1:
-                idref = 0
-            else:
-                idref = idref + 100
-            rel_pass_dict[rel_pass] = 0
+            idref = idref + 1
+            rel_pass_dict[rel_pass] = math.pow(2, idref)
             if dokml:
                 if foutkml is not None and kml is not None:
                     kml.save(foutkml)
@@ -651,17 +702,10 @@ def make_resample_dir(dirorig, dirdest, unzip_path, doresample, dokml):
                         idcolor = 0
                 foutkml = os.path.join(dirdest, f'Passes_RelativeOrbit_{rel_pass}.kml')
                 kml = simplekml.Kml()
-
-        else:
-            rel_pass_dict[rel_pass] = rel_pass_dict[rel_pass] + 1
-        sensor_id = math.pow(2, rel_pass_dict[rel_pass]) + idref
+        orbit_index = rel_pass_dict[rel_pass]
 
         if doresample:
-            # file_out = os.path.join(dirdest, f'{output_name}_resampled.nc')
-            # if os.path.exists(file_out):
-            #     print(f'[INFO] File {file_out} already exist. Skyping...')
-            #     continue
-            line_out = ami.make_resample_impl(olimage, file_out, sensor_id, idref)
+            line_out = ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
             if line_out is not None:
                 lines_out.append(line_out)
             if zp.is_zipfile(prod_path):

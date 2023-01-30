@@ -44,50 +44,44 @@ class ARC_OPTIONS:
         # options.read(config_file)
         self.options = options
 
+    def get_resample_options(self):
+        # input path, output path, path organizations, platform, start date, end date
+        section = 'RESAMPLE'
+        options = self.get_basic_options(section)
+        unzip_path = self.get_path(section, 'unzip_path')
+        if unzip_path is None:
+            unzip_path = options['input_path']
+            print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
+        options['unzip_path'] = unzip_path
+        return options
+
     def get_integrate_options(self):
-        if not self.options.has_section('INTEGRATE'):
-            print(f'[ERROR] Integrate section is not included in config file')
+        return self.get_basic_options('INTEGRATE')
+
+    def get_basic_options(self, section):
+        # section = 'INTEGRATE'
+        if not self.options.has_section(section):
+            print(f'[ERROR] {section} section is not included in config file')
             return None
         compulsory_options = ['input_path', 'output_path', 'start_date', 'end_date']
-        for coption in compulsory_options:
-            if not self.options.has_option('INTEGRATE', coption):
-                print(f'[ERROR] Option INTEGRATE/{coption} is compulsory')
-                return None
-        input_path = self.options['INTEGRATE']['input_path']
-        output_path = self.options['INTEGRATE']['output_path']
-        start_date_str = self.options['INTEGRATE']['start_date']
-        end_date_str = self.options['INTEGRATE']['end_date']
-        if not os.path.exists(input_path):
-            print(f'[ERROR] Input path {input_path} does not exist')
+        if not self.check_compulsory_options(section, compulsory_options):
             return None
-        if not os.path.exists(output_path):
-            try:
-                os.mkdir(output_path)
-            except:
-                print(f'[ERROR] Output path {output_path} does not exist and coul not be created')
+        input_path = self.get_path(section, 'input_path', False)
+        output_path = self.get_path(section, 'output_path', True)
+        if input_path is None or output_path is None:
+            return None
+        start_date_str = self.options[section]['start_date']
+        end_date_str = self.options[section]['end_date']
         start_date, end_date = get_dates_from_stroptions(start_date_str, end_date_str)
         if start_date is None or end_date is None:
             return None
 
-        input_path_organization = None
-        if self.options.has_option('INTEGRATE', 'input_path_organization'):
-            input_path_organization = self.options['INTEGRATE']['input_path_organization']
-            if not check_folder_organization(input_path_organization):
-                return None
+        input_path_organization = self.get_path_organization(section, 'input_path_organization')
+        output_path_organization = self.get_path_organization(section, 'output_path_organization')
+        if input_path_organization == 'INVALID' or output_path_organization == 'INVALID':
+            return None
 
-        output_path_organization = None
-        if self.options.has_option('INTEGRATE', 'output_path_organization'):
-            output_path_organization = self.options['INTEGRATE']['output_path_organization']
-            if not check_folder_organization(output_path_organization):
-                return None
-
-        platform = 'S3'
-        if self.options.has_option('INTEGRATE', 'platform'):
-            platform = self.options['INTEGRATE']['platform']
-            valid_values = ['S3', 'S3A', 'S3B']
-            if not platform in valid_values:
-                print(f'[ERROR] Platform value {platform} is not valid (valid options: S3, S3A, S3B')
-                return None
+        platform = self.get_platform(section)
 
         options_out = {
             'input_path': input_path,
@@ -99,6 +93,46 @@ class ARC_OPTIONS:
             'platform': platform
         }
         return options_out
+
+    def get_path_organization(self, section, key):
+        if self.options.has_option(section, key):
+            path_organization = self.options[section][key]
+            if not check_folder_organization(path_organization):
+                return 'INVALID'
+            return path_organization
+        else:
+            return None
+
+    def get_path(self, section, key, create):
+        path = self.options[section][key]
+        if not os.path.exists(path):
+            if not create:
+                print(f'[ERROR] {key} {path} does not exist')
+                return None
+            else:
+                try:
+                    os.mkdir(path)
+                except:
+                    print(f'[ERROR] {key} {path} does not exist and could not be created')
+                    return None
+        return path
+
+    def get_platform(self, section):
+        platform = 'S3'
+        if self.options.has_option(section, 'platform'):
+            platform = self.options[section]['platform']
+            valid_values = ['S3', 'S3A', 'S3B']
+            if not platform in valid_values:
+                print(f'[ERROR] Platform value {platform} is not valid (valid options: S3, S3A, S3B')
+                return None
+        return platform
+
+    def check_compulsory_options(self, section, compulsory_options):
+        for coption in compulsory_options:
+            if not self.options.has_option(section, coption):
+                print(f'[ERROR] Option {section}/{coption} is compulsory')
+                return False
+        return True
 
     def get_value(self, section, key):
         value = None
@@ -128,6 +162,23 @@ class ARC_OPTIONS:
                 vals = vals.strip().replace('.', '_')
                 list.append(f'RRS{vals}')
             return list
+        if type == 'strlist':
+            list_str = value.split(',')
+            list = []
+            for vals in list_str:
+                list.append(vals.strip())
+        if type == 'floatlist':
+            list_str = value.split(',')
+            list = []
+            for vals in list_str:
+                vals = vals.strip()
+                list.append(float(vals))
+            return list
+
+    def get_folder_date_o(self, options,key_path,key_organization,date_here,create):
+        path_base = options[key_path]
+        org = options[key_organization]
+        return self.get_folder_date(path_base,org,date_here,create)
 
     def get_folder_date(self, path_base, org, date_here, create):
         if org is None:
