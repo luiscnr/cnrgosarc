@@ -668,7 +668,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         do_zip_here = False
         if name.endswith('.SEN3'):
             path_prod_u = prod_path
-        elif zp.is_zipzp.is_zipfile(prod_path):
+        elif zp.is_zipfile(prod_path):
             do_zip_here = True
             path_prod_u = prod_path.split('/')[-1][0:-4]
             path_prod_u = os.path.join(unzip_path, path_prod_u)
