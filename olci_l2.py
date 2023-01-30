@@ -15,6 +15,7 @@ class OLCI_L2():
         self.wl_list = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75, 865, 885,
                         1020.5]
         self.reflectance_bands, self.nbands = self.get_reflectance_bands_info()
+        self.reflectance_bands_mask = self.reflectance_bands
         self.max_dif_wl = 1
         self.width = -1
         self.height = -1
@@ -83,6 +84,8 @@ class OLCI_L2():
             }
         return reflectance_bands, nbands
 
+
+
     def get_other_bands_info(self):
         other_bands = {
             'KD490_M07': {
@@ -136,6 +139,21 @@ class OLCI_L2():
                 array_reflectance = np.ma.filled(array_reflectance, fill_value=fvalue)
                 return array_reflectance
         return None
+
+    def get_reflectance_band_name(self,wlref):
+        for band_name in self.reflectance_bands:
+            dif = abs(wlref - self.reflectance_bands[band_name]['wavelenght'])
+            if dif < self.max_dif_wl:
+                return band_name
+        return None
+
+    def set_reflectance_bands_mask(self,wlvalues):
+        self.reflectance_bands_mask = {}
+        for wl in wlvalues:
+            band_name = self.get_reflectance_band_name(wl)
+            if band_name is not None:
+                self.reflectance_bands_mask[band_name] = self.reflectance_bands[band_name]
+
 
     def get_val_from_tie_point_grid(self, yPoint, xPoint, ySubsampling, xSubsampling, dataset):
         grid_height = dataset.shape[0]
@@ -288,8 +306,8 @@ class OLCI_L2():
         print(f'[INFO] Number of non-masked pixels: {nvalid}')
 
         nvalidrrs = ntotal
-        for band_name in self.reflectance_bands:
-            nc_sat = Dataset(self.reflectance_bands[band_name]['file_path'], 'r')
+        for band_name in self.reflectance_bands_mask:
+            nc_sat = Dataset(self.reflectance_bands_mask[band_name]['file_path'], 'r')
             array_reflectance = np.ma.array(nc_sat.variables[band_name][:, :])
             nvalid = ntotal - np.ma.count_masked(array_reflectance)
             if nvalid < nvalidrrs:
@@ -302,11 +320,11 @@ class OLCI_L2():
         flist = ['WATER']
         water_mask = flagging.Mask(mask_array, flist)
         nwater1 = np.count_nonzero(water_mask)
-        print('#WATER WITH WATER FLAG: ', nwater1)
+        print('[INFO] #WATER WITH WATER FLAG: ', nwater1)
         flist = ['INVALID', 'LAND', 'COASTLINE', 'SNOW_ICE']
         land_mask = flagging.Mask(mask_array, flist)
         nwater2 = ntotal - np.count_nonzero(land_mask)
-        print('#WATER WITH NO LAND/ICE FLAGS: ', nwater2)
+        print('[INFO] #WATER WITH NOT (INVALID + LAND + COASTLINE + SNOW_ICE): ', nwater2)
 
         nmasked = np.count_nonzero(flag_mask)
         nvalid = ntotal - nmasked

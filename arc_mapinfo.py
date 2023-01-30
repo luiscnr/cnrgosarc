@@ -483,19 +483,18 @@ class ArcMapInfo:
             print(f'[INFO] Starting resampling for granule: {olimage.path_source}')
         section = 'RESAMPLE'
         # Source;Width;Height;NTotal;NFlagged;NWater1;NWater2;NValid;PValid'
+        rrs_bands = arc_opt.get_value_param(section, 'rrs_bands', self.olci_l2_bands, 'floatlist')
+        olimage.set_reflectance_bands_mask(rrs_bands)
         mask, res_original, line_original = olimage.get_mask_default()
         start_date = olimage.get_start_date()
         start_date_str = start_date.strftime('%Y%m%dT%H%M%S')
 
         th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
-        print(th_nvalid)
-        print(res_original)
         if res_original[7] <= th_nvalid and th_nvalid >= 0:
-            print('me deberia llegar aqui')
             res_resampled = [-999] * 9
             line_resampled = ';'.join(str(l) for l in res_resampled)
             line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};-999;{line_original};{line_resampled}'
-            print('[WARNING] No valid pixels were found. Skiping granule...')
+            print('[WARNING] No valid pixels were found. Skipping granule...')
             return line_output
 
         if self.verbose:
