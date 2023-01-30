@@ -191,6 +191,8 @@ class ArcMapInfo:
         for wl in rrs_bands:
             wlstr = str(wl).replace('.', '_')
             bandname = f'RRS{wlstr}'
+            if bandname.endswith('_0'):
+                bandname = bandname[:6]
             if self.verbose:
                 print(f'[INFO] Creating band: {bandname}')
             var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)

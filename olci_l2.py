@@ -84,8 +84,6 @@ class OLCI_L2():
             }
         return reflectance_bands, nbands
 
-
-
     def get_other_bands_info(self):
         other_bands = {
             'KD490_M07': {
@@ -140,20 +138,19 @@ class OLCI_L2():
                 return array_reflectance
         return None
 
-    def get_reflectance_band_name(self,wlref):
+    def get_reflectance_band_name(self, wlref):
         for band_name in self.reflectance_bands:
             dif = abs(wlref - self.reflectance_bands[band_name]['wavelenght'])
             if dif < self.max_dif_wl:
                 return band_name
         return None
 
-    def set_reflectance_bands_mask(self,wlvalues):
+    def set_reflectance_bands_mask(self, wlvalues):
         self.reflectance_bands_mask = {}
         for wl in wlvalues:
             band_name = self.get_reflectance_band_name(wl)
             if band_name is not None:
                 self.reflectance_bands_mask[band_name] = self.reflectance_bands[band_name]
-
 
     def get_val_from_tie_point_grid(self, yPoint, xPoint, ySubsampling, xSubsampling, dataset):
         grid_height = dataset.shape[0]
