@@ -774,7 +774,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 else:
                     if args.verbose:
                         print('[INFO] Granule added to the parallel process list')
-                    params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, params_mask, None]
+                    params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, None, None]
                     if zp.is_zipfile(prod_path):
                         params_granule[7] = path_prod_u
                     params_list.append(params_granule)
