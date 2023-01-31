@@ -14,7 +14,7 @@ from datetime import timedelta
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEBASE","RESAMPLEPML", "INTEGRATE", "QL"],
+                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEBASE", "RESAMPLEPML", "INTEGRATE", "QL"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -59,12 +59,8 @@ def main():
     # if args.config_file:
     #     fconfig = args.config_file
 
-
-
     if args.mode == "CHECK":
         return
-
-
 
     if args.mode == 'GRID' and args.output:  ##creating grid
         print('create grid')
@@ -82,8 +78,6 @@ def main():
         line_output = ami.make_resample_impl(olimage, file_out, 1, -1)
         print(line_output)
         return
-
-
 
     if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a single PML file
         ami = ArcMapInfo(None, args.verbose)
@@ -123,7 +117,7 @@ def main():
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
 
-        ami.create_nc_file_resample_base(olimage,file_out,arc_opt)
+        ami.create_nc_file_resample_base(olimage, file_out, arc_opt)
 
     if args.mode == 'RESAMPLE':
         run_resample(arc_opt)
@@ -210,10 +204,17 @@ def check_py():
         print('[ERROR] shapely was not found')
         check = False
 
+    try:
+        import multiprocessing
+        print(f'[INFO] Multiprocessing is allowed with {os.cpu_count()} CPUs')
+    except:
+        print('[ERROR] multiprocessing was not found')
+        check = False
     if not check:
         print('[ERROR] Some packages are not available...')
     else:
         print('[INFO] All the packages are available')
+
 
 
 def run_resampling_info():
@@ -643,22 +644,41 @@ def do_check44():
         print(lines[idx])
 
 
+# ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
+# params: 0: ami; 1 olimage; 2: file_out; 3: granule_index; 4: orbit_index; 5: arc_opt
+def make_resample_dir_parallel(params):
+    ami = params[0]
+    ami.make_resample_impl(params[1], params[2], params[3], params[4], params[5])
+    path_prod_u = params[6]
+    if path_prod_u is not None:
+        for fn in os.listdir(path_prod_u):
+            os.remove(os.path.join(path_prod_u, fn))
+
 def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     section = 'RESAMPLE'
     doresample = arc_opt.get_value_param(section, 'do_resample', True, 'boolean')
     dokml = arc_opt.get_value_param(section, 'do_kml', False, 'boolean')
     if dirdest is None:
         dirdest = dirorig
+    apply_pool = arc_opt.get_value_param(section, 'apply_pool', 0, 'int')
     import simplekml
     import zipfile as zp
     from arc_mapinfo import ArcMapInfo
     from olci_l2 import OLCI_L2
 
     ami = ArcMapInfo(arc_opt, args.verbose)
+    if apply_pool != 0:
+        params_list = []
+        if args.verbose:
+            print('[INFO] Starting parallel processing')
+    else:
+        if args.verbose:
+            print('[INFO] Starting sequencial processing')
 
     first_line = ['Source', 'StartDate', 'RelOrbit', 'GranuleIndex', 'OrbitIndex', 'OrigWidth', 'OrigHeight',
-                  'OrigNTotal','OrigNFlagged', 'OrigNWater1', 'OrigNWatet2', 'OrigNValid', 'OrigPValid', 'YMin', 'YMax',
-                  'XMin','XMax', 'Width', 'Height', 'NTotal','NValid', 'PValid']
+                  'OrigNTotal', 'OrigNFlagged', 'OrigNWater1', 'OrigNWatet2', 'OrigNValid', 'OrigPValid', 'YMin',
+                  'YMax',
+                  'XMin', 'XMax', 'Width', 'Height', 'NTotal', 'NValid', 'PValid']
     lines_out = [';'.join(first_line)]
     rel_pass_dict = {}
     idref = -1  # it's used for defining orbit index in rel_pass_dict as pow(2,idref)
@@ -729,13 +749,19 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         orbit_index = rel_pass_dict[rel_pass]
 
         if doresample and not resample_done:
-            line_out = ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
-            if line_out is not None:
-                lines_out.append(line_out)
-            if zp.is_zipfile(prod_path):
-                # os.remove(prod_path)
-                for fn in os.listdir(path_prod_u):
-                    os.remove(os.path.join(path_prod_u, fn))
+            if apply_pool == 0:
+                line_out = ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
+                if line_out is not None:
+                    lines_out.append(line_out)
+                if zp.is_zipfile(prod_path):
+                    # os.remove(prod_path)
+                    for fn in os.listdir(path_prod_u):
+                        os.remove(os.path.join(path_prod_u, fn))
+            else:
+                params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, None]
+                if zp.is_zipfile(prod_path):
+                    params_granule[6] = path_prod_u
+                params_list.append(params_granule)
 
         if dokml:
             start_date = olimage.get_start_date()
@@ -752,7 +778,19 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 for fn in os.listdir(path_prod_u):
                     os.remove(os.path.join(path_prod_u, fn))
 
-    if doresample:
+    if doresample and apply_pool!=0 and len(params_list)>0:
+        if args.verbose:
+            print(f'[INFO] Starting parallel processing. Number of products: {len(params_list)}')
+            print(f'[INFO] CPUs: {os.cpu_count()}')
+            print(f'[INFO] Parallel processes: {apply_pool}')
+        from multiprocessing import Pool
+        if apply_pool < 0:
+            poolhere = Pool()
+        else:
+            poolhere = Pool(apply_pool)
+        poolhere.map(make_resample_dir_parallel, params_list)
+
+    if doresample and apply_pool == 0:
         fcsvout = os.path.join(dirdest, 'ResampleInfo.csv')
         if args.verbose:
             print(f'[INFO] Creating info file:{fcsvout}')
