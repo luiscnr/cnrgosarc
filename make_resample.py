@@ -75,7 +75,17 @@ def main():
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
-        line_output = ami.make_resample_impl(olimage, file_out, 1, -1)
+        try:
+            import configparser
+            options = configparser.ConfigParser()
+            options.read(args.config_file)
+            from arc_options import ARC_OPTIONS
+            arc_opt = ARC_OPTIONS(options)
+        except:
+            print(f'[ERROR] Config file {args.config_file} could not be read. Exiting...')
+            return
+
+        line_output = ami.make_resample_impl(olimage, file_out, 1, -1, arc_opt, None)
         print(line_output)
         return
 
@@ -127,9 +137,8 @@ def main():
         run_integration(arc_opt)
         return
 
-        # olimage = OLCI_L2(folci, args.verbose)
-        # ami.make_resample_impl(olimage, file_out, 1)
-
+def kk():
+    print('DEPRECATED')
     # fgrid = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300m.nc'
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGridOlciQuickLook.png'
     # ami.create_nc_filegrid(fgrid,True)
@@ -214,7 +223,6 @@ def check_py():
         print('[ERROR] Some packages are not available...')
     else:
         print('[INFO] All the packages are available')
-
 
 
 def run_resampling_info():
@@ -648,11 +656,12 @@ def do_check44():
 # params: 0: ami; 1 olimage; 2: file_out; 3: granule_index; 4: orbit_index; 5: arc_opt
 def make_resample_dir_parallel(params):
     ami = params[0]
-    ami.make_resample_impl(params[1], params[2], params[3], params[4], params[5])
-    path_prod_u = params[6]
+    ami.make_resample_impl(params[1], params[2], params[3], params[4], params[5], params[6])
+    path_prod_u = params[7]
     if path_prod_u is not None:
         for fn in os.listdir(path_prod_u):
             os.remove(os.path.join(path_prod_u, fn))
+
 
 def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     section = 'RESAMPLE'
@@ -750,18 +759,25 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
 
         if doresample and not resample_done:
             if apply_pool == 0:
-                line_out = ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
+                line_out = ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt, None)
                 if line_out is not None:
                     lines_out.append(line_out)
                 if zp.is_zipfile(prod_path):
-                    # os.remove(prod_path)
                     for fn in os.listdir(path_prod_u):
                         os.remove(os.path.join(path_prod_u, fn))
             else:
-                params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, None]
-                if zp.is_zipfile(prod_path):
-                    params_granule[6] = path_prod_u
-                params_list.append(params_granule)
+                params_mask = ami.check_make_resample_impl(olimage, arc_opt)
+                if params_mask is None:  ##no resampling, deleting path_prod_u if working with zip file
+                    if zp.is_zipfile(prod_path):
+                        for fn in os.listdir(path_prod_u):
+                            os.remove(os.path.join(path_prod_u, fn))
+                else:
+                    if args.verbose:
+                        print('[INFO] Granule added to the parallel process list')
+                    params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, params_mask, None]
+                    if zp.is_zipfile(prod_path):
+                        params_granule[7] = path_prod_u
+                    params_list.append(params_granule)
 
         if dokml:
             start_date = olimage.get_start_date()
@@ -778,11 +794,13 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 for fn in os.listdir(path_prod_u):
                     os.remove(os.path.join(path_prod_u, fn))
 
-    if doresample and apply_pool!=0 and len(params_list)>0:
+    if doresample and apply_pool != 0 and len(params_list) > 0:
         if args.verbose:
+            print(f'[INFO]******************************************************************************************')
             print(f'[INFO] Starting parallel processing. Number of products: {len(params_list)}')
             print(f'[INFO] CPUs: {os.cpu_count()}')
             print(f'[INFO] Parallel processes: {apply_pool}')
+            print(f'[INFO]******************************************************************************************')
         from multiprocessing import Pool
         if apply_pool < 0:
             poolhere = Pool()

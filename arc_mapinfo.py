@@ -160,7 +160,7 @@ class ArcMapInfo:
 
     def create_nc_file_resampled(self, ofname, olimage, arc_opt):
         section = 'RESAMPLE'
-        file_base = arc_opt.get_value_param(section,'file_base',None,'str')
+        file_base = arc_opt.get_value_param(section, 'file_base', None, 'str')
         if file_base is not None:
             if os.path.exists(file_base):
                 if self.verbose:
@@ -277,7 +277,6 @@ class ArcMapInfo:
         if self.verbose:
             print(f'[INFO] Copying file grid: {self.ifile_base}...')
 
-
         # with Dataset(self.ifile_base) as src:
         #     dst = Dataset(ofile, 'w', format='NETCDF4')
         #     # copy global attributes all at once via dictionary
@@ -315,7 +314,7 @@ class ArcMapInfo:
             if os.path.exists(ofile):
                 historicalSize = os.path.getsize(ofile)
                 if self.verbose:
-                    porc = (historicalSize/originalSize)*100
+                    porc = (historicalSize / originalSize) * 100
                     print(f'[INFO] Copying {porc:.2f} %')
             time.sleep(1)
         if self.verbose:
@@ -530,39 +529,63 @@ class ArcMapInfo:
         limits = [xmin, xmax, ymin, ymax]
         return limits, area_def
 
-    def make_resample_impl(self, olimage, fileout, granuleindex, orbitindex, arc_opt):
+    def check_make_resample_impl(self, olimage, arc_opt):
         if self.verbose:
             print('--------------------')
-            print(f'[INFO] Starting resampling for granule: {olimage.path_source}')
+            print(f'[INFO] Checking resampling for granule: {olimage.path_source}')
         section = 'RESAMPLE'
         # Source;Width;Height;NTotal;NFlagged;NWater1;NWater2;NValid;PValid'
         rrs_bands = arc_opt.get_value_param(section, 'rrs_bands', self.olci_l2_bands, 'floatlist')
         olimage.set_reflectance_bands_mask(rrs_bands)
         mask, res_original, line_original = olimage.get_mask_default()
+        th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
+        if res_original[7] <= th_nvalid and th_nvalid >= 0:
+            print('[WARNING] No valid pixels were found. Skipping granule...')
+            return None
+        params_mask = [mask, res_original, line_original]
+        return params_mask
+
+    def make_resample_impl(self, olimage, fileout, granuleindex, orbitindex, arc_opt, params_mask):
+        if self.verbose:
+            print('--------------------')
+            print(f'[INFO] Starting resampling for granule: {olimage.path_source}')
+        section = 'RESAMPLE'
+        rrs_bands = arc_opt.get_value_param(section, 'rrs_bands', self.olci_l2_bands, 'floatlist')
+        olimage.set_reflectance_bands_mask(rrs_bands)
         start_date = olimage.get_start_date()
         start_date_str = start_date.strftime('%Y%m%dT%H%M%S')
-
         th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
+
+        if params_mask is None:
+            mask, res_original, line_original = olimage.get_mask_default()
+        else:
+            mask = params_mask[0]
+            res_original = params_mask[1]
+            line_original = params_mask[2]
+
+        ##CHECKING MASK
+        # Source;Width;Height;NTotal;NFlagged;NWater1;NWater2;NValid;PValid'
         if res_original[7] <= th_nvalid and th_nvalid >= 0:
             res_resampled = [-999] * 9
             line_resampled = ';'.join(str(l) for l in res_resampled)
             line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};-999;{line_original};{line_resampled}'
             print('[WARNING] No valid pixels were found. Skipping granule...')
             return line_output
+        ##END CHECKING
 
         if self.verbose:
-            print(f'[INFO] Defining subarea for the granule...')
+            print(f'[INFO][{granuleindex}] Defining subarea for the granule...')
         lats, lons = olimage.get_lat_long_arrays()
 
         if self.verbose:
             print(
-                f'[INFO] Granule geographic limits. Lat: {np.min(lats)} - {np.max(lats)}  Long: {np.min(lons)} - {np.max(lons)}')
+                f'[INFO][{granuleindex}] Granule geographic limits. Lat: {np.min(lats)} - {np.max(lats)}  Long: {np.min(lons)} - {np.max(lons)}')
 
         limits, sub_area_def = self.get_subarea_def(lats, lons)
         swath_def = SwathDefinition(lons=lons, lats=lats)
         if self.verbose:
-            print(f'[INFO] Array limits after resampling: {limits}')
-            print(f'[INFO] Getting neighbour info...')
+            print(f'[INFO][{granuleindex}] Array limits after resampling: {limits}')
+            print(f'[INFO][{granuleindex}] Getting neighbour info...')
         # row_indices, col_indices = utils.generate_nearest_neighbour_linesample_arrays(swath_def, sub_area_def, 2000)
         valid_input_index, valid_output_index, index_array, distance_array = get_neighbour_info(swath_def, sub_area_def,
                                                                                                 500, neighbours=1)
@@ -574,15 +597,15 @@ class ArcMapInfo:
         xmax = int(limits[1])
 
         if self.verbose:
-            print(f'[INFO] Creating output file from file grid...')
+            print(f'[INFO][{granuleindex}] Creating output file from file grid...')
         datasetout = self.create_nc_file_resampled(fileout, olimage, arc_opt)
 
         if datasetout is None:
-            print(f'[ERROR] Output file {fileout} could not be created')
+            print(f'[ERROR][{granuleindex}] Output file {fileout} could not be created')
 
         if self.verbose:
-            print(f'[INFO] Resampling variables...')
-            print(f'[INFO] --->Mask')
+            print(f'[INFO][{granuleindex}] Resampling variables...')
+            print(f'[INFO][{granuleindex}] --->Mask')
         # mask (using fill_value=10 becuase of the problems resampling with fill_value=-999)
         result = get_sample_from_neighbour_info('nn', output_shape, mask, valid_input_index,
                                                 valid_output_index, index_array,
@@ -593,7 +616,7 @@ class ArcMapInfo:
         resampled_n_total = np.count_nonzero(result_m >= 0)
         if resampled_n_total == 0:
             print(
-                f'[WARNING] No valid pixels were resampled for granule {olimage.path_source}. Removing file and skipping')
+                f'[WARNING][{granuleindex}] No valid pixels were resampled for granule {olimage.path_source}. Removing file and skipping')
             datasetout.close()
             os.remove(fileout)
             return
@@ -606,7 +629,7 @@ class ArcMapInfo:
         angles_bands = arc_opt.get_value_param(section, 'angle_bands', [], 'strlist')
         for var_name in all_variables:
             if self.verbose:
-                print(f'[INFO] --->{var_name}')
+                print(f'[INFO][{granuleindex}] --->{var_name}')
             var = datasetout.variables[var_name]
             fvalue = var.getncattr('_FillValue')
             if var_name.startswith('RRS'):
@@ -623,37 +646,11 @@ class ArcMapInfo:
                                                     distance_array=distance_array, fill_value=fvalue)
             var[ymin:ymax, xmin:xmax] = [result[:, :]]
 
-        # for var in datasetout.variables:
-        #     if var.startswith('RRS'):
-        #         if self.verbose:
-        #             print(f'[INFO] --->{var}')
-        #         var_rrs = datasetout.variables[var]
-        #
-        #         wlref = var_rrs.wavelength
-        #         if wlref > 0:
-        #             rrsarray = olimage.get_reflectance_band_array(wlref)
-        #             rrsarray[mask == 1] = -999
-        #
-        #             result = get_sample_from_neighbour_info('nn', output_shape, rrsarray, valid_input_index,
-        #                                                     valid_output_index, index_array,
-        #                                                     distance_array=distance_array, fill_value=-999)
-        #             var_rrs[ymin:ymax, xmin:xmax] = [result[:, :]]
-        # name_angles = ['OZA', 'OAA', 'SZA', 'SAA']
-        # for angle in name_angles:
-        #     if self.verbose:
-        #         print(f'[INFO] --->{angle}')
-        #     var = datasetout.variables[angle]
-        #     fvalue = var.getncattr('_FillValue')
-        #
-        #     array = olimage.get_angle_array(angle)
-        #     result = get_sample_from_neighbour_info('nn', output_shape, array, valid_input_index, valid_output_index,
-        #                                             index_array, distance_array=distance_array, fill_value=fvalue)
-        #     # print(np.min(array), np.max(array), np.min(result), np.max(result))
-        #     var[ymin:ymax, xmin:xmax] = [result[:, :]]
+
 
         # sensor mask
         if self.verbose:
-            print(f'[INFO] --->Sensor mask')
+            print(f'[INFO][{granuleindex}] --->Sensor mask')
         var = datasetout.variables['sensor_mask']
         array = np.array(datasetout.variables['sensor_mask'][ymin:ymax, xmin:xmax])
         # sensorflag = granuleindex
@@ -705,7 +702,7 @@ class ArcMapInfo:
         line_output = f'{olimage.name_source};{start_date_str};{olimage.get_rel_pass()};{granuleindex};{orbitindex};{line_original};{line_resampled}'
 
         if self.verbose:
-            print(f'[INFO] Completed. Output file: {fileout}')
+            print(f'[INFO][{granuleindex}] Completed. Output file: {fileout}')
 
         return line_output
 
@@ -847,3 +844,33 @@ class ArcMapInfo:
         for x in range(width):
             lon2D[:, x] = lon1D[x]
         return lat2D, lon2D
+
+    def deprecated(self):
+        print('deprecated')
+# for var in datasetout.variables:
+#     if var.startswith('RRS'):
+#         if self.verbose:
+#             print(f'[INFO] --->{var}')
+#         var_rrs = datasetout.variables[var]
+#
+#         wlref = var_rrs.wavelength
+#         if wlref > 0:
+#             rrsarray = olimage.get_reflectance_band_array(wlref)
+#             rrsarray[mask == 1] = -999
+#
+#             result = get_sample_from_neighbour_info('nn', output_shape, rrsarray, valid_input_index,
+#                                                     valid_output_index, index_array,
+#                                                     distance_array=distance_array, fill_value=-999)
+#             var_rrs[ymin:ymax, xmin:xmax] = [result[:, :]]
+# name_angles = ['OZA', 'OAA', 'SZA', 'SAA']
+# for angle in name_angles:
+#     if self.verbose:
+#         print(f'[INFO] --->{angle}')
+#     var = datasetout.variables[angle]
+#     fvalue = var.getncattr('_FillValue')
+#
+#     array = olimage.get_angle_array(angle)
+#     result = get_sample_from_neighbour_info('nn', output_shape, array, valid_input_index, valid_output_index,
+#                                             index_array, distance_array=distance_array, fill_value=fvalue)
+#     # print(np.min(array), np.max(array), np.min(result), np.max(result))
+#     var[ymin:ymax, xmin:xmax] = [result[:, :]]
