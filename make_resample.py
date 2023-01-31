@@ -137,6 +137,7 @@ def main():
         run_integration(arc_opt)
         return
 
+
 def kk():
     print('DEPRECATED')
     # fgrid = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300m.nc'
@@ -678,6 +679,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     ami = ArcMapInfo(arc_opt, args.verbose)
     if apply_pool != 0:
         params_list = []
+        from multiprocessing import Pool
         if args.verbose:
             print('[INFO] Starting parallel processing')
     else:
@@ -774,10 +776,20 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 else:
                     if args.verbose:
                         print('[INFO] Granule added to the parallel process list')
-                    params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, None, None]
+                    if apply_pool < 0:
+                        params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, None, None]
+                    else:
+                        params_granule = [ami, olimage, file_out, granule_index, orbit_index, arc_opt, params_mask,
+                                          None]
                     if zp.is_zipfile(prod_path):
                         params_granule[7] = path_prod_u
                     params_list.append(params_granule)
+                    if len(params_list) == apply_pool:
+                        if args.verbose:
+                            print(f'[INFO] Running parallel processes: {apply_pool}')
+                        poolhere = Pool(apply_pool)
+                        poolhere.map(make_resample_dir_parallel, params_list)
+                        params_list = []
 
         if dokml:
             start_date = olimage.get_start_date()
@@ -801,7 +813,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             print(f'[INFO] CPUs: {os.cpu_count()}')
             print(f'[INFO] Parallel processes: {apply_pool}')
             print(f'[INFO]******************************************************************************************')
-        from multiprocessing import Pool
+
         if apply_pool < 0:
             poolhere = Pool()
         else:
