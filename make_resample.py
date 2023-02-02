@@ -11,6 +11,7 @@ from datetime import timedelta
 # from arc_integration import ArcIntegration
 # from olci_l2 import OLCI_L2
 # import simplekml
+import numpy as np
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
@@ -39,17 +40,17 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        # check_model()
+        check_model()
         # run_resampling_info()
         # do_check7()  # gettig combinatons
         # do_check8() #information about combinations
         # do_resampled_vm_list()
         # do_resampled_vm_christmas()
         # do_check6()
-        path_olci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T005835_20180715T005917_20211121T192724_0042_033_245______MAR_R_NT_003.SEN3'
-        olimage = OLCI_L2(path_olci, True)
-        olimage.get_geo_and_params()
-        print(olimage.params)
+        # path_olci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T005835_20180715T005917_20211121T192724_0042_033_245______MAR_R_NT_003.SEN3'
+        # olimage = OLCI_L2(path_olci, True)
+        # olimage.get_geo_and_params()
+        # print(olimage.params)
         # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
         # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
         # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
@@ -160,14 +161,53 @@ def kk():
 
 def check_model():
     jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/Out.json'
-    import json
-    f = open(jsonfile)
-    data = json.load(f)
-    f.close()
+    from arc_gpr_model import ARC_GPR_MODEL
+    model = ARC_GPR_MODEL(jsonfile)
+    val_443 = 0.0094
+    val_490 = 0.0100
+    val_560 = 0.0037
+    val_665 = 0.000048831
+    val_longitude = -70.2275
+    day = 207
+    input_vector = np.array([val_longitude,day,np.log10(val_443),np.log10(val_490),np.log10(val_560),np.log10(val_665)])
+    #active_vector = model.active_set_vectors
+
+
+    model.compute_chla_impl(input_vector)
+    #
+    # from sklearn.gaussian_process import GaussianProcessRegressor
+    # from sklearn.gaussian_process.kernels import RationalQuadratic
+    # kernel = RationalQuadratic()
+    # res = kernel.__call__(input_vector,active_vector)
+    # print(res[0].shape)
+    # ymean = res @ model.alpha
+    # print(ymean.shape)
+    # print(ymean)
+    #
+    # kernel_dict = {
+    #     'Name': 'RationalQuadratic',
+    #     'AlphaRQ' : 1.0,
+    #     'LengthScale': 1.0
+    # }
+    # from gpr_kernel import GPR_KERNEL
+    # klois = GPR_KERNEL(kernel_dict)
+    # res_lois = np.zeros((1,864))
+    # for idx in range(864):
+    #     res_lois[0,idx] = klois.compute_kernel(input_vector,active_vector[idx])
+    # print(res_lois.shape)
+    # ymean_lois = res_lois @ model.alpha
+    # print('ymean lois',ymean_lois)
+
+    # dif = res_lois[0]-res[0]
+    # print(dif)
+
+
+    # kernel = RationalQuadratic()
+    # kernel.__call__(input_vector)
 
     from sklearn.gaussian_process import GaussianProcessRegressor
-    gmodel = GaussianProcessRegressor()
-    print(gmodel)
+    # gmodel = GaussianProcessRegressor()
+    # print(gmodel)
 
 
 def check_py():
