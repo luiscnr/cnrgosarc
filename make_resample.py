@@ -160,7 +160,7 @@ def kk():
 
 
 def check_model():
-    jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/Out.json'
+    jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
     from arc_gpr_model import ARC_GPR_MODEL
     model = ARC_GPR_MODEL(jsonfile)
     val_443 = 0.0094
@@ -169,11 +169,19 @@ def check_model():
     val_665 = 0.000048831
     val_longitude = -70.2275
     day = 207
+    input_vector_orig = np.array([val_longitude,day,val_443,val_490,val_560,val_665])
     input_vector = np.array([val_longitude,day,np.log10(val_443),np.log10(val_490),np.log10(val_560),np.log10(val_665)])
     #active_vector = model.active_set_vectors
 
 
-    model.compute_chla_impl(input_vector)
+    res = model.compute_chla_impl(input_vector)
+    print('Res',res)
+    chla = 10**res
+    print('Chla',chla)
+    res = model.compute_chla(input_vector_orig,True)
+    print('Chla',res)
+    res = model.compute_chla_from_param(val_longitude,day,val_443,val_490,val_560,val_665)
+    print('Chla',res)
     #
     # from sklearn.gaussian_process import GaussianProcessRegressor
     # from sklearn.gaussian_process.kernels import RationalQuadratic

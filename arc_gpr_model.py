@@ -15,11 +15,10 @@ class ARC_GPR_MODEL():
         self.active_set_vectors = np.array(model_dict['ActiveSetVectors'])
         self.alpha = np.array(model_dict['Alpha'])
         self.nactive_set_vectors = len(self.active_set_vectors)
+        self.npredictors = len(self.active_set_vectors[0])
 
         self.sigma = model_dict['Sigma']
-        print('Model sigma es: ', self.sigma)
         self.beta = np.array(model_dict['Beta'])
-        print('Beta data es: ', self.beta)
 
         # print(model_dict.keys())
         # print(kernel_dict)
@@ -33,25 +32,66 @@ class ARC_GPR_MODEL():
         # print(model_dict['Sigma'])
 
     def compute_chla_impl(self, feature_vector):
+        # term 1->linear equation
+        X = np.concatenate(([1], feature_vector))
+        H = X @ self.beta
 
+        # term 2->kernel
         kresult = np.zeros(self.nactive_set_vectors)
         for idx in range(self.nactive_set_vectors):
             active_vector = self.active_set_vectors[idx]
             kresult[idx] = self.kernel.compute_kernel(active_vector, feature_vector)
         K = kresult @ self.alpha
 
-        print('FINAL: ', val)
+        val_fin = H + K
 
-        X = np.concatenate(([1],feature_vector))
-        H = X @ self.beta
-        # valnew = self.beta[0]
-        # for idx in range(1, 7):
-        #     valnew = valnew + (self.beta[idx] * feature_vector[idx - 1])
+        return val_fin
 
-        print('CHECK: ', H)
+    def compute_chla(self, feature_vector, transform_input):
+        if len(feature_vector) != self.npredictors:
+            return np.nan
+        if transform_input:
+            for idx in range(2, self.npredictors):
+                feature_vector[idx] = np.log10(feature_vector[idx])
+        val_fin = self.compute_chla_impl(feature_vector)
+        chla = 10 ** val_fin
+        return chla
 
-        val_fin = H + val
+    def compute_chla_from_param(self, long_value, day, val_443, val_490, val_560, val_665):
+        feature_vector = [long_value, day, val_443, val_490, val_560, val_665]
+        return self.compute_chla(feature_vector, True)
 
-        print('VALFIN: ', val_fin)
+    def compute_chla_from_matrix(self, matrix, transform_input):
+        matrix = np.zeros((16, 6))
+        if len(matrix.shape) != 2 or matrix.shape[1] != self.npredictors:
+            return None
+        nobs = matrix.shape[0]
+        result = np.zeros(nobs)
+        for idx in range(nobs):
+            result[idx] = self.compute_chla(matrix[idx], transform_input)
+        return result
 
-        return val
+    def compute_chla_from_2d_arrays(self, array_long, day, array_443, array_490, array_560, array_665):
+
+        chla_array = np.zeros(array_long.shape)
+        chla_array[:] = -999
+
+        indices = np.where(
+            np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_560 > 0, array_665 > 0)))
+        nvalid = len(indices[0])
+        if nvalid == 0:
+            return chla_array
+
+        input_matrix = np.zeros(nvalid, self.npredictors)
+        input_matrix[:, 0] = array_long[indices]
+        input_matrix[:, 1] = day
+        input_matrix[:, 2] = array_443[indices]
+        input_matrix[:, 3] = array_490[indices]
+        input_matrix[:, 4] = array_560[indices]
+        input_matrix[:, 5] = array_665[indices]
+
+        chla_1d = self.compute_chla_from_matrix(input_matrix, True)
+
+        chla_array[indices] = chla_1d
+
+        return chla_array
