@@ -15,7 +15,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEBASE", "RESAMPLEPML", "INTEGRATE", "QL"],
+                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -24,18 +24,19 @@ parser.add_argument('-tp', "--temp_path", help="Temporary directory")
 parser.add_argument('-sd', "--start_date", help="Start date (yyyy-mm-dd)")
 parser.add_argument('-ed', "--end_date", help="End date (yyyy-mm-dd")
 parser.add_argument('-c', "--config_file", help="Configuration file (Default: arc_config.ini)")
+parser.add_argument('-bf', "--base_file", help="Create base file for the following mode: RESAMPLE,INTEGRATE.",
+                    action="store_true")
 parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true")
 args = parser.parse_args()
 
 
 def main():
-    print('[INFO] Started Artic Resampler')
+    print('[INFO] Started Artic Processing Tool')
     if args.mode == "CHECKPY":
         check_py()
         return
 
     from arc_mapinfo import ArcMapInfo
-
     from olci_l2 import OLCI_L2
     import os
 
@@ -56,48 +57,21 @@ def main():
         # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
         return
 
-    # fconfig = None
-    # if args.config_file:
-    #     fconfig = args.config_file
-
-    if args.mode == "CHECK":
-        return
-
-    if args.mode == 'GRID' and args.output:  ##creating grid
-        print('create grid')
+    if args.mode == 'GRID' and args.outputpath:  ##creating single file grid
+        print('Create grid')
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
         ami.create_nc_filegrid(file_out, True, False)
         return
 
-    if args.mode == "RESAMPLE" and args.product:  ##testing, resampling of a single granule
-        ami = ArcMapInfo(None, args.verbose)
-        file_out = args.outputpath
-        folci = args.product
-        olimage = OLCI_L2(folci, args.verbose)
-        olimage.get_geo_and_params()
-        try:
-            import configparser
-            options = configparser.ConfigParser()
-            options.read(args.config_file)
-            from arc_options import ARC_OPTIONS
-            arc_opt = ARC_OPTIONS(options)
-        except:
-            print(f'[ERROR] Config file {args.config_file} could not be read. Exiting...')
-            return
-
-        line_output = ami.make_resample_impl(olimage, file_out, 1, -1, arc_opt, None)
-        print(line_output)
-        return
-
-    if args.mode == "RESAMPLEPML" and args.product:  ##testing, resampling of a single PML file
+    if args.mode == "RESAMPLEPML" and args.product and args.outputpath:  ##testing, resampling of a single PML file
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
         fpml = args.product
         ami.make_resample_pml(fpml, file_out)
         return
 
-    if args.mode == 'QL' and args.product:
+    if args.mode == 'QL' and args.product and args.outputpath: ##Quick Look Generation
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
         fdataset = args.product
@@ -105,6 +79,15 @@ def main():
         ami.save_quick_look_fdata(file_out, fdataset, 'chla')
         return
 
+    if args.mode == 'INTEGRATE' and args.base_file and args.outputpath:
+        output_path = args.output_path
+        if not os.path.exists(output_path) and not os.path.isdir(output_path):
+            print(f'[ERROR] Output path {output_path} does not exist or nor it is a directory')
+            return
+        from arc_integration import ArcIntegration
+        arcInt = ArcIntegration()
+
+    ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
         return
@@ -121,14 +104,24 @@ def main():
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
 
-    if args.mode == 'RESAMPLEBASE' and args.product:
+    if args.mode == 'RESAMPLE' and args.base_file and args.product:
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
-
         ami.create_nc_file_resample_base(olimage, file_out, arc_opt)
+
+    if args.mode == "RESAMPLE" and args.product:  ##resampling of a single granule. Options are also required
+        ami = ArcMapInfo(None, args.verbose)
+        file_out = args.outputpath
+        folci = args.product
+        olimage = OLCI_L2(folci, args.verbose)
+        olimage.get_geo_and_params()
+        line_output = ami.make_resample_impl(olimage, file_out, 1, -1, arc_opt, None)
+        if args.verbose:
+            print(f'[INFO] Output line: {line_output}')
+        return
 
     if args.mode == 'RESAMPLE':
         run_resample(arc_opt)
@@ -136,6 +129,10 @@ def main():
 
     if args.mode == 'INTEGRATE':
         run_integration(arc_opt)
+        return
+
+    if args.mode == 'CHLA':
+        run_chla(arc_opt)
         return
 
 
@@ -169,19 +166,19 @@ def check_model():
     val_665 = 0.000048831
     val_longitude = -70.2275
     day = 207
-    input_vector_orig = np.array([val_longitude,day,val_443,val_490,val_560,val_665])
-    input_vector = np.array([val_longitude,day,np.log10(val_443),np.log10(val_490),np.log10(val_560),np.log10(val_665)])
-    #active_vector = model.active_set_vectors
-
+    input_vector_orig = np.array([val_longitude, day, val_443, val_490, val_560, val_665])
+    input_vector = np.array(
+        [val_longitude, day, np.log10(val_443), np.log10(val_490), np.log10(val_560), np.log10(val_665)])
+    # active_vector = model.active_set_vectors
 
     res = model.compute_chla_impl(input_vector)
-    print('Res',res)
-    chla = 10**res
-    print('Chla',chla)
-    res = model.compute_chla(input_vector_orig,True)
-    print('Chla',res)
-    res = model.compute_chla_from_param(val_longitude,day,val_443,val_490,val_560,val_665)
-    print('Chla',res)
+    print('Res', res)
+    chla = 10 ** res
+    print('Chla', chla)
+    res = model.compute_chla(input_vector_orig, True)
+    print('Chla', res)
+    res = model.compute_chla_from_param(val_longitude, day, val_443, val_490, val_560, val_665)
+    print('Chla', res)
     #
     # from sklearn.gaussian_process import GaussianProcessRegressor
     # from sklearn.gaussian_process.kernels import RationalQuadratic
@@ -208,7 +205,6 @@ def check_model():
 
     # dif = res_lois[0]-res[0]
     # print(dif)
-
 
     # kernel = RationalQuadratic()
     # kernel.__call__(input_vector)
@@ -412,6 +408,29 @@ def run_integration(arc_opt):
             arc_integration.make_integration(fout)
 
         date_run = date_run + timedelta(hours=24)
+
+
+def run_chla(arc_opt):
+    options = arc_opt.get_processing_options()
+    if options is None:
+        return
+    from arc_processing import ArcProcessing
+    arc_proc = ArcProcessing(arc_opt, args.verbose)
+    input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
+    if input_name is not None:
+        input_file = os.path.join(options['input_path'], input_name)
+        if os.path.exists(input_file):
+            if args.verbose:
+                print(f'[INFO] Working with the single file: {input_file}')
+        else:
+            print(f'[ERROR] File {input_file} does not exist')
+        output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
+        if output_name is None:
+            output_name = 'SingleOutputChla.nc'
+        output_file = os.path.join(options['output_path'], output_name)
+        if args.verbose:
+            print(f'[INFO] Output file: {output_file}')
+        arc_proc.compute_chla_image(input_file, output_file)
 
 
 def do_check7():

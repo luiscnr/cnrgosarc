@@ -4,7 +4,7 @@ import numpy as np
 class ARC_GPR_MODEL():
 
     def __init__(self, fmodel):
-        print('STARTED MODEL')
+        print('[INFO] Started GPR model')
         import json
         f = open(fmodel)
         model_dict = json.load(f)
@@ -61,16 +61,39 @@ class ARC_GPR_MODEL():
         feature_vector = [long_value, day, val_443, val_490, val_560, val_665]
         return self.compute_chla(feature_vector, True)
 
-    def compute_chla_from_matrix(self, matrix, transform_input):
-        matrix = np.zeros((16, 6))
+    ##fast implementantion, with transformed data
+    def compute_chla_from_matrix(self, matrix):
+        print('31')
         if len(matrix.shape) != 2 or matrix.shape[1] != self.npredictors:
             return None
+        print('32')
         nobs = matrix.shape[0]
         result = np.zeros(nobs)
+        print('33')
         for idx in range(nobs):
-            result[idx] = self.compute_chla(matrix[idx], transform_input)
+            if (idx % 1000) == 0:
+                print(idx, '/', nobs)
+            feature_vector = matrix[idx]
+            X = np.concatenate(([1], feature_vector))
+            H = X @ self.beta
+            #kresult = np.zeros(self.nactive_set_vectors)
+            K = 0
+            for idv in range(self.nactive_set_vectors):
+                active_vector = self.active_set_vectors[idv]
+                sum = np.sum(np.power((active_vector - feature_vector), 2) / np.power(self.kernel.length_scale, 2))
+                kresult = (self.kernel.sigmaf ** 2) * ((1 + ((1 / (2 * self.kernel.alpharq)) * sum)) ** -self.kernel.alpharq)
+                K = K + (kresult*self.alpha[idv])
+                #kresult[idx] = self.kernel.compute_kernel(active_vector, feature_vector)
+            #K = kresult @ self.alpha
+            result[idx] = H + K
+        print('34')
         return result
 
+    def check_chla_valid(self,array_443, array_490, array_560, array_665):
+        indices = np.where(
+            np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_560 > 0, array_665 > 0)))
+        nvalid = len(indices[0])
+        return nvalid
     def compute_chla_from_2d_arrays(self, array_long, day, array_443, array_490, array_560, array_665):
 
         chla_array = np.zeros(array_long.shape)
@@ -82,16 +105,17 @@ class ARC_GPR_MODEL():
         if nvalid == 0:
             return chla_array
 
-        input_matrix = np.zeros(nvalid, self.npredictors)
+        print('1', nvalid)
+        input_matrix = np.zeros((nvalid, self.npredictors))
         input_matrix[:, 0] = array_long[indices]
         input_matrix[:, 1] = day
-        input_matrix[:, 2] = array_443[indices]
-        input_matrix[:, 3] = array_490[indices]
-        input_matrix[:, 4] = array_560[indices]
-        input_matrix[:, 5] = array_665[indices]
-
-        chla_1d = self.compute_chla_from_matrix(input_matrix, True)
-
+        input_matrix[:, 2] = np.log10(array_443[indices])
+        input_matrix[:, 3] = np.log10(array_490[indices])
+        input_matrix[:, 4] = np.log10(array_560[indices])
+        input_matrix[:, 5] = np.log10(array_665[indices])
+        print('2', input_matrix.shape)
+        chla_1d = self.compute_chla_from_matrix(input_matrix)
+        print('3')
         chla_array[indices] = chla_1d
-
+        print('4')
         return chla_array

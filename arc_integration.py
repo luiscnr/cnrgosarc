@@ -11,37 +11,50 @@ import simplekml
 
 class ArcIntegration():
 
-    def __init__(self, arc_opt, verbose, dir_input):
+    def __init__(self, arc_opt, verbose, dir_input, output_type):
 
         self.verbose = verbose
         self.dir_input = dir_input
         self.ami = ArcMapInfo(arc_opt, False)
         self.width = self.ami.area_def.width
         self.height = self.ami.area_def.height
-        self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
+        self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75]
+        self.olci_l2_min_values = [-0.0063 ,-0.0058 ,-0.0046,-0.0029,-0.0024 ,-0.0017 ,-0.0012,-0.00083,-0.000794,-0.00071,-0.00065]
+
         self.info = {}
+        if output_type is None:
+            output_type = 'RRS'
+        self.output_type = output_type
         self.time_min = -1
         self.time_max = -1
 
-        # self.arc_integration_method = 'Average'
-        # self.ystep = 6500
-        # self.xstep = 6500
-        # self.platform = 'S3'
-        self.average_variables_all = []
+        self.rrs_variables_all = []
         for wl in self.olci_l2_bands:
             wls = str(wl)
             wls = wls.replace('.', '_')
             bname = f'RRS{wls}'
-            self.average_variables_all.append(bname)
+            self.rrs_variables_all.append(bname)
+
+        self.transp_variables_all = ['KD490_M07']
+
+        if arc_opt is None:  ##only for creating base file
+            return
 
         section = 'INTEGRATE'
         self.arc_integration_method = arc_opt.get_value_param(section, 'method', 'average', 'str')
         self.th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
-        self.mask_negatives = arc_opt.get_value_param(section,'mask_negatives',True,'boolean')
+        self.mask_negatives = arc_opt.get_value_param(section, 'mask_negatives', False, 'boolean')
         self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
         self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
         self.platform = arc_opt.get_value_param(section, 'platform', 'S3', 'str')
-        self.average_variables = arc_opt.get_value_param(section, 'avg_bands', self.average_variables_all, 'rrslist')
+        if self.output_type == 'RRS':
+            self.average_variables = self.rrs_variables_all
+        elif self.output_type == 'TRANSP':
+            self.average_variables = self.transp_variables_all
+        else:
+            rrs_variables = arc_opt.get_value_param(section, 'rrs_bands', self.rrs_variables_all, 'rrslist')
+            transp_variables = arc_opt.get_value_param(section, 'transp_bands', self.transp_variables_all, 'strlist')
+            self.average_variables = rrs_variables + transp_variables
 
         if self.verbose:
             print(f'[INFO] Integration method: {self.arc_integration_method}')
@@ -57,20 +70,36 @@ class ArcIntegration():
             return datasetout
 
         ##create rrs variables
+        if self.output_type == 'RRS':
+            for idx in range(len(self.olci_l2_bands)):
+                wl = self.olci_l2_bands[idx]
+                wlstr = str(wl).replace('.', '_')
+                bandname = f'RRS{wlstr}'
+                if bandname in datasetout.variables:
+                    continue
+                if self.verbose:
+                    print(f'[INFO] Creating RRS band: {bandname}')
+                var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var[:] = 0
+                #var.wavelength = wl
+                var.long_name = f'Remote Sensing Reflectance at {bandname.lower()}'
+                var.standard_name = f'surface_ratio_of_upwelling_radiance_emerging_from_sea_water_to_downwelling_radiative_flux_in_air'
+                var.units = 'sr^-1'
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'longitude latitude'
+                var.valid_min = self.olci_l2_min_values[idx]
+                var.valid_max = 1.0
+                var.type = 'surface'
+                var.applied_flags = '(WATER, INLAND_WATER) and not (CLOUD, CLOUD_AMBIGUOUS, CLOUD_MARGIN, INVALID, ' \
+                                    'COSMETIC, SATURATED, SUSPECT, HISOLZEN, HIGHGLINT, SNOW_ICE, AC_FAIL, WHITECAPS, ' \
+                                    'ADJAC, RWNEG_O2, RWNEG_O3, RWNEG_O4, RWNEG_O5, RWNEG_O6, RWNEG_O7, RWNEG_O8) '
+                var.source = 'OLCI - Level2'
 
 
-        for wl in self.olci_l2_bands:
-            wlstr = str(wl).replace('.', '_')
-            bandname = f'RRS{wlstr}'
-            if self.verbose:
-                print(f'[INFO] Creating RRS band: {bandname}')
-            # self.average_variables.append(bandname)
-            var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
-            var[:] = 0
-            var.wavelength = wl
 
         if self.verbose:
             print(f'[INFO] Creating other bands...')
+
         ##create sum_weights variable
         var = datasetout.createVariable('sum_weights', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
         var[:] = 0
@@ -78,6 +107,9 @@ class ArcIntegration():
         # create n_granules
         var = datasetout.createVariable('n_granules', 'i4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
         var[:] = 0
+
+        if self.output_type == 'RRS' or self.output_type == 'TRANSP':
+            return datasetout
 
         # time_dif
         var = datasetout.createVariable('time_dif', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
@@ -101,6 +133,7 @@ class ArcIntegration():
 
         return datasetout
 
+    ##TYPE: RRS, KD, CONFIG
     def make_integration(self, file_out):
         if self.verbose:
             print('[INFO] Checking bands: ')
@@ -111,6 +144,7 @@ class ArcIntegration():
         if self.arc_integration_method == 'average':
             self.make_integration_avg(file_out)
 
+    # TYPE: RRS, KD, CONFIG
     def make_integration_avg(self, file_out):
         if self.verbose:
             print('[INFO] Retrieving info from granules...')
@@ -126,6 +160,7 @@ class ArcIntegration():
         var_sensor_mask = datasetout.variables['sensor_mask']
         var_n_granules = datasetout.variables['n_granules']
         var_weighted_mask = datasetout.variables['sum_weights']
+
         # var_time_dif = datasetout.variables['time_dif']
         # var_time_min = datasetout.variables['time_min']
         # var_time_max = datasetout.variables['time_min']
@@ -148,20 +183,15 @@ class ArcIntegration():
             xini = self.info[name]['x_min']
             xfin = self.info[name]['x_max']
 
-            # sensor_flag = self.info[name]['sensor_flag']
-            # h = yfin - yini
-            # w = xfin - xini
-            # info_overlap = self.get_overlapping_images(name, yini, yfin, xini, xfin)
             dataset = Dataset(file)
             sensor_mask_granule = np.array(dataset.variables['sensor_mask'][yini:yfin, xini:xfin])
             weigthed_mask_granule = np.array(dataset.variables['mask'][yini:yfin, xini:xfin])
 
             if self.mask_negatives:
-                for idx in range(1,7):
+                for idx in range(1, 7):
                     var_rrs = self.average_variables_all[idx]
                     var_rrs_array = np.array(dataset.variables[var_rrs][yini:yfin, xini:xfin])
-                    weigthed_mask_granule = np.where(var_rrs_array>0,weigthed_mask_granule,0)
-
+                    weigthed_mask_granule = np.where(var_rrs_array > 0, weigthed_mask_granule, 0)
 
             sensor_mask = np.array(var_sensor_mask[yini:yfin, xini:xfin])
             ngranules = np.array(var_n_granules[yini:yfin, xini:xfin])

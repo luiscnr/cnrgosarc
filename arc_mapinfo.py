@@ -157,6 +157,7 @@ class ArcMapInfo:
 
         if datasetout is None:
             print(f'[ERROR] Output file {fileout} could not be created')
+        datasetout.close()
 
     def create_nc_file_resampled(self, ofname, olimage, arc_opt):
         section = 'RESAMPLE'
