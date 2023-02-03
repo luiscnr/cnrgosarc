@@ -25,7 +25,7 @@ class ArcProcessing:
         section = 'PROCESSING'
         self.file_model = self.arc_opt.get_value_param(section, 'file_model', file_model_default, 'str')
         if os.path.exists(self.file_model):
-            self.chla_model = ARC_GPR_MODEL(file_model_default)
+            self.chla_model = ARC_GPR_MODEL(self.file_model)
         self.file_grid = arc_opt.get_value_param(section, 'file_base', file_grid_default, 'str')
         self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
         self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
