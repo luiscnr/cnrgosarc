@@ -63,59 +63,51 @@ class ARC_GPR_MODEL():
 
     ##fast implementantion, with transformed data
     def compute_chla_from_matrix(self, matrix):
-        print('31')
-        if len(matrix.shape) != 2 or matrix.shape[1] != self.npredictors:
+        if len(matrix.shape) != 2 or matrix.shape[1] != (self.npredictors + 1):
             return None
-        print('32')
+        H = self.beta @ matrix.transpose()
         nobs = matrix.shape[0]
-        result = np.zeros(nobs)
-        print('33')
-        for idx in range(nobs):
-            if (idx % 1000) == 0:
-                print(idx, '/', nobs)
-            feature_vector = matrix[idx]
-            X = np.concatenate(([1], feature_vector))
-            H = X @ self.beta
-            #kresult = np.zeros(self.nactive_set_vectors)
-            K = 0
-            for idv in range(self.nactive_set_vectors):
-                active_vector = self.active_set_vectors[idv]
-                sum = np.sum(np.power((active_vector - feature_vector), 2) / np.power(self.kernel.length_scale, 2))
-                kresult = (self.kernel.sigmaf ** 2) * ((1 + ((1 / (2 * self.kernel.alpharq)) * sum)) ** -self.kernel.alpharq)
-                K = K + (kresult*self.alpha[idv])
-                #kresult[idx] = self.kernel.compute_kernel(active_vector, feature_vector)
-            #K = kresult @ self.alpha
-            result[idx] = H + K
-        print('34')
+        KResults = np.zeros((nobs, self.nactive_set_vectors))
+        KTemp = np.zeros((nobs, self.npredictors))
+        for idv in range(self.nactive_set_vectors):
+            active_vector = self.active_set_vectors[idv]
+            KTemp[:, 0] = np.power((active_vector[0] - matrix[:, 1]), 2) / np.power(self.kernel.length_scale[0], 2)
+            KTemp[:, 1] = np.power((active_vector[1] - matrix[:, 2]), 2) / np.power(self.kernel.length_scale[1], 2)
+            KTemp[:, 2] = np.power((active_vector[2] - matrix[:, 3]), 2) / np.power(self.kernel.length_scale[2], 2)
+            KTemp[:, 3] = np.power((active_vector[3] - matrix[:, 4]), 2) / np.power(self.kernel.length_scale[3], 2)
+            KTemp[:, 4] = np.power((active_vector[4] - matrix[:, 5]), 2) / np.power(self.kernel.length_scale[4], 2)
+            KTemp[:, 5] = np.power((active_vector[5] - matrix[:, 6]), 2) / np.power(self.kernel.length_scale[5], 2)
+            KSum = np.sum(KTemp, 1)
+            KResults[:, idv] = (self.kernel.sigmaf ** 2) * (
+                    (1 + ((1 / (2 * self.kernel.alpharq)) * KSum)) ** -self.kernel.alpharq)
+            KResults[:, idv] = KResults[:, idv] * self.alpha[idv]
+        K = np.sum(KResults, 1)
+        result = H + K
+        result = np.power(10, result)
         return result
 
-    def check_chla_valid(self,array_443, array_490, array_560, array_665):
+    def check_chla_valid(self, array_443, array_490, array_560, array_665):
         indices = np.where(
             np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_560 > 0, array_665 > 0)))
         nvalid = len(indices[0])
         return nvalid
-    def compute_chla_from_2d_arrays(self, array_long, day, array_443, array_490, array_560, array_665):
 
+    # EFFECTIVE METHOD FOR RETREIVING CHLA
+    def compute_chla_from_2d_arrays(self, array_long, day, array_443, array_490, array_560, array_665):
         chla_array = np.zeros(array_long.shape)
         chla_array[:] = -999
-
         indices = np.where(
             np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_560 > 0, array_665 > 0)))
         nvalid = len(indices[0])
         if nvalid == 0:
             return chla_array
-
-        print('1', nvalid)
-        input_matrix = np.zeros((nvalid, self.npredictors))
-        input_matrix[:, 0] = array_long[indices]
-        input_matrix[:, 1] = day
-        input_matrix[:, 2] = np.log10(array_443[indices])
-        input_matrix[:, 3] = np.log10(array_490[indices])
-        input_matrix[:, 4] = np.log10(array_560[indices])
-        input_matrix[:, 5] = np.log10(array_665[indices])
-        print('2', input_matrix.shape)
+        input_matrix = np.ones((nvalid, self.npredictors + 1))
+        input_matrix[:, 1] = array_long[indices]
+        input_matrix[:, 2] = day
+        input_matrix[:, 3] = np.log10(array_443[indices])
+        input_matrix[:, 4] = np.log10(array_490[indices])
+        input_matrix[:, 5] = np.log10(array_560[indices])
+        input_matrix[:, 6] = np.log10(array_665[indices])
         chla_1d = self.compute_chla_from_matrix(input_matrix)
-        print('3')
         chla_array[indices] = chla_1d
-        print('4')
         return chla_array

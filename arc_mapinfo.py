@@ -16,7 +16,7 @@ class ArcMapInfo:
         # DEFAULTS
         area_id = 'polar_stereographic'
         # self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300mNOGEO.nc'
-        ifile_base_default = '/store/COP2-OC-TAC/arc/code/ArcGrid_65_90_300mNOGEO.nc'
+        ifile_base_default = '/store/COP2-OC-TAC/arc/code/ArcGrid_65_90_300m.nc'
         self.ifile_base = ifile_base_default
 
         if arc_options is not None:

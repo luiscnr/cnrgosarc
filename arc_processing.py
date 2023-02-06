@@ -101,55 +101,28 @@ class ArcProcessing:
 
         if self.verbose:
             print(f'[INFO] Computing chla. YStep: {self.ystep} XStep: {self.xstep}')
-        valid_tiles = []
 
+        iprogress = 1
+        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
         for y in range(0, self.height, self.ystep):
-            if self.verbose:
-                print(f'[INFO] -> {y}')
             for x in range(0, self.width, self.xstep):
-                if self.verbose:
-                    print(f'[INFO] -> {y} {x}')
+                iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-                #array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
                 array_443 = np.array(var443[limits[0]:limits[1], limits[2]:limits[3]])
                 array_490 = np.array(var490[limits[0]:limits[1], limits[2]:limits[3]])
                 array_560 = np.array(var560[limits[0]:limits[1], limits[2]:limits[3]])
                 array_665 = np.array(var665[limits[0]:limits[1], limits[2]:limits[3]])
-                nvalid = self.chla_model.check_chla_valid(array_443,array_490,array_560,array_665)
-                if nvalid>0:
-                    valid_tiles.append(limits)
-
-                # array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
-                #
-                # array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
-                #                                                          array_560, array_665)
-                # array_diff = array_chla_prev / array_chla
-                #
-                # var_chla[limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
-                # var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
-
-        nvalidtiles = len(valid_tiles)
-        itile = 0
-        print('NValidTiles: ',nvalidtiles)
-        for limits in valid_tiles:
-
-            if self.verbose:
-                itile = itile + 1
-                print(f'[INFO] Computing chla for tile: {itile} / {nvalidtiles} ')
-            array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
-            array_443 = np.array(var443[limits[0]:limits[1], limits[2]:limits[3]])
-            array_490 = np.array(var490[limits[0]:limits[1], limits[2]:limits[3]])
-            array_560 = np.array(var560[limits[0]:limits[1], limits[2]:limits[3]])
-            array_665 = np.array(var665[limits[0]:limits[1], limits[2]:limits[3]])
-            array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
-
-            array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
-                                                                     array_560, array_665)
-            array_diff = array_chla_prev / array_chla
-
-            var_chla[limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
-            var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
-
+                nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if self.verbose:
+                    print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+                if nvalid > 0:
+                    array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
+                    array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+                    array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
+                                                                             array_560, array_665)
+                    array_diff = array_chla_prev / array_chla
+                    var_chla[limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+                    var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
         ncsat.close()
         if ncgrid is not None:
             ncgrid.close()
@@ -189,8 +162,8 @@ class ArcProcessing:
         var.type = "surface"
         var.units = "milligram m^-3"
         var.missing_value = -999.0
-        var.valid_min = np.float(0.01)
-        var.valid_max = np.float(300.0)
+        # var.valid_min = np.float(0.01)
+        # var.valid_max = np.float(300.0)
         var.comment = ""
         var.source = "OLCI - WFR STANDARD PROCESSOR - GPR CHL-A ALGORITHM"
 

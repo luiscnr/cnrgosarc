@@ -41,7 +41,8 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        check_model()
+        check_chla()
+        # check_model()
         # run_resampling_info()
         # do_check7()  # gettig combinatons
         # do_check8() #information about combinations
@@ -85,7 +86,19 @@ def main():
             print(f'[ERROR] Output path {output_path} does not exist or nor it is a directory')
             return
         from arc_integration import ArcIntegration
-        arcInt = ArcIntegration()
+        arcInt = ArcIntegration(None,args.verbose,None,'RRS')
+
+        fout = os.path.join(output_path,'ArcGrid_65_90_300m_RRS_NR_Base.nc')
+        arcInt.create_nc_file_out(fout,'NR')
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NT_Base.nc')
+        arcInt.create_nc_file_out(fout, 'NT')
+
+        arcInt.output_type = 'TRANSP'
+        fout = os.path.join(output_path,'ArcGrid_69_90_300m_TRANSP_NR_Base.nc')
+        arcInt.create_nc_file_out(fout,'NR')
+        fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NT_Base.nc')
+        arcInt.create_nc_file_out(fout, 'NT')
+
 
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
     if not args.config_file:
@@ -155,7 +168,17 @@ def kk():
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
     # ami.save_quick_look_fdata(fout,fdata)
 
+def check_chla():
+    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/207/02019_chl-arc-fr.nc'
+    from netCDF4 import Dataset
+    ncsat = Dataset(file)
+    chla = np.array(ncsat.variables['chla'])
+    chla_valid = chla[chla>0]
+    print(chla_valid.shape)
 
+    ncsat.close()
+
+    return True
 def check_model():
     jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
     from arc_gpr_model import ARC_GPR_MODEL

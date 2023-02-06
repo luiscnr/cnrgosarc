@@ -11,7 +11,7 @@ import simplekml
 
 class ArcIntegration():
 
-    def __init__(self, arc_opt, verbose, dir_input, output_type):
+    def __init__(self, arc_opt, verbose, dir_input, output_type, file_attributes):
 
         self.verbose = verbose
         self.dir_input = dir_input
@@ -19,7 +19,9 @@ class ArcIntegration():
         self.width = self.ami.area_def.width
         self.height = self.ami.area_def.height
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75]
-        self.olci_l2_min_values = [-0.0063 ,-0.0058 ,-0.0046,-0.0029,-0.0024 ,-0.0017 ,-0.0012,-0.00083,-0.000794,-0.00071,-0.00065]
+        self.olci_l2_min_values = [-0.0063, -0.0058, -0.0046, -0.0029, -0.0024, -0.0017, -0.0012, -0.00083, -0.000794,
+                                   -0.00071, -0.00065]
+        self.file_attributes = file_attributes
 
         self.info = {}
         if output_type is None:
@@ -51,7 +53,7 @@ class ArcIntegration():
             self.average_variables = self.rrs_variables_all
         elif self.output_type == 'TRANSP':
             self.average_variables = self.transp_variables_all
-        else:
+        elif self.output_type == 'TEST':
             rrs_variables = arc_opt.get_value_param(section, 'rrs_bands', self.rrs_variables_all, 'rrslist')
             transp_variables = arc_opt.get_value_param(section, 'transp_bands', self.transp_variables_all, 'strlist')
             self.average_variables = rrs_variables + transp_variables
@@ -62,26 +64,75 @@ class ArcIntegration():
             print(f'[INFO] Platform: {self.platform}')
             print(f'[INFO] Variables: {self.average_variables}')
 
-    def create_nc_file_out(self, ofname):
+    def get_global_attributes(self, timeliness):
+        if self.file_attributes is None:
+            return None
+        if not os.path.exists(self.file_attributes):
+            return None
+        import configparser
+        try:
+            options = configparser.ConfigParser()
+            options.read(self.file_attributes)
+        except:
+            return None
+        if not options.has_section('GLOBAL_ATTRIBUTES'):
+            return None
+        at_dict = dict(options['GLOBAL_ATTRIBUTES'])
+        if timeliness is None:
+            return at_dict
+        if self.output_type == 'RRS':
+            at_dict['parameter'] = 'Remote Sensing Reflectance'
+            at_dict['parameter_code'] = 'RRS'
+            if timeliness == 'NR':
+                at_dict['timeliness'] = 'NR'
+                at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
+                at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D'
+            if timeliness == 'NT':
+                at_dict['timeliness'] = 'NT'
+                at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
+                at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_my_l3-olci-300m_P1D'
+
+        if self.output_type == 'TRANSP':
+            at_dict['parameter'] = 'Diffuse attenuation coefficient at 490nm'
+            at_dict['parameter_code'] = 'KD490'
+            if timeliness == 'NR':
+                at_dict['timeliness'] = 'NR'
+                at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
+                at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_nrt_l3-olci-300m_P1D'
+            if timeliness == 'NT':
+                at_dict['timeliness'] = 'NT'
+                at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
+                at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_my_l3-olci-300m_P1D'
+
+        return at_dict
+
+    def create_nc_file_out(self, ofname, timeliness):
         if self.verbose:
             print(f'[INFO] Copying file base to start output file...')
         datasetout = self.ami.copy_nc_base(ofname)
         if datasetout is None:
             return datasetout
 
+        ##global attributes
+        atribs = self.get_global_attributes(timeliness)
+        for at in atribs:
+            datasetout.setncattr(at, atribs[at])
+
         ##create rrs variables
-        if self.output_type == 'RRS':
+        if self.output_type == 'RRS' or self.output_type== 'TEST':
             for idx in range(len(self.olci_l2_bands)):
                 wl = self.olci_l2_bands[idx]
                 wlstr = str(wl).replace('.', '_')
                 bandname = f'RRS{wlstr}'
                 if bandname in datasetout.variables:
                     continue
+                if not bandname in self.average_variables:
+                    continue
                 if self.verbose:
                     print(f'[INFO] Creating RRS band: {bandname}')
                 var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
-                var[:] = 0
-                #var.wavelength = wl
+                # var[:] = 0
+                # var.wavelength = wl
                 var.long_name = f'Remote Sensing Reflectance at {bandname.lower()}'
                 var.standard_name = f'surface_ratio_of_upwelling_radiance_emerging_from_sea_water_to_downwelling_radiative_flux_in_air'
                 var.units = 'sr^-1'
@@ -90,12 +141,33 @@ class ArcIntegration():
                 var.valid_min = self.olci_l2_min_values[idx]
                 var.valid_max = 1.0
                 var.type = 'surface'
+                var.missing_value = -999.0
                 var.applied_flags = '(WATER, INLAND_WATER) and not (CLOUD, CLOUD_AMBIGUOUS, CLOUD_MARGIN, INVALID, ' \
                                     'COSMETIC, SATURATED, SUSPECT, HISOLZEN, HIGHGLINT, SNOW_ICE, AC_FAIL, WHITECAPS, ' \
                                     'ADJAC, RWNEG_O2, RWNEG_O3, RWNEG_O4, RWNEG_O5, RWNEG_O6, RWNEG_O7, RWNEG_O8) '
                 var.source = 'OLCI - Level2'
 
-
+        bandname = 'KD490'
+        addtransp = False
+        if bandname in self.average_variables and not bandname in datasetout.variables:
+            addtransp = True
+        if addtransp:
+            var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            # var[:] = 0
+            var.band_name = 'OLCI band name KD490_M07'
+            var.long_name = 'OLCI Diffuse Attenuation Coefficient at 490nm'
+            var.standard_name = 'volume_attenuation_coefficient_of_downwelling_radiative_flux_in_sea_water'
+            var.units = 'm^-1'
+            var.grid_mapping = 'stereographic'
+            var.coordinates = 'longitude latitude'
+            var.type = 'surface'
+            var.valid_min = 0.0
+            var.valid_max = 10.0
+            var.missing_value = -999.0
+            var.applied_flags = '(WATER, INLAND_WATER) and not (CLOUD, CLOUD_AMBIGUOUS, CLOUD_MARGIN, INVALID, ' \
+                                'COSMETIC, SATURATED, SUSPECT, HISOLZEN, HIGHGLINT, SNOW_ICE, AC_FAIL, WHITECAPS, ' \
+                                'ADJAC, RWNEG_O2, RWNEG_O3, RWNEG_O4, RWNEG_O5, RWNEG_O6, RWNEG_O7, RWNEG_O8) '
+            var.source = 'OLCI - Level2'
 
         if self.verbose:
             print(f'[INFO] Creating other bands...')
@@ -133,19 +205,19 @@ class ArcIntegration():
 
         return datasetout
 
-    ##TYPE: RRS, KD, CONFIG
-    def make_integration(self, file_out):
+    ##TYPE: RRS, TRANSP, CONFIG
+    def make_integration(self, file_out,timeliness):
         if self.verbose:
             print('[INFO] Checking bands: ')
         for band in self.average_variables:
             if band not in self.average_variables_all:
-                print(f'[ERROR] RRS variable {band} is not available. Exiting...')
+                print(f'[ERROR] Variable {band} is not available. Exiting...')
                 return
         if self.arc_integration_method == 'average':
-            self.make_integration_avg(file_out)
+            self.make_integration_avg(file_out,timeliness)
 
-    # TYPE: RRS, KD, CONFIG
-    def make_integration_avg(self, file_out):
+    # TYPE: RRS, TRANSP, TEST
+    def make_integration_avg(self, file_out, timeliness):
         if self.verbose:
             print('[INFO] Retrieving info from granules...')
         self.get_info()
@@ -155,7 +227,7 @@ class ArcIntegration():
             return
         if self.verbose:
             print(f'[INFO] Creating ouptput file: {file_out}')
-        datasetout = self.create_nc_file_out(file_out)
+        datasetout = self.create_nc_file_out(file_out,timeliness)
 
         var_sensor_mask = datasetout.variables['sensor_mask']
         var_n_granules = datasetout.variables['n_granules']
@@ -189,9 +261,10 @@ class ArcIntegration():
 
             if self.mask_negatives:
                 for idx in range(1, 7):
-                    var_rrs = self.average_variables_all[idx]
-                    var_rrs_array = np.array(dataset.variables[var_rrs][yini:yfin, xini:xfin])
-                    weigthed_mask_granule = np.where(var_rrs_array > 0, weigthed_mask_granule, 0)
+                    var_rrs = self.rrs_variables_all[idx]
+                    if var_rrs in self.average_variables:
+                        var_rrs_array = np.array(dataset.variables[var_rrs][yini:yfin, xini:xfin])
+                        weigthed_mask_granule = np.where(var_rrs_array > 0, weigthed_mask_granule, 0)
 
             sensor_mask = np.array(var_sensor_mask[yini:yfin, xini:xfin])
             ngranules = np.array(var_n_granules[yini:yfin, xini:xfin])
