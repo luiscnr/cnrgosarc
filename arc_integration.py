@@ -43,7 +43,7 @@ class ArcIntegration():
                 'max_value': 1.0,
                 'mask': None
             }
-            if wl > 410 and wl > 670:
+            if 410 < wl < 670:
                 self.rrs_variables_rneg_flag.append(bname)
 
         self.transp_variables_all = {
@@ -427,7 +427,9 @@ class ArcIntegration():
                 min_value = self.rrs_variables_all[var_rrs_name]['min_value']
                 max_value = self.rrs_variables_all[var_rrs_name]['max_value']
                 var_rrs_array_granule = np.array(dataset_granule.variables[var_rrs_name][yini:yfin, xini:xfin])
-                weigthed_mask_granule = np.where(np.logical_and(var_rrs_array_granule>=min_value,var_rrs_array_granule<=max_value),weigthed_mask_granule,0)
+                weigthed_mask_granule = np.where(
+                    np.logical_and(var_rrs_array_granule >= min_value, var_rrs_array_granule <= max_value),
+                    weigthed_mask_granule, 0)
 
             if self.mask_negatives:  ##Option to mask all the negative reflectances (not used in operational processing)
                 for var_rrs_name in self.rrs_variables_rneg_flag:
@@ -479,19 +481,20 @@ class ArcIntegration():
                         min_value = self.transp_variables_all[var_avg_name]['min_value']
                         max_value = self.transp_variables_all[var_avg_name]['max_value']
                         mask_all = self.transp_variables_all[var_avg_name]['mask']
-                    mask_granule = np.where(np.logical_and(avg_granule>=min_value,avg_granule<=max_value), mask_granule, 0)
+                    mask_granule = np.where(np.logical_and(avg_granule >= min_value, avg_granule <= max_value),
+                                            mask_granule, 0)
 
                     if mask_all is None:
                         mask_all = np.zeros((self.height, self.width))
-                    mask_all_here = mask_all[yini:yfin,xini:xfin]
-                    mask_all_here[sensor_mask==-999]=-999
+                    mask_all_here = mask_all[yini:yfin, xini:xfin]
+                    mask_all_here[sensor_mask == -999] = -999
                     mask_all_here[mask_granule > 0] = mask_all_here[mask_granule > 0] + mask_granule[mask_granule > 0]
-                    mask_all[yini:yfin, xini:xfin] = mask_all_here[:,:]
+                    mask_all[yini:yfin, xini:xfin] = mask_all_here[:, :]
 
                     if var_avg_name in self.rrs_variables_all:
-                        self.rrs_variables_all['mask'] = mask_all
+                        self.rrs_variables_all[var_avg_name]['mask'] = mask_all
                     if var_avg_name in self.transp_variables_all:
-                        self.transp_variables_all['mask'] = mask_all
+                        self.transp_variables_all[var_avg_name]['mask'] = mask_all
 
                 indices = np.where(mask_granule > 0)
                 # making sum in destination var.
@@ -520,10 +523,10 @@ class ArcIntegration():
                     if var_avg_name not in self.rrs_variables_rneg_flag:
                         if var_avg_name in self.rrs_variables_all:
                             mask_o = self.rrs_variables_all[var_avg_name]['mask']
-                            mask = mask_o[limits[0]:limits[1],limits[2]:limits[3]]
+                            mask = mask_o[limits[0]:limits[1], limits[2]:limits[3]]
                         if var_avg_name in self.transp_variables_all:
                             mask_o = self.transp_variables_all[var_avg_name]['mask']
-                            mask = mask_o[limits[0]:limits[1],limits[2]:limits[3]]
+                            mask = mask_o[limits[0]:limits[1], limits[2]:limits[3]]
                     indices_good = np.where(mask > 0)
                     indices_mask = np.where(mask <= 0)
                     avg_array[indices_good] = avg_array[indices_good] / weigthed_mask[indices_good]

@@ -41,7 +41,7 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        #ami = ArcMapInfo(None,True)
+        # ami = ArcMapInfo(None,True)
 
         check_chla()
         # check_model()
@@ -75,7 +75,7 @@ def main():
         ami.make_resample_pml(fpml, file_out)
         return
 
-    if args.mode == 'QL' and args.product and args.outputpath: ##Quick Look Generation
+    if args.mode == 'QL' and args.product and args.outputpath:  ##Quick Look Generation
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
         fdataset = args.product
@@ -92,17 +92,17 @@ def main():
             print('[INFO] Started creation of base files for integration...')
         from arc_integration import ArcIntegration
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
-        arcInt = ArcIntegration(None,args.verbose,None,'RRS',file_at)
+        arcInt = ArcIntegration(None, args.verbose, None, 'RRS', file_at)
         arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
 
-        fout = os.path.join(output_path,'ArcGrid_65_90_300m_RRS_NR_Base.nc')
-        arcInt.create_nc_file_out(fout,'NR')
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NR_Base.nc')
+        arcInt.create_nc_file_out(fout, 'NR')
         fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NT_Base.nc')
         arcInt.create_nc_file_out(fout, 'NT')
 
         arcInt.output_type = 'TRANSP'
-        fout = os.path.join(output_path,'ArcGrid_69_90_300m_TRANSP_NR_Base.nc')
-        arcInt.create_nc_file_out(fout,'NR')
+        fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NR_Base.nc')
+        arcInt.create_nc_file_out(fout, 'NR')
         fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NT_Base.nc')
         arcInt.create_nc_file_out(fout, 'NT')
 
@@ -177,8 +177,7 @@ def kk():
     # ami.save_quick_look_fdata(fout,fdata)
 
 
-def copy_nc_excluding_variables(ifile,ofile,excluded_variables):
-
+def copy_nc_excluding_variables(ifile, ofile, excluded_variables):
     from netCDF4 import Dataset
     with Dataset(ifile) as src:
         dst = Dataset(ofile, 'w', format='NETCDF4')
@@ -199,7 +198,8 @@ def copy_nc_excluding_variables(ifile,ofile,excluded_variables):
                 continue
             if args.verbose:
                 print(f'[INFO] -> Copying variable: {name}')
-            dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,shuffle=True, complevel=6)
+            dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True, shuffle=True,
+                               complevel=6)
             # copy variable attributes all at once via dictionary
             dst[name].setncatts(src[name].__dict__)
             dst[name][:] = src[name][:]
@@ -210,17 +210,20 @@ def check_chla():
     from netCDF4 import Dataset
     ncsat = Dataset(file)
     wmask = np.array(ncsat.variables['sum_weights'])
-    nvalid = np.count_nonzero(wmask[wmask>0])
-    print('N Valid mask: ',nvalid)
-    bands = ['RRS400','RRS412_5','RRS442_5','RRS490','RRS510','RRS560','RRS620','RRS665','RRS673_75','RRS681_25','RRS708_75']
+    nvalid = np.count_nonzero(wmask[wmask > 0])
+    print('N Valid mask: ', nvalid)
+    bands = ['RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510', 'RRS560', 'RRS620', 'RRS665', 'RRS673_75',
+             'RRS681_25', 'RRS708_75']
     for band in bands:
         array = np.array(ncsat.variables[band])
-        nvalid = np.count_nonzero(array[array>-999.0])
-        print(band,nvalid)
+        nvalid = np.count_nonzero(array[array > -999.0])
+        print(band, nvalid)
 
     ncsat.close()
 
     return True
+
+
 def check_model():
     jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
     from arc_gpr_model import ARC_GPR_MODEL
@@ -461,19 +464,19 @@ def run_integration(arc_opt):
             if pl == '3':
                 pl = ''
             from arc_integration import ArcIntegration
-            output_type = arc_opt.get_value_param('INTEGRATE','output_type','RRS','str')
-            file_base = arc_opt.get_value_param('INTEGRATE','file_base',None,'str')
+            output_type = arc_opt.get_value_param('INTEGRATE', 'output_type', 'RRS', 'str')
+            file_base = arc_opt.get_value_param('INTEGRATE', 'file_base', None, 'str')
             if args.verbose:
                 print(f'[INFO] Output type: {output_type}')
-            arc_integration = ArcIntegration(arc_opt, args.verbose, input_path,output_type,None)
-            timeliness = arc_opt.get_value_param('INTEGRATE','timeliness',None,'str')
+            arc_integration = ArcIntegration(arc_opt, args.verbose, input_path, output_type, None)
+            timeliness = arc_opt.get_value_param('INTEGRATE', 'timeliness', None, 'str')
             if file_base is not None:
                 if os.path.exists(file_base):
                     arc_integration.ami.ifile_base = file_base
                     if timeliness is None:
-                        if file_base.find('NR')>0:
+                        if file_base.find('NR') > 0:
                             timeliness = 'NR'
-                        if file_base.find('NT')>0:
+                        if file_base.find('NT') > 0:
                             timeliness = 'NT'
                     if args.verbose:
                         print(f'[INFO] File base: {file_base}')
@@ -485,13 +488,11 @@ def run_integration(arc_opt):
                 print(f'[INFO] Input path: {input_path}')
                 print(f'[INFO] Output file: {fout}')
 
-            arc_integration.make_integration(fout,date_run,timeliness)
+            arc_integration.make_integration(fout, date_run, timeliness)
             name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
             fout_end = os.path.join(output_path, name_out_end)
-            excluded_variables = ['n_granules','sum_weights']
-            copy_nc_excluding_variables(fout,fout_end,excluded_variables)
-
-
+            excluded_variables = ['n_granules', 'sum_weights']
+            copy_nc_excluding_variables(fout, fout_end, excluded_variables)
 
         date_run = date_run + timedelta(hours=24)
 
