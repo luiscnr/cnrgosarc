@@ -76,26 +76,35 @@ class ArcMapInfo:
 
         if createLatLong:
             # latitude
-            satellite_latitude = OFILE.createVariable('latitude', 'f4', ('y', 'x'), zlib=True, shuffle=True,
+            satellite_latitude = OFILE.createVariable('lat', 'f4', ('y', 'x'), zlib=True, shuffle=True,
                                                       complevel=4, least_significant_digit=3)
             satellite_latitude.units = "degrees_north"
             satellite_latitude.standard_name = "latitude"
+            satellite_latitude.long_name = "latitude"
+            satellite_latitude.valid_min = self.get_lat_min()
+            satellite_latitude.valid_max = 90.0
+            satellite_latitude.comment = "Spherical min. latidude: 65 degrees north"
+
 
             # longitude
-            satellite_longitude = OFILE.createVariable('longitude', 'f4', ('y', 'x'), zlib=True, shuffle=True,
+            satellite_longitude = OFILE.createVariable('lon', 'f4', ('y', 'x'), zlib=True, shuffle=True,
                                                        complevel=4, least_significant_digit=3)
             satellite_longitude.units = "degrees_east"
             satellite_longitude.standard_name = "longitude"
+            satellite_longitude.long_name = "longitude"
+            satellite_longitude.valid_min = -180.0
+            satellite_longitude.valid_max = 180.0
 
         # mask
         if createMask:
             min_lat = self.get_lat_min_spherical()
-            satellite_mask = OFILE.createVariable('sensor_mask', 'i2', ('y', 'x'), fill_value=-999, zlib=True,
+            satellite_mask = OFILE.createVariable('SENSORMASK', 'i2', ('y', 'x'), fill_value=-999, zlib=True,
                                                   shuffle=True, complevel=4)
-            satellite_mask.standard_name = f'sensor_mask'
-            satellite_mask.description = f'Pixels with latitude lower than: {min_lat} are masked'
+            satellite_mask.long_name = f'Sensor Mask'
+            satellite_mask.comment = 'OLCI Sentinel-3A=1; OLCI Sentinel-3B=2. Each SENSORMASK pixel is the sum of all available sensor values. For example, if a pixel is observed by OLCI Sentinel-3A and OLCI Sentinel-3B then SENSORMASK = 3. Pixels with latitude lower than 65 degrees are masked'
             satellite_mask.grid_mapping = "stereographic"
             satellite_mask.coordinates = "longitude latitude"
+
 
         tileY = 5000
         tileX = 5000
@@ -131,14 +140,6 @@ class ArcMapInfo:
                     # mask[np.where((lats >= 70) & (lats <= 75))] = 10
                     # mask[np.where((lons >= 10) & (lons <= 20))] = mask[np.where((lons >= 10) & (lons <= 20))] + 10
                     satellite_mask[yini:yend, xini:xend] = [mask[:, :]]
-
-        OFILE.Conventions = "CF-1.8"
-        OFILE.title = "title"
-        OFILE.history = "history"
-        OFILE.institution = "institution"
-        OFILE.source = "source"
-        OFILE.comment = "comment"
-        OFILE.reference = "reference"
 
         OFILE.close()
 
@@ -270,6 +271,8 @@ class ArcMapInfo:
 
         return datasetout
 
+
+
     def copy_nc_base(self, ofile):
         dst = None
         if not os.path.exists(self.ifile_base):
@@ -278,28 +281,7 @@ class ArcMapInfo:
         if self.verbose:
             print(f'[INFO] Copying file grid: {self.ifile_base}...')
 
-        # with Dataset(self.ifile_base) as src:
-        #     dst = Dataset(ofile, 'w', format='NETCDF4')
-        #     # copy global attributes all at once via dictionary
-        #     dst.setncatts(src.__dict__)
-        #
-        #     # copy dimensions
-        #     for name, dimension in src.dimensions.items():
-        #         if self.verbose:
-        #             print(f'[INFO] -> Copying dimension: {name}')
-        #         dst.createDimension(
-        #             name, (len(dimension) if not dimension.isunlimited() else None))
-        #
-        #     # copy all file data except for the excluded
-        #     for name, variable in src.variables.items():
-        #         if self.verbose:
-        #             print(f'[INFO] -> Copying variable: {name}')
-        #         dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
-        #                            shuffle=True, complevel=4)
-        #         # copy variable attributes all at once via dictionary
-        #         dst[name].setncatts(src[name].__dict__)
-        #
-        #         dst[name][:] = src[name][:]
+
 
         # shutil.copy(self.ifile_base,ofile)
 
@@ -353,6 +335,10 @@ class ArcMapInfo:
         xmid = math.floor(self.area_def.width / 2)
         lon, lat = self.area_def.get_lonlat_from_array_coordinates(xmid, 0)
         lat_min = np.round(lat)
+        return lat_min
+
+    def get_lat_min(self):
+        lon, lat_min = self.area_def.get_lonlat_from_array_coordinates(0, 0)
         return lat_min
 
     def print_area_def_info(self):
