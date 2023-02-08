@@ -9,26 +9,35 @@ import numpy as np
 
 class ArcProcessing:
 
-    def __init__(self, arc_opt, verbose):
+    def __init__(self, arc_opt, verbose, output_type, file_attributes):
         self.verbose = verbose
         self.arc_opt = arc_opt
         self.ami = ArcMapInfo(self.arc_opt, False)
         self.width = self.ami.area_def.width
         self.height = self.ami.area_def.height
         self.chla_model = None
+        if output_type is None:
+            output_type = 'CHLA'
+        self.output_type = output_type
+        self.file_attributes = file_attributes
 
         # FILE DEFAULTS
         file_model_default = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
         file_grid_default = self.ami.ifile_base
 
-        ##GETTING GENERAL PARAMETERS
-        section = 'PROCESSING'
-        self.file_model = self.arc_opt.get_value_param(section, 'file_model', file_model_default, 'str')
+        if arc_opt is None:  # only for creating the file base
+            self.file_grid = file_grid_default
+            self.file_model = file_model_default
+        else:
+            ##GETTING GENERAL PARAMETERS
+            section = 'PROCESSING'
+            self.file_model = self.arc_opt.get_value_param(section, 'file_model', file_model_default, 'str')
+            self.file_grid = arc_opt.get_value_param(section, 'file_base', file_grid_default, 'str')
+            self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
+            self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
+
         if os.path.exists(self.file_model):
             self.chla_model = ARC_GPR_MODEL(self.file_model)
-        self.file_grid = arc_opt.get_value_param(section, 'file_base', file_grid_default, 'str')
-        self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
-        self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
 
     def compute_chla_image(self, filein, fileout):
         section = 'PROCESSING'
@@ -45,7 +54,7 @@ class ArcProcessing:
         ncsat = Dataset(filein)
         rrs_bands = ['RRS442_5', 'RRS490', 'RRS560', 'RRS665']
         if self.verbose:
-            print('[INFO] Checking RRS bands... ')
+            print('[INFO] Checking RRS bands')
         for band in rrs_bands:
             if band not in ncsat.variables:
                 print(f'[ERROR] RRS variable {band} is not available. Exiting...')
@@ -57,8 +66,8 @@ class ArcProcessing:
 
         if self.verbose:
             print('[INFO] Checking longitude... ')
-        if 'longitude' in ncsat.variables:
-            varLong = ncsat.variables['longitude']
+        if 'lon' in ncsat.variables:
+            varLong = ncsat.variables['lon']
             ncgrid = None
         else:
             ncgrid = Dataset(file_base)
@@ -90,14 +99,16 @@ class ArcProcessing:
 
         if self.verbose:
             print(f'[INFO] Creating ouptput file: {fileout}')
-        datasetout = self.create_nc_file_out_chl(fileout, file_base)
+        datasetout = self.create_nc_file_out(fileout, file_base)
         if datasetout is None:
             print('[ERROR] Output dataset could not be started. Exiting.')
             return
+
         var_chla = datasetout.variables['CHL']
 
-        var_chla_prev = datasetout.variables['chla']
-        var_diff = datasetout.variables['DIFF']
+        if self.output_type == 'COMPARISON':
+            var_chla_prev = datasetout.variables['chla']
+            var_diff = datasetout.variables['DIFF']
 
         if self.verbose:
             print(f'[INFO] Computing chla. YStep: {self.ystep} XStep: {self.xstep}')
@@ -117,12 +128,14 @@ class ArcProcessing:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 if nvalid > 0:
                     array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
-                    array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+
                     array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
                                                                              array_560, array_665)
-                    array_diff = array_chla_prev / array_chla
                     var_chla[limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
-                    var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+                    if self.output_type == 'COMPARISON':
+                        array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+                        array_diff = array_chla_prev / array_chla
+                        var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
         ncsat.close()
         if ncgrid is not None:
             ncgrid.close()
@@ -143,7 +156,7 @@ class ArcProcessing:
         limits = [yini, yfin, xini, xfin]
         return limits
 
-    def create_nc_file_out_chl(self, ofname, file_base):
+    def create_nc_file_out(self, ofname, file_base):
         if self.verbose:
             print(f'[INFO] Copying file base {file_base} to start output file {ofname}...')
         self.ami.ifile_base = file_base
@@ -152,24 +165,28 @@ class ArcProcessing:
             return datasetout
 
         ##CREATE CHL VARIABLE
-        if self.verbose:
-            print('[INFO] Creating CHL variable...')
-        var = datasetout.createVariable('CHL', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
-        var[:] = -999
-        var.coordinates = "lat lon"
-        var.long_name = "Chlorophyll a concentration"
-        var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
-        var.type = "surface"
-        var.units = "milligram m^-3"
-        var.missing_value = -999.0
-        # var.valid_min = np.float(0.01)
-        # var.valid_max = np.float(300.0)
-        var.comment = ""
-        var.source = "OLCI - WFR STANDARD PROCESSOR - GPR CHL-A ALGORITHM"
+        if self.output_type == 'CHLA' or self.output_type == 'COMPARISON':
+            if self.verbose:
+                print('[INFO] Creating CHL variable...')
+            if 'CHL' not in datasetout.variables:
+                var = datasetout.createVariable('CHL', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var[:] = -999
+                var.coordinates = "lat lon"
+                var.long_name = "Chlorophyll a concentration"
+                var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
+                var.type = "surface"
+                var.units = "milligram m^-3"
+                var.missing_value = -999.0
+                var.valid_min = np.float(0.01)
+                var.valid_max = np.float(100.0)
+                var.comment = ""
+                var.source = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) CHL-A ALGORITHM"
 
-        if self.verbose:
-            print('[INFO] Creating DIFF variable')
-        var = datasetout.createVariable('DIFF', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
-        var[:] = -999
+        if self.output_type == 'COMPARISON':
+            if self.verbose:
+                print('[INFO] Creating DIFF variable')
+            if not 'DIFF' in datasetout.variables:
+                var = datasetout.createVariable('DIFF', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var[:] = -999
 
         return datasetout

@@ -108,6 +108,17 @@ def main():
 
         return
 
+    if args.mode == 'CHLA' and args.base_file and args.outputpath:
+        output_path = args.outputpath
+        if not os.path.exists(output_path) and not os.path.isdir(output_path):
+            print(f'[ERROR] Output path {output_path} does not exist or nor it is a directory')
+            return
+        if args.verbose:
+            print(f'[INFO] Started creation of base files for processing CHLA')
+        file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
+        from arc_processing import ArcProcessing
+        arc_proc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
+
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
@@ -480,19 +491,19 @@ def run_integration(arc_opt):
                             timeliness = 'NT'
                     if args.verbose:
                         print(f'[INFO] File base: {file_base}')
-            name_out = f'O{pl}{datestr}_rrs-arc-fr_temp.nc'
+            name_out = f'O{pl}{datestr}_AVERAGE-arc-fr.nc'
             # if arc_integration.th_nvalid >= 0:
             #     name_out = f'O{pl}{datestr}_rrs-arc-fr_THVALID_{arc_integration.th_nvalid}.nc'
             fout = os.path.join(output_path, name_out)
             if args.verbose:
                 print(f'[INFO] Input path: {input_path}')
                 print(f'[INFO] Output file: {fout}')
-
             arc_integration.make_integration(fout, date_run, timeliness)
-            name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
-            fout_end = os.path.join(output_path, name_out_end)
-            excluded_variables = ['n_granules', 'sum_weights']
-            copy_nc_excluding_variables(fout, fout_end, excluded_variables)
+
+            # name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
+            # fout_end = os.path.join(output_path, name_out_end)
+            # excluded_variables = ['n_granules', 'sum_weights','KD490']
+            # copy_nc_excluding_variables(fout, fout_end, excluded_variables)
 
         date_run = date_run + timedelta(hours=24)
 

@@ -62,6 +62,8 @@ class ArcIntegration():
             self.average_variables = list(self.rrs_variables_all.keys())
         elif self.output_type == 'TRANSP':
             self.average_variables = list(self.transp_variables_all)
+        elif self.output_type == 'OPERATIVE':
+            self.average_variables = list(self.rrs_variables_all.keys()) + list(self.transp_variables_all)
 
         if arc_opt is None:  ##only for creating base file
             return
@@ -143,7 +145,7 @@ class ArcIntegration():
                 datasetout.setncattr(at, atribs[at])
 
         ##create rrs variables
-        if self.output_type == 'RRS' or self.output_type == 'TEST':
+        if self.output_type == 'RRS' or self.output_type == 'TEST' or self.output_type == 'OPERATIVE':
             for idx in range(len(self.olci_l2_bands)):
                 wl = self.olci_l2_bands[idx]
                 wlstr = str(wl).replace('.', '_')
@@ -206,7 +208,7 @@ class ArcIntegration():
             var = datasetout.createVariable('n_granules', 'i4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var[:] = 0
 
-        if self.output_type == 'RRS' or self.output_type == 'TRANSP':
+        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE':
             return datasetout
 
         # time_dif
@@ -244,8 +246,9 @@ class ArcIntegration():
         if self.arc_integration_method == 'average':
             self.make_integration_avg(file_out, date_run, timeliness)
 
-    # TYPE: RRS, TRANSP, TEST
-    def make_integration_avg(self, file_out, date_run, timeliness):
+    def make_integration_avg_deprecate(self, file_out, date_run, timeliness):
+
+        ##DEPRECATED 1, METHOD BASED IN GRANULE GROUPS
         if self.verbose:
             print('[INFO] Retrieving info from granules...')
         self.get_info()
@@ -270,12 +273,157 @@ class ArcIntegration():
         var_n_granules = datasetout.variables['n_granules']
         var_weighted_mask = datasetout.variables['sum_weights']
 
-        # var_time_dif = datasetout.variables['time_dif']
-        # var_time_min = datasetout.variables['time_min']
-        # var_time_max = datasetout.variables['time_min']
-        # var_min_oza = datasetout.variables['oza_min']
-        # var_max_oza = datasetout.variables['oza_max']
+        infog = self.group_granules()
+        ngroups = len(infog)
+        for group in infog:
+            granules = infog[group]['granules_list']
+            limits = [infog[group]['y_min'], infog[group]['y_max'], infog[group]['x_min'], infog[group]['x_max']]
 
+            # Step 0: getting general arrays
+            sensor_mask = np.array(var_sensor_mask[limits[0]:limits[1], limits[2]:limits[3]])
+            ngranules = np.array(var_n_granules[limits[0]:limits[1], limits[2]:limits[3]])
+            weigthed_mask = np.array(var_weighted_mask[limits[0]:limits[1], limits[2]:limits[3]])
+
+            # step 1, sum values for weighted mask, ngranules and for each average band. Setting sensor mask
+            ngranules_rec = len(granules)
+            igranule_rec = 1
+            for name in granules:
+                if self.verbose:
+                    print(f'[INFO] Working with granule: {name} ({igranule_rec}/{ngranules_rec})')
+                    igranule_rec = igranule_rec + 1
+                file = os.path.join(self.dir_input, name)
+                dataset_granule = Dataset(file)
+                weigthed_mask_granule = np.array(
+                    dataset_granule.variables['mask'][limits[0]:limits[1], limits[2]:limits[3]])
+
+                # assuring that pixels lower than 65 degress are masked
+                weigthed_mask_granule[sensor_mask == -999] = -999
+
+                # assuring that pixels lower than valid_min in central bands are masked
+                for var_rrs_name in self.rrs_variables_rneg_flag:
+                    if not var_rrs_name in self.average_variables:
+                        continue
+                    min_value = self.rrs_variables_all[var_rrs_name]['min_value']
+                    max_value = self.rrs_variables_all[var_rrs_name]['max_value']
+                    var_rrs_array_granule = np.array(
+                        dataset_granule.variables[var_rrs_name][limits[0]:limits[1], limits[2]:limits[3]])
+                    weigthed_mask_granule = np.where(
+                        np.logical_and(var_rrs_array_granule >= min_value, var_rrs_array_granule <= max_value),
+                        weigthed_mask_granule, 0)
+
+                if self.mask_negatives:  ##Option to mask all the negative reflectances (not used in operational processing)
+                    for var_rrs_name in self.rrs_variables_rneg_flag:
+                        if not var_rrs_name in self.average_variables:
+                            continue
+                        var_rrs_array_granule = np.array(
+                            dataset_granule.variables[var_rrs_name][limits[0]:limits[1], limits[2]:limits[3]])
+                        weigthed_mask_granule = np.where(var_rrs_array_granule > 0, weigthed_mask_granule, 0)
+
+                # ngranules, only for testing
+                ngranules[weigthed_mask_granule >= 0] = ngranules[weigthed_mask_granule >= 0] + 1
+
+                # weighted_mask (sum of n valid pixels)
+                weigthed_mask[weigthed_mask_granule > 0] = weigthed_mask[weigthed_mask_granule > 0] + \
+                                                           weigthed_mask_granule[weigthed_mask_granule > 0]
+
+                # sensor_mask: 1 ,2, 3
+                if name.startswith('S3A'):
+                    sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 0)] = 1
+                    sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 2)] = 3
+                if name.startswith('S3B'):
+                    sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 0)] = 2
+                    sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 1)] = 3
+
+                # assigning general masks
+                var_sensor_mask[limits[0]:limits[1], limits[2]:limits[3]] = [sensor_mask[:, :]]
+                var_n_granules[limits[0]:limits[1], limits[2]:limits[3]] = [ngranules[:, :]]
+                var_weighted_mask[limits[0]:limits[1], limits[2]:limits[3]] = [weigthed_mask[:, :]]
+
+                for var_avg_name in self.average_variables:
+                    if self.verbose:
+                        print(f'[INFO]--> {var_avg_name}')
+
+                    # destination var
+                    var_avg = datasetout.variables[var_avg_name]
+                    avg_array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
+
+                    # origin var
+                    var_granule = var_avg_name
+                    if var_avg_name in self.granule_variables.keys():
+                        var_granule = self.granule_variables[var_avg_name]
+                    avg_granule = np.array(
+                        dataset_granule.variables[var_granule][limits[0]:limits[1], limits[2]:limits[3]])
+                    if var_granule == 'KD490_M07':
+                        avg_granule[avg_granule != -999] = np.power(10, avg_granule[avg_granule != -999])
+
+                    mask_granule = weigthed_mask_granule
+                    # for varibles out of the central band, independent mask
+                    if var_avg_name not in self.rrs_variables_rneg_flag:
+                        if var_avg_name in self.rrs_variables_all:
+                            min_value = self.rrs_variables_all[var_avg_name]['min_value']
+                            max_value = self.rrs_variables_all[var_avg_name]['max_value']
+                            mask_all = self.rrs_variables_all[var_avg_name]['mask']
+                        if var_avg_name in self.transp_variables_all:
+                            min_value = self.transp_variables_all[var_avg_name]['min_value']
+                            max_value = self.transp_variables_all[var_avg_name]['max_value']
+                            mask_all = self.transp_variables_all[var_avg_name]['mask']
+                        mask_granule = np.where(np.logical_and(avg_granule >= min_value, avg_granule <= max_value),
+                                                mask_granule, 0)
+
+                        if mask_all is None:
+                            mask_all = np.zeros((self.height, self.width))
+                        mask_all_here = mask_all[limits[0]:limits[1], limits[2]:limits[3]]
+                        mask_all_here[sensor_mask == -999] = -999
+                        mask_all_here[mask_granule > 0] = mask_all_here[mask_granule > 0] + mask_granule[
+                            mask_granule > 0]
+                        mask_all[limits[0]:limits[1], limits[2]:limits[3]] = mask_all_here[:, :]
+
+                        if var_avg_name in self.rrs_variables_all:
+                            self.rrs_variables_all[var_avg_name]['mask'] = mask_all
+                        if var_avg_name in self.transp_variables_all:
+                            self.transp_variables_all[var_avg_name]['mask'] = mask_all
+
+                    indices = np.where(mask_granule > 0)
+                    # making sum in destination var.
+                    avg_array = np.where(np.logical_and(mask_granule > 0, avg_array == -999), 0, avg_array)
+                    avg_array[indices] = avg_array[indices] + (avg_granule[indices] * mask_granule[indices])
+                    var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [avg_array[:, :]]
+
+                dataset_granule.close()
+
+        if self.verbose:
+            print('[INFO] Computing average...')
+
+        for y in range(0, self.height, self.ystep):
+            if self.verbose:
+                print(f'[INFO] -> {y}')
+            for x in range(0, self.width, self.xstep):
+                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                weigthed_mask = np.array(var_weighted_mask[limits[0]:limits[1], limits[2]:limits[3]])
+                if np.max(weigthed_mask[:]) == 0:
+                    continue
+
+                for var_avg_name in self.average_variables:
+                    var_avg = datasetout.variables[var_avg_name]
+                    avg_array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
+                    mask = weigthed_mask
+                    if var_avg_name not in self.rrs_variables_rneg_flag:
+                        if var_avg_name in self.rrs_variables_all:
+                            mask_o = self.rrs_variables_all[var_avg_name]['mask']
+                            mask = mask_o[limits[0]:limits[1], limits[2]:limits[3]]
+                        if var_avg_name in self.transp_variables_all:
+                            mask_o = self.transp_variables_all[var_avg_name]['mask']
+                            mask = mask_o[limits[0]:limits[1], limits[2]:limits[3]]
+                    indices_good = np.where(mask > 0)
+                    indices_mask = np.where(mask <= 0)
+                    avg_array[indices_good] = avg_array[indices_good] / weigthed_mask[indices_good]
+                    avg_array[indices_mask] = -999
+
+                    var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [avg_array[:, :]]
+
+        datasetout.close()
+
+        ##DEPRECATED 2, METHOD BASED IN AREAS
         # for y in range(0, self.height, self.ystep):
         #     for x in range(0, self.width, self.xstep):
         #         if self.verbose:
@@ -392,15 +540,51 @@ class ArcIntegration():
         #
         # datasetout.close()
 
-        for name in self.info:
-            if self.th_nvalid >= 0:
-                nvalid = self.info[name]['n_valid']
-                if nvalid <= self.th_nvalid:
-                    print(
-                        f'[INFO] Number of valid pixels {nvalid} must be greater than {self.th_nvalid}. Granule {name} is skipped.')
-                    continue
+        # var_time_dif = datasetout.variables['time_dif']
+        # var_time_min = datasetout.variables['time_min']
+        # var_time_max = datasetout.variables['time_min']
+        # var_min_oza = datasetout.variables['oza_min']
+        # var_max_oza = datasetout.variables['oza_max']
+
+    # TYPE: RRS, TRANSP, OPERATIVE, TEST
+    def make_integration_avg(self, file_out, date_run, timeliness):
+        if self.verbose:
+            print('[INFO] Retrieving info from granules...')
+        self.get_info()
+        nvalidgranules = len(self.info)
+        if nvalidgranules == 0:
+            print(f'[WARNING] No valid granules were found. Check date and platform values. Skipping...')
+            return
+        infof = self.filter_granules()
+        nvalidgranules = len(infof)
+        if nvalidgranules == 0:
+            print(f'[WARNING] No valid granules were found. Check date and platform values. Skipping...')
+            return
+        if self.verbose:
+            print(f'[INFO] Number of valid granules to be averaged: {nvalidgranules}')
+
+        if self.verbose:
+            print(f'[INFO] Creating ouptput file: {file_out}')
+        datasetout = self.create_nc_file_out(file_out, timeliness)
+
+        if date_run is not None:
+            datasetout.start_date = date_run.strftime('%Y-%m-%d')
+            datasetout.stop_date = date_run.strftime('%Y-%m-%d')
+        if timeliness is not None:
+            datasetout.timeliness = timeliness
+        cdate = dt.utcnow()
+        datasetout.creation_date = cdate.strftime('%Y-%m-%d')
+        datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        var_sensor_mask = datasetout.variables['SENSORMASK']
+        var_n_granules = datasetout.variables['n_granules']
+        var_weighted_mask = datasetout.variables['sum_weights']
+
+        igranule = 1
+        for name in infof:
             if self.verbose:
-                print(f'[INFO]Working with granule: {name}')
+                print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
+                igranule = igranule +1
 
             file = os.path.join(self.dir_input, name)
             yini = self.info[name]['y_min']
@@ -442,13 +626,16 @@ class ArcIntegration():
             # ngranules, only for testing
             ngranules[weigthed_mask_granule >= 0] = ngranules[weigthed_mask_granule >= 0] + 1
 
-            indices = np.where(weigthed_mask_granule > 0)
+            # indices = np.where(weigthed_mask_granule > 0)
 
-            weigthed_mask[indices] = weigthed_mask[indices] + weigthed_mask_granule[indices]
+            weigthed_mask[weigthed_mask_granule > 0] = weigthed_mask[weigthed_mask_granule > 0] + weigthed_mask_granule[
+                weigthed_mask_granule > 0]
             if name.startswith('S3A'):
-                sensor_mask[indices] = sensor_mask[indices] + 1
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 0)] = 1
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 2)] = 3
             if name.startswith('S3B'):
-                sensor_mask[indices] = sensor_mask[indices] + 2
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 0)] = 2
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 1)] = 3
 
             var_sensor_mask[yini:yfin, xini:xfin] = [sensor_mask[:, :]]
             var_n_granules[yini:yfin, xini:xfin] = [ngranules[:, :]]
@@ -573,6 +760,65 @@ class ArcIntegration():
         limits = [yini, yfin, xini, xfin]
         return limits
 
+    def filter_granules(self):
+        info_filtered = []
+        if len(self.info)==0:
+            return info_filtered
+        for name in self.info:
+            if self.th_nvalid >= 0:
+                nvalid = self.info[name]['n_valid']
+                if nvalid <= self.th_nvalid:
+                    print(
+                        f'[INFO] Number of valid pixels {nvalid} must be greater than {self.th_nvalid}. Granule {name} is skipped.')
+                    continue
+            info_filtered.append(name)
+
+        return info_filtered
+
+
+    def group_granules(self):
+        info_agrup = {}
+        ngranules = len(self.info)
+        if ngranules == 0:
+            return info_agrup
+        granules_included = [False] * ngranules
+        names = list(self.info.keys())
+        igroup = 1
+        ngranules_included = 0
+        for idx in range(ngranules):
+            if granules_included[idx]:
+                continue
+            name = names[idx]
+            if self.th_nvalid >= 0:
+                nvalid = self.info[name]['n_valid']
+                if nvalid <= self.th_nvalid:
+                    granules_included[idx] = True
+                    ngranules_included = ngranules_included + 1
+                    continue
+
+            limits = [self.info[name]['y_min'], self.info[name]['y_max'], self.info[name]['x_min'],
+                      self.info[name]['x_max']]
+            granules_included[idx] = True
+            granules_list = [name]
+            extended_limits, granules_list, granules_included = self.get_extended_limits(limits, granules_list,
+                                                                                         granules_included)
+            if self.verbose:
+                print(f'[INFO] Group of granules {igroup} with {len(granules_list)} granules')
+            ngranules_included = ngranules_included + len(granules_list)
+            info_agrup[str(igroup)] = {
+                'granules_list': granules_list,
+                'y_min': extended_limits[0],
+                'y_max': extended_limits[1],
+                'x_min': extended_limits[2],
+                'x_max': extended_limits[3]
+            }
+            igroup = igroup + 1
+
+        if ngranules == ngranules_included and self.verbose:
+            print(f'[INFO] Grouping granules compleded with {igroup - 1} {len(info_agrup)} groups')
+
+        return info_agrup
+
     def get_info(self):
         self.info = {}
         for name in os.listdir(self.dir_input):
@@ -623,6 +869,39 @@ class ArcIntegration():
     #         mask = np.zeros((self.height,self.width))
     #         mask_bands.append(mask)
     #     return mask_bands
+    def get_extended_limits(self, limits, granules_list, granules_included):
+        names = list(self.info.keys())
+        extended_limits = limits
+        for idx in range(len(self.info)):
+            if len(granules_list) == 10:
+                break
+            if granules_included[idx]:
+                continue
+            name = names[idx]
+            if self.th_nvalid >= 0:
+                nvalid = self.info[name]['n_valid']
+                if nvalid <= self.th_nvalid:
+                    # granules_included[idx] = True
+                    continue
+
+            ymin_here = self.info[name]['y_min']
+            ymax_here = self.info[name]['y_max']
+            xmin_here = self.info[name]['x_min']
+            xmax_here = self.info[name]['x_max']
+            add_granule = self.check_add_granule(ymin_here, ymax_here, xmin_here, xmax_here, limits)
+            if add_granule:
+                granules_included[idx] = True
+                granules_list.append(name)
+                if ymin_here < extended_limits[0]:
+                    extended_limits[0] = ymin_here
+                if ymax_here > extended_limits[1]:
+                    extended_limits[1] = ymax_here
+                if xmin_here < extended_limits[2]:
+                    extended_limits[2] = xmin_here
+                if xmax_here > extended_limits[3]:
+                    extended_limits[3] = xmax_here
+
+        return extended_limits, granules_list, granules_included
 
     def get_rec_info(self, limits):
         info_rec = {}
@@ -637,32 +916,33 @@ class ArcIntegration():
             ymax_here = self.info[name]['y_max']
             xmin_here = self.info[name]['x_min']
             xmax_here = self.info[name]['x_max']
-            add_granule = False
-            if limits[0] <= ymin_here <= limits[1] and limits[2] <= xmin_here <= limits[3]:
-                add_granule = True
-            if limits[0] <= ymin_here <= limits[1] and limits[2] <= xmax_here <= limits[3]:
-                add_granule = True
-            if limits[0] <= ymax_here <= limits[1] and limits[2] <= xmin_here <= limits[3]:
-                add_granule = True
-            if limits[0] <= ymax_here <= limits[1] and limits[2] <= xmax_here <= limits[3]:
-                add_granule = True
-
-            if limits[0] <= ymin_here <= limits[1] and xmin_here < limits[2] and xmax_here > limits[3]:
-                add_granule = True
-            if limits[0] <= ymax_here <= limits[1] and xmin_here < limits[2] and xmax_here > limits[3]:
-                add_granule = True
-
-            if limits[2] <= xmin_here <= limits[3] and ymin_here < limits[0] and ymax_here > limits[1]:
-                add_granule = True
-            if limits[2] <= xmax_here <= limits[3] and ymin_here < limits[0] and ymax_here > limits[1]:
-                add_granule = True
-
-            if ymin_here < limits[0] and ymax_here > limits[1] and xmin_here < limits[2] and xmax_here > limits[3]:
-                add_granule = True
+            add_granule = self.check_add_granule(ymin_here, ymax_here, xmin_here, xmax_here, limits)
 
             if add_granule:
                 info_rec[name] = self.info[name]
         return info_rec
+
+    def check_add_granule(self, ymin_here, ymax_here, xmin_here, xmax_here, limits):
+        add_granule = False
+        if limits[0] <= ymin_here <= limits[1] and limits[2] <= xmin_here <= limits[3]:
+            add_granule = True
+        if limits[0] <= ymin_here <= limits[1] and limits[2] <= xmax_here <= limits[3]:
+            add_granule = True
+        if limits[0] <= ymax_here <= limits[1] and limits[2] <= xmin_here <= limits[3]:
+            add_granule = True
+        if limits[0] <= ymax_here <= limits[1] and limits[2] <= xmax_here <= limits[3]:
+            add_granule = True
+        if limits[0] <= ymin_here <= limits[1] and xmin_here < limits[2] and xmax_here > limits[3]:
+            add_granule = True
+        if limits[0] <= ymax_here <= limits[1] and xmin_here < limits[2] and xmax_here > limits[3]:
+            add_granule = True
+        if limits[2] <= xmin_here <= limits[3] and ymin_here < limits[0] and ymax_here > limits[1]:
+            add_granule = True
+        if limits[2] <= xmax_here <= limits[3] and ymin_here < limits[0] and ymax_here > limits[1]:
+            add_granule = True
+        if ymin_here < limits[0] and ymax_here > limits[1] and xmin_here < limits[2] and xmax_here > limits[3]:
+            add_granule = True
+        return add_granule
 
     def compute_nvalid_array(self):
         array = np.zeros((self.height, self.height))
