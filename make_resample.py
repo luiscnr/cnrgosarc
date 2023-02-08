@@ -117,7 +117,14 @@ def main():
             print(f'[INFO] Started creation of base files for processing CHLA')
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
         from arc_processing import ArcProcessing
-        arc_proc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
+        arcProc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
+        file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+
+        fout = os.path.join(output_path,'ArcGrid_65_90_300m_PLANKTON_NR_Base.nc')
+        arcProc.create_nc_file_out(fout,file_base,'NR')
+        fout = os.path.join(output_path,'ArcGrid_65_90_300m_PLANKTON_NT_Base.nc')
+        arcProc.create_nc_file_out(fout,file_base,'NT')
+        return
 
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
     if not args.config_file:
@@ -217,7 +224,7 @@ def copy_nc_excluding_variables(ifile, ofile, excluded_variables):
 
 
 def check_chla():
-    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr_temp_first.nc'
+    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_AVERAGE-arc-fr.nc'
     from netCDF4 import Dataset
     ncsat = Dataset(file)
     wmask = np.array(ncsat.variables['sum_weights'])
@@ -495,15 +502,24 @@ def run_integration(arc_opt):
             # if arc_integration.th_nvalid >= 0:
             #     name_out = f'O{pl}{datestr}_rrs-arc-fr_THVALID_{arc_integration.th_nvalid}.nc'
             fout = os.path.join(output_path, name_out)
+
+
             if args.verbose:
+                print(f'[INFO] Timeliness: {timeliness}')
                 print(f'[INFO] Input path: {input_path}')
                 print(f'[INFO] Output file: {fout}')
             arc_integration.make_integration(fout, date_run, timeliness)
 
-            # name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
-            # fout_end = os.path.join(output_path, name_out_end)
-            # excluded_variables = ['n_granules', 'sum_weights','KD490']
-            # copy_nc_excluding_variables(fout, fout_end, excluded_variables)
+            if output_type=='RRS' or output_type=='OPERATIVE':
+                name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
+                fout_end = os.path.join(output_path, name_out_end)
+                excluded_variables = ['n_granules', 'sum_weights','KD490']
+                copy_nc_excluding_variables(fout, fout_end, excluded_variables)
+            if output_type=='TRANSP' or output_type=='OPERATIVE':
+                name_out_end = f'O{pl}{datestr}_transp-arc-fr.nc'
+                fout_end = os.path.join(output_path, name_out_end)
+                excluded_variables = ['n_granules', 'sum_weights', 'RRS400','RRS412_5','RRS442_5','RRS490','RRS510','RRS560','RRS620','RRS665','RRS673_75','RRS681_25','RRS708_75']
+                copy_nc_excluding_variables(fout, fout_end, excluded_variables)
 
         date_run = date_run + timedelta(hours=24)
 
@@ -512,8 +528,31 @@ def run_chla(arc_opt):
     options = arc_opt.get_processing_options()
     if options is None:
         return
+    ##ONLY CHLA MODE IS IMPLEMENTED
+    output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
+    if not output_type == 'CHLA':
+        return
     from arc_processing import ArcProcessing
-    arc_proc = ArcProcessing(arc_opt, args.verbose)
+    if args.verbose:
+        print('[INFO] PROCESSING OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
+    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
+    if file_base is not None:
+        if os.path.exists(file_base):
+            if timeliness is None:
+                if file_base.find('NR') > 0:
+                    timeliness = 'NR'
+                if file_base.find('NT') > 0:
+                    timeliness = 'NT'
+    if args.verbose:
+        print(f'[INFO] File base: {file_base}')
+        print(f'[INFO] Timeliness: {timeliness}')
+
+
+    ##WORKING WITH SINGLE GRANULE, ONLY CHLA
     input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
     if input_name is not None:
         input_file = os.path.join(options['input_path'], input_name)
@@ -528,7 +567,40 @@ def run_chla(arc_opt):
         output_file = os.path.join(options['output_path'], output_name)
         if args.verbose:
             print(f'[INFO] Output file: {output_file}')
-        arc_proc.compute_chla_image(input_file, output_file)
+        # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
+        arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+        arc_proc.compute_chla_image(input_file, output_file, timeliness)
+        return
+
+    ##WORKING WITH DATES
+    start_date = options['start_date']
+    end_date = options['end_date']
+    date_run = start_date
+    arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run}')
+        make_processing = True
+        input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
+        dateyj = date_run.strftime('%Y%j')
+        name_rrs = f'O{dateyj}_rrs-arc-fr.nc'
+        input_file = os.path.join(input_path,name_rrs)
+        if not os.path.exists(input_file):
+            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
+            make_processing = True
+        output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
+                                              True)
+        if output_path is None:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+            make_processing = False
+
+        if make_processing:
+            output_name = f'O{dateyj}_plankton-arc-fr.nc'
+            output_file = os.path.join(options['output_path'], output_name)
+            if args.verbose:
+                print(f'[INFO] Output file: {output_file}')
+            arc_proc.compute_chla_image(input_file, output_file, timeliness)
 
 
 def do_check7():

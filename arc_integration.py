@@ -843,7 +843,6 @@ class ArcIntegration():
                 'n_total': dataset.resampled_n_total,
                 'n_valid': dataset.resampled_n_valid,
                 'granule_index': dataset.granule_index,
-                'sensor_flag': dataset.sensorflag,
                 'start_date': dataset.start_date
             }
             time_here = float(dt.strptime(dataset.start_date, '%Y%m%dT%H%M%S').timestamp())

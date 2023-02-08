@@ -39,7 +39,7 @@ class ArcProcessing:
         if os.path.exists(self.file_model):
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
-    def compute_chla_image(self, filein, fileout):
+    def compute_chla_image(self, filein, fileout, timeliness):
         section = 'PROCESSING'
         if self.chla_model is None:
             print('[ERROR] Chla model could not be initiated. Please review file_model option in PROCESSING section.')
@@ -99,7 +99,7 @@ class ArcProcessing:
 
         if self.verbose:
             print(f'[INFO] Creating ouptput file: {fileout}')
-        datasetout = self.create_nc_file_out(fileout, file_base)
+        datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
         if datasetout is None:
             print('[ERROR] Output dataset could not be started. Exiting.')
             return
@@ -156,13 +156,47 @@ class ArcProcessing:
         limits = [yini, yfin, xini, xfin]
         return limits
 
-    def create_nc_file_out(self, ofname, file_base):
+    def get_global_attributes(self, timeliness):
+        if self.file_attributes is None:
+            return None
+        if not os.path.exists(self.file_attributes):
+            return None
+        import configparser
+        try:
+            options = configparser.ConfigParser()
+            options.read(self.file_attributes)
+        except:
+            return None
+        if not options.has_section('GLOBAL_ATTRIBUTES'):
+            return None
+        at_dict = dict(options['GLOBAL_ATTRIBUTES'])
+        if timeliness is None:
+            return at_dict
+        if self.output_type == 'CHLA':
+            at_dict['parameter'] = 'Chlorophyll-a concentration'
+            at_dict['parameter_code'] = 'PLANKTON'
+            if timeliness == 'NR':
+                at_dict['timeliness'] = 'NR'
+                at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
+                at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_nrt_l3-olci-300m_P1D'
+            if timeliness == 'NT':
+                at_dict['timeliness'] = 'NT'
+                at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
+                at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D'
+
+    def create_nc_file_out(self, ofname, file_base,timeliness):
         if self.verbose:
             print(f'[INFO] Copying file base {file_base} to start output file {ofname}...')
         self.ami.ifile_base = file_base
         datasetout = self.ami.copy_nc_base(ofname)
         if datasetout is None:
             return datasetout
+
+        ##global attributes
+        atribs = self.get_global_attributes(timeliness)
+        if atribs is not None:  ##atrib could be defined in file base
+            for at in atribs:
+                datasetout.setncattr(at, atribs[at])
 
         ##CREATE CHL VARIABLE
         if self.output_type == 'CHLA' or self.output_type == 'COMPARISON':
@@ -171,16 +205,16 @@ class ArcProcessing:
             if 'CHL' not in datasetout.variables:
                 var = datasetout.createVariable('CHL', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
                 var[:] = -999
-                var.coordinates = "lat lon"
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'longitude latitude'
                 var.long_name = "Chlorophyll a concentration"
                 var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
                 var.type = "surface"
                 var.units = "milligram m^-3"
                 var.missing_value = -999.0
-                var.valid_min = np.float(0.01)
-                var.valid_max = np.float(100.0)
-                var.comment = ""
-                var.source = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) CHL-A ALGORITHM"
+                var.valid_min = 0.003
+                var.valid_max = 100.0
+                var.comment = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) Algorithm"
 
         if self.output_type == 'COMPARISON':
             if self.verbose:
