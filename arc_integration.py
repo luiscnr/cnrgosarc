@@ -23,6 +23,8 @@ class ArcIntegration():
                                    -0.00071, -0.00065]
         self.file_attributes = file_attributes
 
+        self.apply_pool = 0
+
         self.info = {}
         if output_type is None:
             output_type = 'RRS'
@@ -131,6 +133,29 @@ class ArcIntegration():
 
         return at_dict
 
+    def create_nc_file_out_avg(self, ofname):
+        if self.verbose:
+            print(f'[INFO] Copying file base {self.ami.ifile_base} to start output file...')
+        datasetout = self.ami.copy_nc_base(ofname)
+        if datasetout is None:
+            return datasetout
+        ##create sum_weights variable
+        if 'sum_weights' not in datasetout.variables:
+            var = datasetout.createVariable('sum_weights', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var[:] = 0
+
+        ##create average variable
+        if 'average' not in datasetout.variables:
+            var = datasetout.createVariable('average', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var[:] = 0
+
+        # create n_granules
+        if 'n_granules' not in datasetout.variables:
+            var = datasetout.createVariable('n_granules', 'i4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var[:] = 0
+
+        return datasetout
+
     def create_nc_file_out(self, ofname, timeliness):
         if self.verbose:
             print(f'[INFO] Copying file base to start output file...')
@@ -140,7 +165,7 @@ class ArcIntegration():
 
         ##global attributes
         atribs = self.get_global_attributes(timeliness)
-        if atribs is not None:  ##atrib could be defined in file base
+        if atribs is not None:  ##atrib is None, atribs ard defined in file base
             for at in atribs:
                 datasetout.setncattr(at, atribs[at])
 
@@ -195,6 +220,9 @@ class ArcIntegration():
                                 'ADJAC, RWNEG_O2, RWNEG_O3, RWNEG_O4, RWNEG_O5, RWNEG_O6, RWNEG_O7, RWNEG_O8) '
             var.source = 'OLCI - Level2'
 
+        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE':
+            return datasetout
+
         if self.verbose:
             print(f'[INFO] Creating other bands...')
 
@@ -207,9 +235,6 @@ class ArcIntegration():
         if 'n_granules' not in datasetout.variables:
             var = datasetout.createVariable('n_granules', 'i4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
             var[:] = 0
-
-        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE':
-            return datasetout
 
         # time_dif
         var = datasetout.createVariable('time_dif', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
@@ -234,17 +259,16 @@ class ArcIntegration():
         return datasetout
 
     ##TYPE: RRS, TRANSP, CONFIG
-    def make_integration(self, file_out, date_run, timeliness):
+    def make_integration(self, output_path):
         if self.verbose:
             print('[INFO] Checking bands: ')
         for band in self.average_variables:
             if band not in self.rrs_variables_all and band not in self.transp_variables_all:
                 print(f'[ERROR] Variable {band} is not available. Exiting...')
                 return
-        if os.path.exists(file_out):
-            os.remove(file_out)
+
         if self.arc_integration_method == 'average':
-            self.make_integration_avg(file_out, date_run, timeliness)
+            self.make_integration_avg(output_path)
 
     def make_integration_avg_deprecate(self, file_out, date_run, timeliness):
 
@@ -546,8 +570,284 @@ class ArcIntegration():
         # var_min_oza = datasetout.variables['oza_min']
         # var_max_oza = datasetout.variables['oza_max']
 
+    def make_integration_avg(self, output_path):
+        if self.verbose:
+            print('[INFO] Retrieving info from granules...')
+        self.get_info()
+        nvalidgranules = len(self.info)
+        if nvalidgranules == 0:
+            print(f'[WARNING] No valid granules were found. Check date and platform values. Skipping...')
+            return
+        infof = self.filter_granules()
+        nvalidgranules = len(infof)
+        if nvalidgranules == 0:
+            print(f'[WARNING] No valid granules were found. Check date and platform values. Skipping...')
+            return
+        if self.verbose:
+            print(f'[INFO] Number of valid granules to be averaged: {nvalidgranules}')
+
+        file_mask = os.path.join(output_path, 'Mask.nc')
+
+        ##AVERAGE MASK
+        self.create_basic_mask(file_mask, infof, nvalidgranules)
+
+        # AVERAGE VARIABLES
+        if self.apply_pool == 0:
+            for var_avg_name in self.average_variables:
+                file_var = os.path.join(output_path, f'{var_avg_name}.nc')
+                self.create_single_average(var_avg_name, file_var, infof, nvalidgranules)
+        else:
+            from multiprocessing import Pool
+            params_list = []
+            if self.apply_pool < 0:
+                poolhere = Pool()
+            else:
+                poolhere = Pool(self.apply_pool)
+
+            for var_avg_name in self.average_variables:
+                file_var = os.path.join(output_path, f'{var_avg_name}.nc')
+
+                params = [var_avg_name, file_var, infof, nvalidgranules]
+                params_list.append(params)
+                if len(params_list) == self.apply_pool:
+                    poolhere.map(self.create_single_average_parallel, params_list)
+                    params_list = []
+            if len(params_list) > 0:
+                poolhere.map(self.create_single_average_parallel, params_list)
+
+        # CHECKING MASK
+        dataset_mask = Dataset(file_mask, 'r+')
+        var_mask = dataset_mask.variables['sum_weights']
+        var_mask_array = np.array(var_mask)
+        ngood = np.count_nonzero(var_mask_array > 0)
+        if self.verbose:
+            print(f'[INFO] # Number of good pixels (flag-based mask): {ngood}')
+        for var_avg_name in self.average_variables:
+            if var_avg_name in self.rrs_variables_rneg_flag:
+                if self.verbose:
+                    print(f'[INFO] Checking range in variable: {var_avg_name}')
+                file_var = os.path.join(output_path, f'{var_avg_name}.nc')
+                dataset_var = Dataset(file_var)
+                var_avg_array = np.array(dataset_var.variables['average'])
+                var_mask_array[var_avg_array <= 0] = var_avg_array[var_avg_array <= 0]
+                dataset_var.close()
+        var_mask[:] = [var_mask_array[:]]
+        ngood = np.count_nonzero(var_mask_array > 0)
+        if self.verbose:
+            print(f'[INFO] # Number of good pixels (flag-based mask + range): {ngood}')
+        dataset_mask.close()
+
+    def start_rrs_or_transp_file(self, output_path, file_out, date_run, timeliness):
+        if self.verbose:
+            print(f'[INFO] Creating ouptput file: {file_out}')
+        datasetout = self.create_nc_file_out(file_out, timeliness)
+
+        if date_run is not None:
+            datasetout.start_date = date_run.strftime('%Y-%m-%d')
+            datasetout.stop_date = date_run.strftime('%Y-%m-%d')
+        if timeliness is not None:
+            datasetout.timeliness = timeliness
+        cdate = dt.utcnow()
+        datasetout.creation_date = cdate.strftime('%Y-%m-%d')
+        datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        ##SENSOR MASK
+        var_sensor_mask = datasetout.variables['SENSORMASK']
+        file_mask = os.path.join(output_path, 'Mask.nc')
+        dataset_mask = Dataset(file_mask)
+        smask = np.array(dataset_mask.variables['SENSORMASK'])
+        wmask = np.array(dataset_mask.variables['sum_weights'])
+        var_sensor_mask[:] = [smask[:]]
+        dataset_mask.close()
+
+        return datasetout, wmask
+
+    def create_rrs_file(self, output_path, file_out, date_run, timeliness):
+        datasetout, wmask = self.start_rrs_or_transp_file(output_path, file_out, date_run, timeliness)
+
+        # RRS BANDS
+        for avg_name in self.rrs_variables_all:
+            file_avg = os.path.join(output_path, f'{avg_name}.nc')
+            if os.path.exists(file_avg) and avg_name in datasetout.variables:
+                if self.verbose:
+                    print(f'[INFO] Assigning variable: {avg_name}')
+                variable = datasetout.variables[avg_name]
+                dataset_var = Dataset(file_avg)
+                var_array = np.array(dataset_var.variables['average'])
+                if avg_name in self.rrs_variables_rneg_flag:
+                    if self.verbose:
+                        print(f'[INFO] Adapting mask for variable {avg_name}')
+                    var_array[wmask <= 0] = -999.0
+                variable[:] = [var_array[:]]
+                dataset_var.close()
+
+        datasetout.close()
+        if self.verbose:
+            print(f'[INFO] Completed')
+
+    def create_transp_file(self, output_path, file_out, date_run, timeliness):
+        datasetout, wmask = self.start_rrs_or_transp_file(output_path, file_out, date_run, timeliness)
+
+        # TRANSP BANDS
+        for avg_name in self.transp_variables_all:
+            file_avg = os.path.join(output_path, f'{avg_name}.nc')
+            if os.path.exists(file_avg) and avg_name in datasetout.variables:
+                if self.verbose:
+                    print(f'[INFO] Assigning variable: {avg_name}')
+                variable = datasetout.variables[avg_name]
+                dataset_var = Dataset(file_avg)
+                var_array = np.array(dataset_var.variables['average'])
+                variable[:] = [var_array[:]]
+                dataset_var.close()
+        datasetout.close()
+        if self.verbose:
+            print(f'[INFO] Completed')
+
+    def create_single_average_parallel(self, params):
+        self.create_single_average(params[0], params[1], params[2], params[3])
+
+    def create_single_average(self, var_avg_name, file_var, infof, nvalidgranules):
+        if self.verbose:
+            print(f'[INFO] Creating basic average file: {file_var}')
+
+        min_value = 0.0
+        max_value = 1.0
+        if var_avg_name in self.rrs_variables_all:
+            min_value = self.rrs_variables_all[var_avg_name]['min_value']
+            max_value = self.rrs_variables_all[var_avg_name]['max_value']
+        if var_avg_name in self.transp_variables_all:
+            min_value = self.transp_variables_all[var_avg_name]['min_value']
+            max_value = self.transp_variables_all[var_avg_name]['max_value']
+
+        if self.verbose:
+            print(f'[INFO] Minimal value: {min_value}')
+            print(f'[INFO] Maximum value: {max_value}')
+
+        datasetout = self.create_nc_file_out_avg(file_var)
+        var_sensor_mask = datasetout.variables['SENSORMASK']
+        var_sum = datasetout.variables['average']
+        var_num = datasetout.variables['sum_weights']
+
+        igranule = 1
+        for name in infof:
+            if self.verbose:
+                print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
+                igranule = igranule + 1
+
+            file = os.path.join(self.dir_input, name)
+            dataset_granule = Dataset(file)
+            yini = self.info[name]['y_min']
+            yfin = self.info[name]['y_max']
+            xini = self.info[name]['x_min']
+            xfin = self.info[name]['x_max']
+
+            # destination var
+            sum_array = np.array(var_sum[yini:yfin, xini:xfin])
+            num_array = np.array(var_num[yini:yfin, xini:xfin])
+
+            # sensor mask
+            sensor_mask_overall = np.array(var_sensor_mask[yini:yfin, xini:xfin])
+
+            # origin var
+            var_granule = var_avg_name
+            if var_avg_name in self.granule_variables.keys():
+                var_granule = self.granule_variables[var_avg_name]
+            avg_granule = np.array(dataset_granule.variables[var_granule][yini:yfin, xini:xfin])
+            if var_granule == 'KD490_M07':
+                avg_granule[avg_granule != -999] = np.power(10, avg_granule[avg_granule != -999])
+
+            # origin mask
+            weigthed_mask_granule = np.array(dataset_granule.variables['mask'][yini:yfin, xini:xfin])
+
+            # assuring that pixels lower than 65 degress are masked
+            weigthed_mask_granule[sensor_mask_overall == -999] = -999
+
+            # average is computed only for valid min/max values
+            weigthed_mask_granule = np.where(np.logical_and(avg_granule >= min_value, avg_granule <= max_value),
+                                             weigthed_mask_granule, 0)
+
+            # computing sum
+            indices = np.where(weigthed_mask_granule > 0)
+            sum_array[indices] = sum_array[indices] + (avg_granule[indices] * weigthed_mask_granule[indices])
+            num_array[indices] = num_array[indices] + weigthed_mask_granule[indices]
+            var_sum[yini:yfin, xini:xfin] = [sum_array]
+            var_num[yini:yfin, xini:xfin] = [num_array]
+
+            dataset_granule.close()
+
+        for y in range(0, self.height, self.ystep):
+            if self.verbose:
+                print(f'[INFO] -> {y}')
+            for x in range(0, self.width, self.xstep):
+                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                sum_array = np.array(var_sum[limits[0]:limits[1], limits[2]:limits[3]])
+                if np.max(sum_array[:]) == 0:
+                    continue
+                num_array = np.array(var_num[limits[0]:limits[1], limits[2]:limits[3]])
+
+                indices_good = np.where(num_array > 0)
+                indices_mask = np.where(num_array <= 0)
+                sum_array[indices_good] = sum_array[indices_good] / num_array[indices_good]
+                sum_array[indices_mask] = -999
+                sum_array[np.logical_or(sum_array < min_value, sum_array > max_value)] = -999
+
+                var_sum[limits[0]:limits[1], limits[2]:limits[3]] = [sum_array[:, :]]
+
+        datasetout.close()
+
+    def create_basic_mask(self, file_mask, infof, nvalidgranules):
+        if self.verbose:
+            print(f'[INFO] Creating basic mask file: {file_mask}')
+        datasetout = self.create_nc_file_out_avg(file_mask)
+
+        var_sensor_mask = datasetout.variables['SENSORMASK']
+        var_n_granules = datasetout.variables['n_granules']
+        var_weighted_mask = datasetout.variables['sum_weights']
+        igranule = 1
+        for name in infof:
+            if self.verbose:
+                print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
+                igranule = igranule + 1
+
+            file = os.path.join(self.dir_input, name)
+            yini = self.info[name]['y_min']
+            yfin = self.info[name]['y_max']
+            xini = self.info[name]['x_min']
+            xfin = self.info[name]['x_max']
+
+            # general variables
+            sensor_mask = np.array(var_sensor_mask[yini:yfin, xini:xfin])
+            ngranules = np.array(var_n_granules[yini:yfin, xini:xfin])
+            weigthed_mask = np.array(var_weighted_mask[yini:yfin, xini:xfin])
+
+            # weighted mask granule
+            dataset_granule = Dataset(file)
+            weigthed_mask_granule = np.array(dataset_granule.variables['mask'][yini:yfin, xini:xfin])
+
+            # assuring that pixels lower than 65 degress are masked
+            weigthed_mask_granule[sensor_mask == -999] = -999
+
+            ngranules[weigthed_mask_granule >= 0] = ngranules[weigthed_mask_granule >= 0] + 1
+
+            # indices = np.where(weigthed_mask_granule > 0)
+
+            weigthed_mask[weigthed_mask_granule > 0] = weigthed_mask[weigthed_mask_granule > 0] + weigthed_mask_granule[
+                weigthed_mask_granule > 0]
+            if name.startswith('S3A'):
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 0)] = 1
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 2)] = 3
+            if name.startswith('S3B'):
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 0)] = 2
+                sensor_mask[np.logical_and(weigthed_mask_granule > 0, sensor_mask == 1)] = 3
+
+            var_sensor_mask[yini:yfin, xini:xfin] = [sensor_mask[:, :]]
+            var_n_granules[yini:yfin, xini:xfin] = [ngranules[:, :]]
+            var_weighted_mask[yini:yfin, xini:xfin] = [weigthed_mask[:, :]]
+
+        datasetout.close()
+
     # TYPE: RRS, TRANSP, OPERATIVE, TEST
-    def make_integration_avg(self, file_out, date_run, timeliness):
+    def make_integration_avg_v1(self, file_out, date_run, timeliness):
         if self.verbose:
             print('[INFO] Retrieving info from granules...')
         self.get_info()
@@ -584,7 +884,7 @@ class ArcIntegration():
         for name in infof:
             if self.verbose:
                 print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
-                igranule = igranule +1
+                igranule = igranule + 1
 
             file = os.path.join(self.dir_input, name)
             yini = self.info[name]['y_min']
@@ -762,7 +1062,7 @@ class ArcIntegration():
 
     def filter_granules(self):
         info_filtered = []
-        if len(self.info)==0:
+        if len(self.info) == 0:
             return info_filtered
         for name in self.info:
             if self.th_nvalid >= 0:
@@ -774,7 +1074,6 @@ class ArcIntegration():
             info_filtered.append(name)
 
         return info_filtered
-
 
     def group_granules(self):
         info_agrup = {}

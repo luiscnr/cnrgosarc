@@ -42,8 +42,10 @@ def main():
 
     if args.mode == "CHECK":
         # ami = ArcMapInfo(None,True)
+        # adding_time()
+        #modify_chunksizes()
 
-        check_chla()
+        # check_chla()
         # check_model()
         # run_resampling_info()
         # do_check7()  # gettig combinatons
@@ -105,6 +107,11 @@ def main():
         arcInt.create_nc_file_out(fout, 'NR')
         fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NT_Base.nc')
         arcInt.create_nc_file_out(fout, 'NT')
+        arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+        fout = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_Base.nc')
+        fouttemp = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_BaseTemp.nc')
+        arcInt.create_nc_file_out_avg(fouttemp)
+        copy_nc_excluding_variables(fouttemp, fout, ['lat', 'lon'])
 
         return
 
@@ -120,10 +127,10 @@ def main():
         arcProc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
         file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
 
-        fout = os.path.join(output_path,'ArcGrid_65_90_300m_PLANKTON_NR_Base.nc')
-        arcProc.create_nc_file_out(fout,file_base,'NR')
-        fout = os.path.join(output_path,'ArcGrid_65_90_300m_PLANKTON_NT_Base.nc')
-        arcProc.create_nc_file_out(fout,file_base,'NT')
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_PLANKTON_NR_Base.nc')
+        arcProc.create_nc_file_out(fout, file_base, 'NR')
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_PLANKTON_NT_Base.nc')
+        arcProc.create_nc_file_out(fout, file_base, 'NT')
         return
 
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
@@ -171,8 +178,40 @@ def main():
         return
 
     if args.mode == 'CHLA':
-        run_chla(arc_opt)
+        # run_chla(arc_opt)
+        compute_month_chl(arc_opt)
         return
+
+
+def compute_month_chl(arc_opt):
+    options = arc_opt.get_processing_options()
+    if options is None:
+        return
+    ##ONLY CHLA MODE IS IMPLEMENTED
+    output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
+    if not output_type == 'CHLA':
+        return
+    from arc_processing import ArcProcessing
+    if args.verbose:
+        print('[INFO] PROCESSING OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
+    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
+    if file_base is not None:
+        if os.path.exists(file_base):
+            if timeliness is None:
+                if file_base.find('NR') > 0:
+                    timeliness = 'NR'
+                if file_base.find('NT') > 0:
+                    timeliness = 'NT'
+    if args.verbose:
+        print(f'[INFO] File base: {file_base}')
+        print(f'[INFO] Timeliness: {timeliness}')
+    arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+    fileout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/O201907_plankton-arc-fr.nc'
+    arc_proc.compute_chla_month(fileout, timeliness)
 
 
 def kk():
@@ -193,6 +232,207 @@ def kk():
     # fdata = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
     # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
     # ami.save_quick_look_fdata(fout,fdata)
+
+
+def adding_time():
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_rrs-arc-fr_NOTIME.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_rrs-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_in,file_out)
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_plankton-arc-fr_NOTIME.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_plankton-arc-fr2.nc'
+    # copy_nc_adding_time_variable(file_in, file_out)
+    #
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/207/O2019207_rrs-arc-fr_NOTIME.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/207/O2019207_rrs-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_in, file_out)
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/207/O2019207_plankton-arc-fr_NOTIME.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/207/O2019207_plankton-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_in, file_out)
+
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2016/183/O2016183_transp-arc-fr_NOTIME.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2016/183/O2016183_transp-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_in, file_out)
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2016/197/O2016197_transp-arc-fr_NOTIME.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2016/197/O2016197_transp-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_in, file_out)
+
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/O201906_plankton-arc-fr_NOTIME.nc'
+    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201906_plankton-arc-fr_NOSENSOR.nc'
+    # copy_nc_excluding_variables(file_in,file_out,['SENSORMASK'])
+    file_out_end = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201906_plankton-arc-fr.nc'
+    copy_nc_adding_time_variable(file_out, file_out_end)
+
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/O201907_plankton-arc-fr_NOTIME.nc'
+    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201907_plankton-arc-fr_NOSENSOR.nc'
+    # copy_nc_excluding_variables(file_in,file_out,['SENSORMASK'])
+    file_out_end = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201907_plankton-arc-fr.nc'
+    copy_nc_adding_time_variable(file_out, file_out_end)
+
+    ##TO SET ATRIBUTES
+    # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_plankton-arc-fr_NOTIME.nc'
+    # from netCDF4 import Dataset
+    # ncsat = Dataset(file_in, 'a')
+    # ncsat.cmems_product_id = "OCEANCOLOUR_ARC_BGC_L3_MY_009_123"
+    # ncsat.title = "cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D"
+    # ncsat.timeliness = "NT"
+
+    # import configparser
+    # options = configparser.ConfigParser()
+    # file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
+    # options.read(file_at)
+    # ats = list(ncsat.ncattrs())
+    # at_dict = dict(options['GLOBAL_ATTRIBUTES'])
+    # at_dict['parameter'] = 'Chlorophyll-a concentration'
+    # at_dict['parameter_code'] = 'PLANKTON'
+    # at_dict['product_level'] = 'L4'
+    # from datetime import datetime as dt
+    # date = dt(2019,7,1)
+    # date_fin = dt(2019,7,31)
+    # names = []
+    # while date<=date_fin:
+    #     print(date)
+    #     date_str = date.strftime('%Y%j')
+    #     name = f'O{date_str}_plankton-arc-fr.nc'
+    #     names.append(name)
+    #     date  = date+timedelta(hours=24)
+    # namestr = ' '.join(names)
+    # at_dict['source_files'] = namestr
+    # for at in at_dict:
+    #     if at not in ats:
+    #         print(at, at_dict[at])
+    #         ncsat.setncattr(at, at_dict[at])
+    # ncsat.close()
+
+
+def modify_chunksizes():
+    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2016/183/O2016183_transp-arc-fr.nc'
+    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/O2019152181-plankton_monthly-arc-fr.nc'
+    chunk_sizes = [1223, 3669]  # [1223, 3669, 6115, 18345]
+    from datetime import datetime as dt
+
+    for idx in range(len(chunk_sizes)):
+        chunk_size = chunk_sizes[idx]
+        # iday = idx +1
+        # date_here = dt(2023,2,iday)
+        imonth = idx + 1
+        date_here = dt(2023, imonth, 1)
+        if imonth == 1:
+            date_here_end = dt(2023, imonth, 31)
+        if imonth == 2:
+            date_here_end = dt(2023, imonth, 28)
+
+        year_str = date_here.strftime('%Y')
+        jjj_str = date_here.strftime(('%j'))
+        jjj_end = date_here_end.strftime(('%j'))
+        # name_file = f'O{year_str}{jjj_str}_transp-arc-fr.nc'
+        # file_out = os.path.join('/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/',year_str,jjj_str,name_file)
+        name_file = f'O{year_str}{jjj_str}{jjj_end}-transp_monthly-arc-fr.nc'
+        file_out = os.path.join('/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/', year_str, name_file)
+        print(file_out, chunk_size)
+        copy_nc_with_chunksize(file_in, file_out, chunk_size, date_here, date_here_end)
+
+
+def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
+    # csizes = (1,chunk_size,chunk_size)
+    csizes = None
+    from netCDF4 import Dataset
+    from datetime import datetime as dt
+    with Dataset(ifile) as src:
+        dst = Dataset(ofile, 'w', format='NETCDF4')
+        # copy global attributes all at once via dictionary
+        dst.setncatts(src.__dict__)
+        # modifying
+        dst.start_date = date_here.strftime('%Y-%m-%d')
+        if date_here_end is None:
+            date_here_end = date_here
+        dst.stop_date = date_here_end.strftime('%Y-%m-%d')
+        dst.timeliness = 'NR'
+        cdate = dt.utcnow()
+        dst.creation_date = cdate.strftime('%Y-%m-%d')
+        dst.creation_time = cdate.strftime('%H:%M:%S UTC')
+        dst.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
+        dst.title = 'cmems_obs-oc_arc_bgc-transp_nrt_l4-olci-300m_P1M'
+        timeseconds = (date_here - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+        # copy dimensions
+        for name, dimension in src.dimensions.items():
+            if args.verbose:
+                print(f'[INFO] -> Copying dimension: {name}')
+            dst.createDimension(
+                name, (len(dimension) if not dimension.isunlimited() else None))
+        # copy var
+        for name, variable in src.variables.items():
+            if args.verbose:
+                print(f'[INFO] -> Copying variables: {name}')
+            if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
+                dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
+                                   shuffle=True,
+                                   complevel=6)
+            else:
+                dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
+                                   shuffle=True,
+                                   complevel=6, chunksizes=csizes)
+            # copy variable attributes all at once via dictionary
+            dst[name].setncatts(src[name].__dict__)
+            # copy variable data
+            dst[name][:] = src[name][:]
+        # modifying time
+        dst.variables['time'][0] = [np.int32(timeseconds)]
+
+    if args.verbose:
+        print('COMPLETED')
+
+
+def copy_nc_adding_time_variable(ifile, ofile):
+    from netCDF4 import Dataset
+    with Dataset(ifile) as src:
+        dst = Dataset(ofile, 'w', format='NETCDF4')
+
+        # copy global attributes all at once via dictionary
+        dst.setncatts(src.__dict__)
+
+        # copy dimensions
+        for name, dimension in src.dimensions.items():
+            if args.verbose:
+                print(f'[INFO] -> Copying dimension: {name}')
+            dst.createDimension(
+                name, (len(dimension) if not dimension.isunlimited() else None))
+
+        # add time dimension
+        dst.createDimension('time', 1)
+
+        from datetime import datetime as dt
+        date_here = dt.strptime(src.start_date, '%Y-%m-%d')
+        print(date_here)
+        timeseconds = (date_here - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+
+        # add time variable
+        var_time = dst.createVariable('time', 'i4', ('time',), fill_value=-999, zlib=True, complevel=6)
+        var_time.long_name = "reference time"
+        var_time.standard_name = "time"
+        var_time.axis = "T"
+        var_time.calendar = "Gregorian"
+        var_time.units = "seconds since 1981-01-01 00:00:00"
+        var_time[0] = [np.int32(timeseconds)]
+
+        # for the remaining variables, creating as time,y,x
+        for name, variable in src.variables.items():
+
+            if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
+                dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
+                                   shuffle=True,
+                                   complevel=6)
+            else:
+                dst.createVariable(name, variable.datatype, ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                   shuffle=True,
+                                   complevel=6)
+            # copy variable attributes all at once via dictionary
+            dst[name].setncatts(src[name].__dict__)
+            # copy data
+            if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
+                dst[name][:] = src[name][:]
+            else:
+                print('variable: ', name)
+                dst[name][0, :, :] = src[name][:, :]
 
 
 def copy_nc_excluding_variables(ifile, ofile, excluded_variables):
@@ -482,44 +722,50 @@ def run_integration(arc_opt):
             if pl == '3':
                 pl = ''
             from arc_integration import ArcIntegration
-            output_type = arc_opt.get_value_param('INTEGRATE', 'output_type', 'RRS', 'str')
-            file_base = arc_opt.get_value_param('INTEGRATE', 'file_base', None, 'str')
+            output_type = arc_opt.get_value_param('INTEGRATE', 'output_type', 'OPERATIVE', 'str')
+            dir_base = arc_opt.get_value_param('INTEGRATE', 'file_base', None, 'str')
             if args.verbose:
                 print(f'[INFO] Output type: {output_type}')
             arc_integration = ArcIntegration(arc_opt, args.verbose, input_path, output_type, None)
-            timeliness = arc_opt.get_value_param('INTEGRATE', 'timeliness', None, 'str')
-            if file_base is not None:
+            timeliness = arc_opt.get_value_param('INTEGRATE', 'timeliness', 'NT', 'str')
+            if dir_base is not None:
+                file_base = os.path.join(dir_base, 'ArcGrid_69_90_300m_AVERAGE_Base.nc')
                 if os.path.exists(file_base):
                     arc_integration.ami.ifile_base = file_base
-                    if timeliness is None:
-                        if file_base.find('NR') > 0:
-                            timeliness = 'NR'
-                        if file_base.find('NT') > 0:
-                            timeliness = 'NT'
                     if args.verbose:
                         print(f'[INFO] File base: {file_base}')
-            name_out = f'O{pl}{datestr}_AVERAGE-arc-fr.nc'
-            # if arc_integration.th_nvalid >= 0:
-            #     name_out = f'O{pl}{datestr}_rrs-arc-fr_THVALID_{arc_integration.th_nvalid}.nc'
-            fout = os.path.join(output_path, name_out)
-
 
             if args.verbose:
                 print(f'[INFO] Timeliness: {timeliness}')
                 print(f'[INFO] Input path: {input_path}')
-                print(f'[INFO] Output file: {fout}')
-            arc_integration.make_integration(fout, date_run, timeliness)
+                print(f'[INFO] Output file: {output_path}')
+            arc_integration.apply_pool = 4
+            arc_integration.make_integration(output_path)
 
-            if output_type=='RRS' or output_type=='OPERATIVE':
+            if output_type == 'RRS' or output_type == 'OPERATIVE':
+                file_base = os.path.join(dir_base,f'ArcGrid_65_90_300m_RRS_{timeliness}_Base.nc')
+                arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
-                fout_end = os.path.join(output_path, name_out_end)
-                excluded_variables = ['n_granules', 'sum_weights','KD490']
-                copy_nc_excluding_variables(fout, fout_end, excluded_variables)
-            if output_type=='TRANSP' or output_type=='OPERATIVE':
+                file_out = os.path.join(output_path,name_out_end)
+                arc_integration.create_rrs_file(output_path,file_out,date_run,timeliness)
+
+            if output_type == 'TRANSP' or output_type == 'OPERATIVE':
+                file_base = os.path.join(dir_base,f'ArcGrid_65_90_300m_TRANSP_{timeliness}_Base.nc')
+                arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_transp-arc-fr.nc'
-                fout_end = os.path.join(output_path, name_out_end)
-                excluded_variables = ['n_granules', 'sum_weights', 'RRS400','RRS412_5','RRS442_5','RRS490','RRS510','RRS560','RRS620','RRS665','RRS673_75','RRS681_25','RRS708_75']
-                copy_nc_excluding_variables(fout, fout_end, excluded_variables)
+                file_out = os.path.join(output_path,name_out_end)
+                arc_integration.create_transp_file(output_path,file_out,date_run,timeliness)
+
+
+            #     fout_end = os.path.join(output_path, name_out_end)
+            #     excluded_variables = ['n_granules', 'sum_weights', 'KD490']
+            #     copy_nc_excluding_variables(fout, fout_end, excluded_variables)
+            # if output_type == 'TRANSP' or output_type == 'OPERATIVE':
+            #     name_out_end = f'O{pl}{datestr}_transp-arc-fr.nc'
+            #     fout_end = os.path.join(output_path, name_out_end)
+            #     excluded_variables = ['n_granules', 'sum_weights', 'RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510',
+            #                           'RRS560', 'RRS620', 'RRS665', 'RRS673_75', 'RRS681_25', 'RRS708_75']
+            #     copy_nc_excluding_variables(fout, fout_end, excluded_variables)
 
         date_run = date_run + timedelta(hours=24)
 
@@ -550,7 +796,6 @@ def run_chla(arc_opt):
     if args.verbose:
         print(f'[INFO] File base: {file_base}')
         print(f'[INFO] Timeliness: {timeliness}')
-
 
     ##WORKING WITH SINGLE GRANULE, ONLY CHLA
     input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
@@ -585,7 +830,7 @@ def run_chla(arc_opt):
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
         dateyj = date_run.strftime('%Y%j')
         name_rrs = f'O{dateyj}_rrs-arc-fr.nc'
-        input_file = os.path.join(input_path,name_rrs)
+        input_file = os.path.join(input_path, name_rrs)
         if not os.path.exists(input_file):
             print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
             make_processing = True
@@ -597,10 +842,12 @@ def run_chla(arc_opt):
 
         if make_processing:
             output_name = f'O{dateyj}_plankton-arc-fr.nc'
-            output_file = os.path.join(options['output_path'], output_name)
+            output_file = os.path.join(output_path, output_name)
             if args.verbose:
+                print(f'[INFO] Input file: {input_file}')
                 print(f'[INFO] Output file: {output_file}')
             arc_proc.compute_chla_image(input_file, output_file, timeliness)
+        date_run = date_run + timedelta(hours=24)
 
 
 def do_check7():
