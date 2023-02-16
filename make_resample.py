@@ -243,10 +243,11 @@ def adding_time():
     while date_here<=date_end:
         yyyy = date_here.strftime('%Y')
         jjj = date_here.strftime('%j')
-        file_in = os.path.join(dir_base,yyyy,jjj,f'O{yyyy}{jjj}_rrs-arc-fr.nc')
-        file_out = os.path.join(dir_base, yyyy, jjj, f'O{yyyy}{jjj}_rrs-arc-fr_NOTIME.nc')
+        file_in = os.path.join(dir_base,yyyy,jjj,f'O{yyyy}{jjj}_rrs-arc-fr_NOTIME.nc')
+        file_out = os.path.join(dir_base, yyyy, jjj, f'O{yyyy}{jjj}_rrs-arc-fr.nc')
         print(file_in,file_out)
-        os.rename(file_in,file_out)
+        #os.rename(file_in,file_out)
+        copy_nc_adding_time_variable(file_in,file_out)
         date_here = date_here + timedelta(hours=24)
 
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_rrs-arc-fr_NOTIME.nc'
