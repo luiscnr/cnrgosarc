@@ -431,7 +431,11 @@ def copy_nc_adding_time_variable(ifile, ofile):
 
         # for the remaining variables, creating as time,y,x
         for name, variable in src.variables.items():
-
+            if args.verbose:
+                print(f'[INFO] -> Copying variable: {name}')
+            if name == 'KD490':
+                print('Skipping...')
+                continue
             if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
                 dst.createVariable(name, variable.datatype, variable.dimensions, fill_value=-999, zlib=True,
                                    shuffle=True,
@@ -446,7 +450,7 @@ def copy_nc_adding_time_variable(ifile, ofile):
             if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
                 dst[name][:] = src[name][:]
             else:
-                print('variable: ', name)
+                #print('variable: ', name)
                 dst[name][0, :, :] = src[name][:, :]
 
 
