@@ -41,8 +41,8 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        # ami = ArcMapInfo(None,True)
-        # adding_time()
+        ami = ArcMapInfo(None,True)
+        adding_time()
         #modify_chunksizes()
 
         # check_chla()
@@ -235,6 +235,20 @@ def kk():
 
 
 def adding_time():
+    from datetime import datetime as dt
+    from datetime import timedelta
+    dir_base = '/store/COP2-OC-TAC/arc/integrated'
+    date_here = dt(2019,6,1)
+    date_end = dt(2019,6,23)
+    while date_here<=date_end:
+        yyyy = date_here.strftime('%Y')
+        jjj = date_here.strftime('%j')
+        file_in = os.path.join(dir_base,yyyy,jjj,f'O{yyyy}{jjj}_rrs-arc-fr.nc')
+        file_out = os.path.join(dir_base, yyyy, jjj, f'O{yyyy}{jjj}_rrs-arc-fr_NOTIME.nc')
+        print(file_in,file_out)
+        os.rename(file_in,file_out)
+        date_here = date_here + timedelta(hours=24)
+
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_rrs-arc-fr_NOTIME.nc'
     # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_rrs-arc-fr.nc'
     # copy_nc_adding_time_variable(file_in,file_out)
@@ -257,16 +271,16 @@ def adding_time():
     # copy_nc_adding_time_variable(file_in, file_out)
 
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/O201906_plankton-arc-fr_NOTIME.nc'
-    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201906_plankton-arc-fr_NOSENSOR.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201906_plankton-arc-fr_NOSENSOR.nc'
     # copy_nc_excluding_variables(file_in,file_out,['SENSORMASK'])
-    file_out_end = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201906_plankton-arc-fr.nc'
-    copy_nc_adding_time_variable(file_out, file_out_end)
+    # file_out_end = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201906_plankton-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_out, file_out_end)
 
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/O201907_plankton-arc-fr_NOTIME.nc'
-    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201907_plankton-arc-fr_NOSENSOR.nc'
+    # file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201907_plankton-arc-fr_NOSENSOR.nc'
     # copy_nc_excluding_variables(file_in,file_out,['SENSORMASK'])
-    file_out_end = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201907_plankton-arc-fr.nc'
-    copy_nc_adding_time_variable(file_out, file_out_end)
+    # file_out_end = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/O201907_plankton-arc-fr.nc'
+    # copy_nc_adding_time_variable(file_out, file_out_end)
 
     ##TO SET ATRIBUTES
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_plankton-arc-fr_NOTIME.nc'
