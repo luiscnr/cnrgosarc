@@ -239,7 +239,7 @@ def adding_time():
     from datetime import timedelta
     dir_base = '/store/COP2-OC-TAC/arc/integrated'
     date_here = dt(2019,6,1)
-    date_end = dt(2019,6,23)
+    date_end = dt(2019,6,1)
     while date_here<=date_end:
         yyyy = date_here.strftime('%Y')
         jjj = date_here.strftime('%j')
