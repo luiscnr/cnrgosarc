@@ -163,11 +163,17 @@ class ArcIntegration():
         if datasetout is None:
             return datasetout
 
+
+
         ##global attributes
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib is None, atribs ard defined in file base
             for at in atribs:
-                datasetout.setncattr(at, atribs[at])
+                if at=='conventions':
+                    datasetout.setncattr('Conventions', atribs[at])
+                else:
+                    datasetout.setncattr(at, atribs[at])
+
 
         ##create rrs variables
         if self.output_type == 'RRS' or self.output_type == 'TEST' or self.output_type == 'OPERATIVE':
@@ -181,14 +187,15 @@ class ArcIntegration():
                     continue
                 if self.verbose:
                     print(f'[INFO] Creating RRS band: {bandname}')
-                var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var = datasetout.createVariable(bandname, 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
                 # var[:] = 0
                 # var.wavelength = wl
                 var.long_name = f'Remote Sensing Reflectance at {bandname.lower()}'
                 var.standard_name = f'surface_ratio_of_upwelling_radiance_emerging_from_sea_water_to_downwelling_radiative_flux_in_air'
                 var.units = 'sr^-1'
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'longitude latitude'
+                var.coordinates = 'lon lat'
                 var.valid_min = self.rrs_variables_all[bandname]['min_value']
                 var.valid_max = self.rrs_variables_all[bandname]['max_value']
                 var.type = 'surface'
@@ -202,15 +209,17 @@ class ArcIntegration():
         addtransp = False
         if bandname in self.average_variables and not bandname in datasetout.variables:
             addtransp = True
+        if self.output_type=='RRS':
+            addtransp = False
         if addtransp:
-            var = datasetout.createVariable(bandname, 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var = datasetout.createVariable(bandname, 'f4', ('time','y', 'x'), fill_value=-999, zlib=True, complevel=6)
             # var[:] = 0
             var.band_name = 'OLCI band name KD490_M07'
             var.long_name = 'OLCI Diffuse Attenuation Coefficient at 490nm'
             var.standard_name = 'volume_attenuation_coefficient_of_downwelling_radiative_flux_in_sea_water'
             var.units = 'm^-1'
             var.grid_mapping = 'stereographic'
-            var.coordinates = 'longitude latitude'
+            var.coordinates = 'lon lat'
             var.type = 'surface'
             var.valid_min = self.transp_variables_all[bandname]['min_value']
             var.valid_max = self.transp_variables_all[bandname]['max_value']
@@ -645,6 +654,9 @@ class ArcIntegration():
         if date_run is not None:
             datasetout.start_date = date_run.strftime('%Y-%m-%d')
             datasetout.stop_date = date_run.strftime('%Y-%m-%d')
+            if 'time' in datasetout.variables:
+                timeseconds = (date_run - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+                datasetout.variables['time'][0] = [np.int32(timeseconds)]
         if timeliness is not None:
             datasetout.timeliness = timeliness
         cdate = dt.utcnow()
@@ -678,7 +690,7 @@ class ArcIntegration():
                     if self.verbose:
                         print(f'[INFO] Adapting mask for variable {avg_name}')
                     var_array[wmask <= 0] = -999.0
-                variable[:] = [var_array[:]]
+                variable[0,:,:] = [var_array[:,:]]
                 dataset_var.close()
 
         datasetout.close()
@@ -697,7 +709,7 @@ class ArcIntegration():
                 variable = datasetout.variables[avg_name]
                 dataset_var = Dataset(file_avg)
                 var_array = np.array(dataset_var.variables['average'])
-                variable[:] = [var_array[:]]
+                variable[0,:,:] = [var_array[:,:]]
                 dataset_var.close()
         datasetout.close()
         if self.verbose:

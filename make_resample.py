@@ -41,9 +41,10 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        ami = ArcMapInfo(None,True)
-        adding_time()
-        #modify_chunksizes()
+        # ami = ArcMapInfo(None,True)
+        # adding_time()
+        add_vega_changes()
+        # modify_chunksizes()
 
         # check_chla()
         # check_model()
@@ -94,24 +95,25 @@ def main():
             print('[INFO] Started creation of base files for integration...')
         from arc_integration import ArcIntegration
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
-        arcInt = ArcIntegration(None, args.verbose, None, 'RRS', file_at)
+
+        # arcInt = ArcIntegration(None, args.verbose, None, 'RRS', file_at)
+        # arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+        # fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NR_Base.nc')
+        # arcInt.create_nc_file_out(fout, 'NR')
+        # fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NT_Base.nc')
+        # arcInt.create_nc_file_out(fout, 'NT')
+
+        arcInt = ArcIntegration(None, args.verbose, None, 'TRANSP', file_at)
         arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-
-        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NR_Base.nc')
-        arcInt.create_nc_file_out(fout, 'NR')
-        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NT_Base.nc')
-        arcInt.create_nc_file_out(fout, 'NT')
-
-        arcInt.output_type = 'TRANSP'
         fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NR_Base.nc')
         arcInt.create_nc_file_out(fout, 'NR')
         fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NT_Base.nc')
         arcInt.create_nc_file_out(fout, 'NT')
-        arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-        fout = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_Base.nc')
-        fouttemp = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_BaseTemp.nc')
-        arcInt.create_nc_file_out_avg(fouttemp)
-        copy_nc_excluding_variables(fouttemp, fout, ['lat', 'lon'])
+        # arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+        # fout = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_Base.nc')
+        # fouttemp = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_BaseTemp.nc')
+        # arcInt.create_nc_file_out_avg(fouttemp)
+        # copy_nc_excluding_variables(fouttemp, fout, ['lat', 'lon'])
 
         return
 
@@ -214,6 +216,87 @@ def compute_month_chl(arc_opt):
     arc_proc.compute_chla_month(fileout, timeliness)
 
 
+def add_vega_changes():
+    print('VEGA CHANGES')
+    ##Grid file
+    file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/DEPRECATED/ArcGrid_65_90_300m_GridBase.nc'
+    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+    from netCDF4 import Dataset
+    src = Dataset(file_base)
+    dst = Dataset(file_out, 'w', format='NETCDF4')
+
+    # dimensions
+    # copy dimensions
+    for name, dimension in src.dimensions.items():
+        if args.verbose:
+            print(f'[INFO] -> Copying dimension: {name}')
+        dst.createDimension(
+            name, (len(dimension) if not dimension.isunlimited() else None))
+    if args.verbose:
+        print('Addding time...')
+    # add time dimension
+    dst.createDimension('time', 1)
+
+    # add time variable
+    var_time = dst.createVariable('time', 'i4', ('time',), zlib=True, complevel=6)
+    var_time.long_name = "reference time"
+    var_time.standard_name = "time"
+    var_time.axis = "T"
+    var_time.calendar = "Gregorian"
+    var_time.units = "seconds since 1981-01-01 00:00:00"
+    var_time[0] = [np.int32(0)]
+
+    for name, variable in src.variables.items():
+        if args.verbose:
+            print(f'[INFO] -> Copying variable: {name}')
+        if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
+            dst.createVariable(name, variable.datatype, variable.dimensions, zlib=True, shuffle=True, complevel=6)
+        else:
+            dst.createVariable(name, variable.datatype, ('time', 'y', 'x'), fill_value=-999, zlib=True, shuffle=True,
+                               complevel=6)
+        # copy variable attributes all at once via dictionary
+        if name == 'time' or name == 'y' or name == 'x':
+            dst[name].setncatts(src[name].__dict__)
+        elif name == 'lat' or name == 'lon':
+            for at in src[name].ncattrs():
+                if at == 'valid_min' or at == 'valid_max':
+                    continue
+                else:
+                    value = src[name].getncattr(at)
+                    dst[name].setncattr(at, value)
+            if name == 'lat':
+                dst[name].comment = 'Spherical latidude from 65 to 90 degrees north'
+            if name == 'lon':
+                dst[name].comment = 'Spherical longitude from -180 to 180 degrees east'
+        elif name == 'stereographic':
+            dst[name].setncatts(src[name].__dict__)
+            dst[name].longitude_of_projection_origin = -45.0
+            dst[name].straight_vertical_longitude_from_pole = -45.0
+            dst[name].earth_radius = int(6378273)
+            dst[name].proj4 = "+proj=stere +lon_0=-45 +lat_0=90 +k=1 +R=6378273 +no_defs"
+
+        else:  # SENSOR MASK
+            for at in src[name].ncattrs():
+                if at == '_FillValue':
+                    continue
+                elif at == 'coordinates':
+                    dst[name].coordinates = "lon lat"
+                else:
+                    value = src[name].getncattr(at)
+                    dst[name].setncattr(at, value)
+
+        # copy data
+        if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
+            dst[name][:] = src[name][:]
+        else:
+            # print('variable: ', name)
+            dst[name][0, :, :] = src[name][:, :]
+
+    # DONE
+    src.close()
+    dst.close()
+
+
 def kk():
     print('DEPRECATED')
     # fgrid = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300m.nc'
@@ -238,16 +321,16 @@ def adding_time():
     from datetime import datetime as dt
     from datetime import timedelta
     dir_base = '/store/COP2-OC-TAC/arc/integrated'
-    date_here = dt(2019,6,10)
-    date_end = dt(2019,6,23)
-    while date_here<=date_end:
+    date_here = dt(2019, 6, 10)
+    date_end = dt(2019, 6, 23)
+    while date_here <= date_end:
         yyyy = date_here.strftime('%Y')
         jjj = date_here.strftime('%j')
-        file_in = os.path.join(dir_base,yyyy,jjj,f'O{yyyy}{jjj}_rrs-arc-fr_NOTIME.nc')
+        file_in = os.path.join(dir_base, yyyy, jjj, f'O{yyyy}{jjj}_rrs-arc-fr_NOTIME.nc')
         file_out = os.path.join(dir_base, yyyy, jjj, f'O{yyyy}{jjj}_rrs-arc-fr.nc')
-        print(file_in,file_out)
-        #os.rename(file_in,file_out)
-        copy_nc_adding_time_variable(file_in,file_out)
+        print(file_in, file_out)
+        # os.rename(file_in,file_out)
+        copy_nc_adding_time_variable(file_in, file_out)
         date_here = date_here + timedelta(hours=24)
 
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_rrs-arc-fr_NOTIME.nc'
@@ -399,6 +482,7 @@ def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
 
 def copy_nc_adding_time_variable(ifile, ofile):
     from netCDF4 import Dataset
+
     with Dataset(ifile) as src:
         dst = Dataset(ofile, 'w', format='NETCDF4')
 
@@ -450,8 +534,10 @@ def copy_nc_adding_time_variable(ifile, ofile):
             if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
                 dst[name][:] = src[name][:]
             else:
-                #print('variable: ', name)
+                # print('variable: ', name)
                 dst[name][0, :, :] = src[name][:, :]
+
+        dst.close()
 
 
 def copy_nc_excluding_variables(ifile, ofile, excluded_variables):
@@ -748,32 +834,35 @@ def run_integration(arc_opt):
             arc_integration = ArcIntegration(arc_opt, args.verbose, input_path, output_type, None)
             timeliness = arc_opt.get_value_param('INTEGRATE', 'timeliness', 'NT', 'str')
             if dir_base is not None:
-                file_base = os.path.join(dir_base, 'ArcGrid_69_90_300m_AVERAGE_Base.nc')
+                file_base = os.path.join(dir_base, 'ArcGrid_65_90_300m_AVERAGE_Base.nc')
                 if os.path.exists(file_base):
                     arc_integration.ami.ifile_base = file_base
                     if args.verbose:
                         print(f'[INFO] File base: {file_base}')
-
+            arc_integration.apply_pool = arc_opt.get_value_param('INTEGRATE', 'apply_pool', 0, 'int')
             if args.verbose:
                 print(f'[INFO] Timeliness: {timeliness}')
                 print(f'[INFO] Input path: {input_path}')
                 print(f'[INFO] Output file: {output_path}')
-            arc_integration.apply_pool = 4
-            arc_integration.make_integration(output_path)
+                print(f'[INFO] Apply pool: {arc_integration.apply_pool}')
+
+            #arc_integration.make_integration(output_path)
 
             if output_type == 'RRS' or output_type == 'OPERATIVE':
-                file_base = os.path.join(dir_base,f'ArcGrid_65_90_300m_RRS_{timeliness}_Base.nc')
+                file_base = os.path.join(dir_base, f'ArcGrid_65_90_300m_RRS_{timeliness}_Base.nc')
                 arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
-                file_out = os.path.join(output_path,name_out_end)
-                arc_integration.create_rrs_file(output_path,file_out,date_run,timeliness)
+                file_out = os.path.join(output_path, name_out_end)
+                arc_integration.output_type = 'RRS'
+                arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness)
 
             if output_type == 'TRANSP' or output_type == 'OPERATIVE':
-                file_base = os.path.join(dir_base,f'ArcGrid_65_90_300m_TRANSP_{timeliness}_Base.nc')
+                file_base = os.path.join(dir_base, f'ArcGrid_65_90_300m_TRANSP_{timeliness}_Base.nc')
                 arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_transp-arc-fr.nc'
-                file_out = os.path.join(output_path,name_out_end)
-                arc_integration.create_transp_file(output_path,file_out,date_run,timeliness)
+                file_out = os.path.join(output_path, name_out_end)
+                arc_integration.output_type = 'TRANSP'
+                arc_integration.create_transp_file(output_path, file_out, date_run, timeliness)
 
 
             #     fout_end = os.path.join(output_path, name_out_end)

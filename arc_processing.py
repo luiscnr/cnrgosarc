@@ -322,6 +322,7 @@ class ArcProcessing:
                 at_dict['timeliness'] = 'NT'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
                 at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D'
+        return at_dict
 
     def create_nc_file_out(self, ofname, file_base, timeliness):
         if self.verbose:
@@ -335,17 +336,20 @@ class ArcProcessing:
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib could be defined in file base
             for at in atribs:
-                datasetout.setncattr(at, atribs[at])
+                if at=='conventions':
+                    datasetout.setncattr('Conventions', atribs[at])
+                else:
+                    datasetout.setncattr(at, atribs[at])
 
         ##CREATE CHL VARIABLE
         if self.output_type == 'CHLA' or self.output_type == 'COMPARISON':
             if self.verbose:
                 print('[INFO] Creating CHL variable...')
             if 'CHL' not in datasetout.variables:
-                var = datasetout.createVariable('CHL', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var = datasetout.createVariable('CHL', 'f4', ('time','y', 'x'), fill_value=-999, zlib=True, complevel=6)
                 var[:] = -999
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'longitude latitude'
+                var.coordinates = 'lon lat'
                 var.long_name = "Chlorophyll a concentration"
                 var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
                 var.type = "surface"
