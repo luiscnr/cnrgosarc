@@ -180,8 +180,8 @@ def main():
         return
 
     if args.mode == 'CHLA':
-        # run_chla(arc_opt)
-        compute_month_chl(arc_opt)
+        run_chla(arc_opt)
+        #compute_month_chl(arc_opt)
         return
 
 

@@ -5,7 +5,9 @@ from arc_gpr_model import ARC_GPR_MODEL
 from netCDF4 import Dataset
 from datetime import datetime as dt
 import numpy as np
-
+import warnings
+warnings.simplefilter('ignore', UserWarning)
+warnings.simplefilter('ignore', RuntimeWarning)
 
 class ArcProcessing:
 
@@ -122,7 +124,7 @@ class ArcProcessing:
                 for idx in range(len(ifile)):
                     file_here = files[ifile[idx]]
                     nc_sat = Dataset(file_here)
-                    chl_here = np.array((nc_sat.variables['CHL'][limits[0]:limits[1], limits[2]:limits[3]]))
+                    chl_here = np.array((nc_sat.variables['CHL'][0,limits[0]:limits[1], limits[2]:limits[3]]))
                     nc_sat.close()
                     indices = np.where(chl_here > 0)
                     chl_here[indices] = np.multiply(chl_here[indices], np.float(iweight[idx]))
@@ -234,9 +236,8 @@ class ArcProcessing:
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
 
-        var_sensor_mask = datasetout.variables['SENSORMASK']
         sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
-        var_sensor_mask = [sensor_mask_array]
+        datasetout.variables['SENSORMASK'] = [sensor_mask_array]
 
         var_chla = datasetout.variables['CHL']
         min_value = var_chla.valid_min
@@ -255,10 +256,10 @@ class ArcProcessing:
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-                array_443 = np.array(var443[limits[0]:limits[1], limits[2]:limits[3]])
-                array_490 = np.array(var490[limits[0]:limits[1], limits[2]:limits[3]])
-                array_560 = np.array(var560[limits[0]:limits[1], limits[2]:limits[3]])
-                array_665 = np.array(var665[limits[0]:limits[1], limits[2]:limits[3]])
+                array_443 = np.array(var443[0,limits[0]:limits[1], limits[2]:limits[3]])
+                array_490 = np.array(var490[0,limits[0]:limits[1], limits[2]:limits[3]])
+                array_560 = np.array(var560[0,limits[0]:limits[1], limits[2]:limits[3]])
+                array_665 = np.array(var665[0,limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
                 if self.verbose:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
@@ -270,7 +271,7 @@ class ArcProcessing:
 
                     array_chla[array_chla < min_value] = -999.0
                     array_chla[array_chla > max_value] = -999.0
-                    var_chla[limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+                    var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
                     if self.output_type == 'COMPARISON':
                         array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
                         array_diff = array_chla_prev / array_chla
@@ -336,7 +337,7 @@ class ArcProcessing:
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib could be defined in file base
             for at in atribs:
-                if at=='conventions':
+                if at == 'conventions':
                     datasetout.setncattr('Conventions', atribs[at])
                 else:
                     datasetout.setncattr(at, atribs[at])
@@ -346,7 +347,8 @@ class ArcProcessing:
             if self.verbose:
                 print('[INFO] Creating CHL variable...')
             if 'CHL' not in datasetout.variables:
-                var = datasetout.createVariable('CHL', 'f4', ('time','y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var = datasetout.createVariable('CHL', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
                 var[:] = -999
                 var.grid_mapping = 'stereographic'
                 var.coordinates = 'lon lat'
