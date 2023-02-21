@@ -846,7 +846,7 @@ def run_integration(arc_opt):
                 print(f'[INFO] Output file: {output_path}')
                 print(f'[INFO] Apply pool: {arc_integration.apply_pool}')
 
-            #arc_integration.make_integration(output_path)
+            arc_integration.make_integration(output_path)
 
             if output_type == 'RRS' or output_type == 'OPERATIVE':
                 file_base = os.path.join(dir_base, f'ArcGrid_65_90_300m_RRS_{timeliness}_Base.nc')
