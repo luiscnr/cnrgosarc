@@ -1263,7 +1263,6 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     if dirdest is None:
         dirdest = dirorig
     apply_pool = arc_opt.get_value_param(section, 'apply_pool', 0, 'int')
-    import simplekml
     import zipfile as zp
     from arc_mapinfo import ArcMapInfo
     from olci_l2 import OLCI_L2
@@ -1342,6 +1341,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             idref = idref + 1
             rel_pass_dict[rel_pass] = math.pow(2, idref)
             if dokml:
+                import simplekml
                 if foutkml is not None and kml is not None:
                     kml.save(foutkml)
                     idcolor = idcolor + 1

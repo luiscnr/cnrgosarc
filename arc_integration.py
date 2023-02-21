@@ -6,7 +6,7 @@ import os
 from arc_mapinfo import ArcMapInfo
 from netCDF4 import Dataset
 from datetime import datetime as dt
-import simplekml
+
 
 
 class ArcIntegration():
