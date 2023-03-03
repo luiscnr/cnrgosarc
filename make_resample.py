@@ -181,7 +181,7 @@ def main():
 
     if args.mode == 'CHLA':
         run_chla(arc_opt)
-        #compute_month_chl(arc_opt)
+        # compute_month_chl(arc_opt)
         return
 
 
@@ -864,7 +864,6 @@ def run_integration(arc_opt):
                 arc_integration.output_type = 'TRANSP'
                 arc_integration.create_transp_file(output_path, file_out, date_run, timeliness)
 
-
             #     fout_end = os.path.join(output_path, name_out_end)
             #     excluded_variables = ['n_granules', 'sum_weights', 'KD490']
             #     copy_nc_excluding_variables(fout, fout_end, excluded_variables)
@@ -948,9 +947,13 @@ def run_chla(arc_opt):
             print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
             make_processing = False
 
+        output_name = f'O{dateyj}_plankton-arc-fr.nc'
+        output_file = os.path.join(output_path, output_name)
+        if os.path.exists(output_file):
+            print(f'[INFO] Output file {output_file} already exists. Skipping...')
+            make_processing = False
+
         if make_processing:
-            output_name = f'O{dateyj}_plankton-arc-fr.nc'
-            output_file = os.path.join(output_path, output_name)
             if args.verbose:
                 print(f'[INFO] Input file: {input_file}')
                 print(f'[INFO] Output file: {output_file}')
@@ -1561,7 +1564,8 @@ def do_check2():
 
 def do_check():
     from olci_l2 import OLCI_L2
-    folci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T110812_20180715T111112_20211121T193318_0180_033_251______MAR_R_NT_003.SEN3'
+    folci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST' \
+            '/S3A_OL_2_WFR____20180715T110812_20180715T111112_20211121T193318_0180_033_251______MAR_R_NT_003.SEN3 '
     olimage = OLCI_L2(folci, args.verbose)
     array = olimage.get_observation_angle_array()
     print(array.shape)

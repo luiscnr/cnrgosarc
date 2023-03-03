@@ -227,6 +227,8 @@ class ArcProcessing:
             print('[ERROR] Output dataset could not be started. Exiting.')
             return
 
+        if self.verbose:
+            print(f'[INFO] Setting times...')
         if sat_date is not None:
             datasetout.start_date = sat_date.strftime('%Y-%m-%d')
             datasetout.stop_date = sat_date.strftime('%Y-%m-%d')
@@ -236,9 +238,13 @@ class ArcProcessing:
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
 
+        if self.verbose:
+            print(f'[INFO] Getting sensor mask...')
         sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
         datasetout.variables['SENSORMASK'] = [sensor_mask_array]
 
+        if self.verbose:
+            print(f'[INFO] Getting chl variable...')
         var_chla = datasetout.variables['CHL']
         min_value = var_chla.valid_min
         max_value = var_chla.valid_max
@@ -329,11 +335,14 @@ class ArcProcessing:
         if self.verbose:
             print(f'[INFO] Copying file base {file_base} to start output file {ofname}...')
         self.ami.ifile_base = file_base
+        self.ami.verbose = self.verbose
         datasetout = self.ami.copy_nc_base(ofname)
         if datasetout is None:
             return datasetout
 
         ##global attributes
+        if self.verbose:
+            print(f'[INFO] Setting global attributes...')
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib could be defined in file base
             for at in atribs:
@@ -344,9 +353,9 @@ class ArcProcessing:
 
         ##CREATE CHL VARIABLE
         if self.output_type == 'CHLA' or self.output_type == 'COMPARISON':
-            if self.verbose:
-                print('[INFO] Creating CHL variable...')
             if 'CHL' not in datasetout.variables:
+                if self.verbose:
+                    print('[INFO] Creating CHL variable...')
                 var = datasetout.createVariable('CHL', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
                                                 complevel=6)
                 var[:] = -999

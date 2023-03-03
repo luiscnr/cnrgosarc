@@ -786,7 +786,7 @@ class ArcIntegration():
             var_num[yini:yfin, xini:xfin] = [num_array]
 
             dataset_granule.close()
-
+        print('ystep: ',self.ystep, ' xstep: ',self.xstep)
         for y in range(0, self.height, self.ystep):
             if self.verbose:
                 print(f'[INFO] -> {y}')

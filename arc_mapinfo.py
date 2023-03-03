@@ -85,7 +85,6 @@ class ArcMapInfo:
             satellite_latitude.valid_max = 90.0
             satellite_latitude.comment = "Spherical min. latidude: 65 degrees north"
 
-
             # longitude
             satellite_longitude = OFILE.createVariable('lon', 'f4', ('y', 'x'), zlib=True, shuffle=True,
                                                        complevel=4, least_significant_digit=3)
@@ -104,7 +103,6 @@ class ArcMapInfo:
             satellite_mask.comment = 'OLCI Sentinel-3A=1; OLCI Sentinel-3B=2. Each SENSORMASK pixel is the sum of all available sensor values. For example, if a pixel is observed by OLCI Sentinel-3A and OLCI Sentinel-3B then SENSORMASK = 3. Pixels with latitude lower than 65 degrees are masked'
             satellite_mask.grid_mapping = "stereographic"
             satellite_mask.coordinates = "longitude latitude"
-
 
         tileY = 5000
         tileX = 5000
@@ -271,8 +269,6 @@ class ArcMapInfo:
 
         return datasetout
 
-
-
     def copy_nc_base(self, ofile):
         dst = None
         if not os.path.exists(self.ifile_base):
@@ -280,8 +276,6 @@ class ArcMapInfo:
             return dst
         if self.verbose:
             print(f'[INFO] Copying file grid: {self.ifile_base}...')
-
-
 
         # shutil.copy(self.ifile_base,ofile)
 
@@ -632,8 +626,6 @@ class ArcMapInfo:
                                                     valid_output_index, index_array,
                                                     distance_array=distance_array, fill_value=fvalue)
             var[ymin:ymax, xmin:xmax] = [result[:, :]]
-
-
 
         # sensor mask
         if self.verbose:
