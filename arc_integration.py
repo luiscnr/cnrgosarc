@@ -666,11 +666,14 @@ class ArcIntegration():
         ##SENSOR MASK
         var_sensor_mask = datasetout.variables['SENSORMASK']
         file_mask = os.path.join(output_path, 'Mask.nc')
-        dataset_mask = Dataset(file_mask)
-        smask = np.array(dataset_mask.variables['SENSORMASK'])
-        wmask = np.array(dataset_mask.variables['sum_weights'])
-        var_sensor_mask[:] = [smask[:]]
-        dataset_mask.close()
+
+        #Mask.nc only exist if there are data valid
+        if os.path.exists(file_mask):
+            dataset_mask = Dataset(file_mask)
+            smask = np.array(dataset_mask.variables['SENSORMASK'])
+            wmask = np.array(dataset_mask.variables['sum_weights'])
+            var_sensor_mask[:] = [smask[:]]
+            dataset_mask.close()
 
         return datasetout, wmask
 
