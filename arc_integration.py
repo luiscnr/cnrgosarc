@@ -668,6 +668,7 @@ class ArcIntegration():
         file_mask = os.path.join(output_path, 'Mask.nc')
 
         #Mask.nc only exist if there are data valid
+        wmask = None
         if os.path.exists(file_mask):
             dataset_mask = Dataset(file_mask)
             smask = np.array(dataset_mask.variables['SENSORMASK'])
