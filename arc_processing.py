@@ -68,8 +68,8 @@ class ArcProcessing:
 
         from calendar import monthrange
         last_day = monthrange(year, month)[1]
-        datasetout.start_date = dt(year,month,1)
-        datasetout.stop_date = dt(year,month,last_day)
+        datasetout.start_date = dt(year,month,1).strftime('%Y-%m-%d')
+        datasetout.stop_date = dt(year,month,last_day).strftime('%Y-%m-%d')
         cdate = dt.utcnow()
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
