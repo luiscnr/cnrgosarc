@@ -109,7 +109,10 @@ class ArcProcessing:
                 count_array = np.array(var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]])
                 error_array = np.array(var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]])
                 mask_array =np.zeros(array.shape)
-                mask_array[0,:,:] = np.array(var_smask[limits[0]:limits[1], limits[2]:limits[3]])[:,:]
+                print(mask_array.shape)
+                marray = np.array(var_smask[limits[0]:limits[1], limits[2]:limits[3]])
+                print(marray.shape)
+                mask_array[0,:,:] = marray[:,:]
 
                 x2array = np.zeros(array.shape)
                 xarray = np.zeros(array.shape)
