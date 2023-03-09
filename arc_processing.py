@@ -110,8 +110,8 @@ class ArcProcessing:
                 error_array = np.array(var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]])
                 mask_array = np.array(var_smask[limits[0]:limits[1], limits[2]:limits[3]])
 
-                x2array = np.zeros(mask_array.shape)
-                xarray = np.zeros(mask_array.shape)
+                x2array = np.zeros(array.shape)
+                xarray = np.zeros(array.shape)
 
                 for file_here in list_files:
                     nc_sat = Dataset(file_here)
