@@ -48,7 +48,7 @@ class ARC_OPTIONS:
         # input path, output path, path organizations, platform, start date, end date
         section = 'RESAMPLE'
         options = self.get_basic_options(section)
-        unzip_path = self.get_path(section, 'unzip_path',False)
+        unzip_path = self.get_path(section, 'unzip_path', False)
         if unzip_path is None:
             unzip_path = options['input_path']
             print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
@@ -179,10 +179,36 @@ class ARC_OPTIONS:
                 list.append(float(vals))
             return list
 
-    def get_folder_date_o(self, options,key_path,key_organization,date_here,create):
+    def get_folder_date_o(self, options, key_path, key_organization, date_here, create):
         path_base = options[key_path]
         org = options[key_organization]
-        return self.get_folder_date(path_base,org,date_here,create)
+        return self.get_folder_date(path_base, org, date_here, create)
+
+    def get_list_files_month(self, path_base, org, year, month, file_date, file_date_format, timeliness):
+        from calendar import monthrange
+        from netCDF4 import Dataset
+        ndays = monthrange(year, month)[1]
+        list_files = []
+        ntimeliness = 0
+        for iday in range(1, ndays + 1):
+            date_here = dt(year, month, iday)
+            folder_date = self.get_folder_date(path_base, org, date_here, False)
+            date_here_str = date_here.strftime(file_date_format)
+            name_file = file_date.replace('DATE', date_here_str)
+            file_out = os.path.join(folder_date, name_file)
+            if os.path.exists(file_out):
+                list_files.append(file_out)
+                dataset = Dataset(file_out)
+                if 'timeliness' in dataset.ncattrs():
+                    if timeliness == dataset.timeliness:
+                        ntimeliness = ntimeliness + 1
+                        print(f'[INFO] File {file_out} is added for computing the average..')
+                    else:
+                        print(f'[WARNING] File {file_out} is {timeliness} but should be {timeliness}. Added anyway...')
+                dataset.close()
+            else:
+                print(f'[WARNING] File {file_out} is not available for computing the average.')
+        return list_files, ntimeliness
 
     def get_folder_date(self, path_base, org, date_here, create):
         if org is None:

@@ -329,6 +329,13 @@ class ArcProcessing:
                 at_dict['timeliness'] = 'NT'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
                 at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D'
+
+        if self.output_type == 'TRANSP': #ONLY NRT MONTHLY
+            at_dict['parameter'] = 'Diffuse attenuation coefficient at 490nm'
+            at_dict['parameter_code'] = 'KD490'
+            at_dict['timeliness'] = timeliness
+
+
         return at_dict
 
     def create_nc_file_out(self, ofname, file_base, timeliness):
@@ -378,3 +385,127 @@ class ArcProcessing:
                 var[:] = -999
 
         return datasetout
+
+    def create_nc_file_out_month(self,ofname, file_base, timeliness):
+        if self.verbose:
+            print(f'[INFO] Copying file base {file_base} to start output file {ofname}...')
+        self.ami.ifile_base = file_base
+        self.ami.verbose = self.verbose
+        datasetout = self.ami.copy_nc_base(ofname)
+        if datasetout is None:
+            return datasetout
+
+        ##global attributes
+        if self.verbose:
+            print(f'[INFO] Setting global attributes...')
+        atribs = self.get_global_attributes(timeliness)
+        if atribs is not None:  ##atrib could be defined in file base
+            for at in atribs:
+                if at == 'conventions':
+                    datasetout.setncattr('Conventions', atribs[at])
+                else:
+                    datasetout.setncattr(at, atribs[at])
+
+        datasetout.product_level = 'L4'
+        if self.output_type == 'CHLA':
+            if timeliness=='NR':
+                datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
+                datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-olci-300m_P1M'
+            if timeliness=='NT':
+                datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_MY_009_124'
+                datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_my_l4-olci-300m_P1M'
+
+        if self.output_type == 'TRANSP':
+            if timeliness=='NR':
+                datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
+                datasetout.title = 'cmems_obs-oc_arc_bgc-transp_nrt_l4-olci-300m_P1M'
+
+        #CHLA
+        if self.output_type == 'CHLA':
+            if 'CHL' not in datasetout.variables:
+                if self.verbose:
+                    print('[INFO] Creating CHL variable...')
+                var = datasetout.createVariable('CHL', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
+                var[:] = -999
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'lon lat'
+                var.long_name = "Chlorophyll a concentration"
+                var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
+                var.type = "surface"
+                var.units = "milligram m^-3"
+                var.missing_value = -999.0
+                var.valid_min = 0.003
+                var.valid_max = 100.0
+                var.comment = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) Algorithm"
+                var.cell_methods = "time: mean (interval: 1 month  comment: sampled instantaneously)"
+
+            if 'CHL_count' not in datasetout.variables:
+                var = datasetout.createVariable('CHL_count', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var[:] = 0
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'lon lat'
+                var.long_name = "OLCI Number Of Observations Of Monthly Chlorophyll a concentration"
+                var.type = "surface"
+                var.units = "1"
+                var.missing_value = -999.0
+                var.valid_min = 0.0
+                var.valid_max = 31.0
+
+            if 'CHL_error' not in datasetout.variables:
+                var = datasetout.createVariable('CHL_error', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var[:] = 0
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'lon lat'
+                var.long_name = "OLCI Standard Deviation Of Monthly Chlorophyll a concentration"
+                var.type = "surface"
+                var.units = "milligram m^-3"
+                var.missing_value = -999.0
+                var.valid_min = 0.003
+                var.valid_max = 100.0
+
+        #TRANSP
+        if self.output_type == 'TRANSP':
+            if 'KD490' not in datasetout.variables:
+                if self.verbose:
+                    print('[INFO] Creating KD490 variable...')
+                var = datasetout.createVariable('KD490', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                    complevel=6)
+                var[:] = -999
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'lon lat'
+                var.long_name = "OLCI Diffuse Attenuation Coefficient at 490nm"
+                var.standard_name = "volume_attenuation_coefficient_of_downwelling_radiative_flux_in_sea_water"
+                var.type = "surface"
+                var.units = "m^-1"
+                var.missing_value = -999.0
+                var.valid_min = 0.0
+                var.valid_max = 10.0
+                var.comment = "OLCI - WFR STANDARD PROCESSOR"
+                var.cell_methods = "time: mean (interval: 1 month  comment: sampled instantaneously)"
+
+            if 'KD490_count' not in datasetout.variables:
+                var = datasetout.createVariable('KD490_count', 'f4', ('y', 'x'), fill_value=-999, zlib=True,
+                                                    complevel=6)
+                var[:] = 0
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'lon lat'
+                var.long_name = "OLCI Number Of Observations Of Monthly Diffuse Attenuation Coefficient at 490nm"
+                var.type = "surface"
+                var.units = "1"
+                var.missing_value = -999.0
+                var.valid_min = 0.0
+                var.valid_max = 31.0
+
+            if 'KD490_error' not in datasetout.variables:
+                var = datasetout.createVariable('KD490_error', 'f4', ('y', 'x'), fill_value=-999, zlib=True,
+                                                    complevel=6)
+                var[:] = 0
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'lon lat'
+                var.long_name = "OLCI Standard Deviation Of Monthly Diffuse Attenuation Coefficient at 490nm"
+                var.type = "surface"
+                var.units = "m^-1"
+                var.missing_value = -999.0
+                var.valid_min = 0.0
+                var.valid_max = 10.0

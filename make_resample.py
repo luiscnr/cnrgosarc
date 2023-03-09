@@ -15,7 +15,8 @@ import numpy as np
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL"],
+                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL",
+                             "MONTHLY_CHLA", "MONTHLY_KD490"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -43,8 +44,12 @@ def main():
     if args.mode == "CHECK":
         # ami = ArcMapInfo(None,True)
         # adding_time()
-        add_vega_changes()
+        # add_vega_changes()
         # modify_chunksizes()
+        path_input = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+        path_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
+        vars = ['SENSORMASK']
+        copy_nc_excluding_variables(path_input, path_output, vars)
 
         # check_chla()
         # check_model()
@@ -135,6 +140,42 @@ def main():
         arcProc.create_nc_file_out(fout, file_base, 'NT')
         return
 
+    if args.mode == 'MONTHLY_CHLA' and args.base_file and args.outputpath:
+        output_path = args.outputpath
+        if not os.path.exists(output_path) and not os.path.isdir(output_path):
+            print(f'[ERROR] Output path {output_path} does not exist or nor it is a directory')
+            return
+        if args.verbose:
+            print(f'[INFO] Started creation of base files for processing monthly CHLA')
+        file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
+        from arc_processing import ArcProcessing
+        arcProc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
+        file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
+
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_PLANKTON_NR_MONTHLY_Base.nc')
+        arcProc.create_nc_file_out_month(fout, file_base, 'NR')
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_PLANKTON_NT_MONTHLY_Base.nc')
+        arcProc.create_nc_file_out_month(fout, file_base, 'NT')
+        return
+
+    if args.mode == 'MONTHLY_KD490' and args.base_file and args.outputpath:
+        output_path = args.outputpath
+        if not os.path.exists(output_path) and not os.path.isdir(output_path):
+            print(f'[ERROR] Output path {output_path} does not exist or nor it is a directory')
+            return
+        if args.verbose:
+            print(f'[INFO] Started creation of base files for processing monthly KD490')
+        file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
+        from arc_processing import ArcProcessing
+        arcProc = ArcProcessing(None, args.verbose, 'TRANSP', file_at)
+        file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
+
+        fout = os.path.join(output_path, 'ArcGrid_65_90_300m_TRANSP_NR_MONTHLY_Base.nc')
+        arcProc.create_nc_file_out_month(fout, file_base, 'NR')
+        # fout = os.path.join(output_path, 'ArcGrid_65_90_300m_PLANKTON_NT_MONTHLY_Base.nc')
+        # arcProc.create_nc_file_out_month(fout, file_base, 'NT')
+        return
+
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
@@ -181,8 +222,87 @@ def main():
 
     if args.mode == 'CHLA':
         run_chla(arc_opt)
+        return
+
+    if args.mode == 'MONTHLY_CHLA':
         # compute_month_chl(arc_opt)
         return
+
+    if args.mode == 'MONTHLY_KD490':
+        run_month(arc_opt, 'TRANSP')
+        return
+
+
+# mode: CHLA or TRANSP
+def run_month(arc_opt, mode):
+    options = arc_opt.get_processing_options()
+    if mode is None:
+        output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
+    else:
+        output_type = mode
+    from arc_processing import ArcProcessing
+    from calendar import monthrange
+
+    if args.verbose:
+        print('[INFO] PROCESSING OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
+    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
+    if file_base is not None:
+        if os.path.exists(file_base):
+            if timeliness is None:
+                if file_base.find('NR') > 0:
+                    timeliness = 'NR'
+                if file_base.find('NT') > 0:
+                    timeliness = 'NT'
+    if args.verbose:
+        print(f'[INFO] File base: {file_base}')
+        print(f'[INFO] Timeliness: {timeliness}')
+    arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+
+    start_date = options['start_date']
+    end_date = options['end_date']
+    start_date = start_date.replace(day=15)
+    end_date = end_date.replace(day=15)
+    date_run = start_date
+
+    # from datetime import datetime as dt
+    # date_run = dt(2022,10,11)
+    # date_run.replace(day=15)
+
+    if output_type == 'CHLA':
+        file_date = 'ODATE_plankton-arc-fr.nc'
+    if output_type == 'TRANSP':
+        file_date = 'ODATE_transp-arc-fr.nc'
+    file_date_format = '%Y%j'
+
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run.month}/{date_run.year}')
+
+        nfiles_month = monthrange(date_run.year, date_run.month)[1]
+
+        make_processing = True
+        input_files, ntimeliness = arc_opt.get_list_files_month(options['input_path'],
+                                                                options['input_path_organization'], date_run.year,
+                                                                date_run.month, file_date, file_date_format, timeliness)
+
+        nfiles_available = len(nfiles_month)
+        if nfiles_available == 0:
+            print(
+                f'[ERROR] No files avaiable for computing the {output_type} average for {date_run.year}/{date_run.month}. Skipping...')
+            continue
+        if nfiles_available < nfiles_month:
+            print(f'[WARNING] Only {nfiles_available} of {nfiles_month} are available for computing the average')
+        if ntimeliness < nfiles_available:
+            print(f'[WARNING] Only {ntimeliness} of {nfiles_available} are in the correct timeliness {timeliness}')
+        
+
+        date_run = date_run + timedelta(days=30)
+        date_run = date_run.replace(day=15)
 
 
 def compute_month_chl(arc_opt):
