@@ -108,10 +108,10 @@ class ArcProcessing:
                 array = np.array(var_avg[0, limits[0]:limits[1], limits[2]:limits[3]])
                 count_array = np.array(var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]])
                 error_array = np.array(var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]])
-                print(array.shape)
+                #print(array.shape)
                 mask_array =np.array(var_smask[0,limits[0]:limits[1], limits[2]:limits[3]])
-                print(var_smask.shape)
-                print(mask_array.shape)
+                #print(var_smask.shape)
+                #print(mask_array.shape)
 
 
 
@@ -145,9 +145,9 @@ class ArcProcessing:
                 count_array[mask_array == -999.0] = -999.0
                 error_array[mask_array == -999.0] = -999.0
 
-                var_avg[0, limits[0]:limits[1], limits[2]:limits[3]] = [array[0, :, :]]
-                var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]] = [count_array[0, :, :]]
-                var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]] = [error_array[0, :, :]]
+                var_avg[0, limits[0]:limits[1], limits[2]:limits[3]] = [array[:, :]]
+                var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]] = [count_array[:, :]]
+                var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]] = [error_array[:, :]]
 
         datasetout.close()
         datasetgrid.close()
