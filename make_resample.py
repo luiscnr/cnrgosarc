@@ -290,7 +290,7 @@ def run_month(arc_opt, mode):
                                                                 options['input_path_organization'], date_run.year,
                                                                 date_run.month, file_date, file_date_format, timeliness)
 
-        nfiles_available = len(nfiles_month)
+        nfiles_available = len(input_files)
         if nfiles_available == 0:
             print(
                 f'[ERROR] No files avaiable for computing the {output_type} average for {date_run.year}/{date_run.month}. Skipping...')
@@ -299,7 +299,7 @@ def run_month(arc_opt, mode):
             print(f'[WARNING] Only {nfiles_available} of {nfiles_month} are available for computing the average')
         if ntimeliness < nfiles_available:
             print(f'[WARNING] Only {ntimeliness} of {nfiles_available} are in the correct timeliness {timeliness}')
-        
+
 
         date_run = date_run + timedelta(days=30)
         date_run = date_run.replace(day=15)
