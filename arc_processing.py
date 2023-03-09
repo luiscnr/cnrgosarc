@@ -41,6 +41,109 @@ class ArcProcessing:
         if os.path.exists(self.file_model):
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
+    def compute_month(self,year,month,timeliness,list_files,file_out):
+        section = 'PROCESSING'
+        file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
+        if file_base is None:
+            file_base = self.file_grid
+        if not os.path.exists(file_base):
+            print(f'[ERROR] File base {file_base} could not be found.')
+            return
+
+        ##file_grid is used for getting SENSORMARK
+        file_grid = self.arc_opt.get_value_param(section, 'file_grid', None, 'str')
+        if file_grid is None:
+            file_grid = self.file_grid
+        if not os.path.exists(file_grid):
+            print(f'[ERROR] File grid {file_grid} could not be found.')
+            return
+
+
+        #note that output_type (TRANSP or CHLA) is defined when the class is started
+        datasetout = self.create_nc_file_out_month(file_out,file_base,timeliness)
+        if datasetout is None:
+            print('[ERROR] Output dataset could not be started. Exiting.')
+            return
+        datasetgrid = Dataset(file_grid)
+
+        from calendar import monthrange
+        last_day = monthrange(year, month)[1]
+        datasetout.start_date = dt(year,month,1)
+        datasetout.stop_date = dt(year,month,last_day)
+        cdate = dt.utcnow()
+        datasetout.creation_date = cdate.strftime('%Y-%m-%d')
+        datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        if self.output_type == 'CHLA':
+            var_avg_name = 'CHL'
+            var_avg_count_name = 'CHL_count'
+            var_avg_error_name = 'CHL_error'
+        if self.output_type == 'TRANSP':
+            var_avg_name = 'KD490'
+            var_avg_count_name = 'KD490_count'
+            var_avg_error_name = 'KD490_error'
+
+        var_avg = datasetout.variables[var_avg_name]
+        var_avg_count = datasetout.variables[var_avg_count_name]
+        var_avg_error = datasetout.variables[var_avg_error_name]
+        var_smask = datasetgrid.variables['SENSORMASK']
+
+        self.ystep = self.arc_opt.get_value_param(section, 'y_step', 6500, 'int')
+        self.xstep = self.arc_opt.get_value_param(section, 'x_step', 6500, 'int')
+
+        iprogress = 1
+        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+
+        for y in range(0, self.height, self.ystep):
+            for x in range(0, self.width, self.xstep):
+                if self.verbose:
+                    print(f'[INFO] AVERAGING {iprogress}/{iprogress_end}')
+                iprogress = iprogress + 1
+                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+
+                array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
+                count_array = np.array(var_avg_count[limits[0]:limits[1], limits[2]:limits[3]])
+                error_array = np.array(var_avg_error[limits[0]:limits[1], limits[2]:limits[3]])
+                mask_array = np.array(var_smask[limits[0]:limits[1], limits[2]:limits[3]])
+
+                x2array = np.zeros(array.shape)
+                xarray = np.zeros(array.shape)
+
+                for file_here in list_files:
+                    nc_sat = Dataset(file_here)
+                    array_here = np.array(nc_sat.variables[var_avg_name][0, limits[0]:limits[1], limits[2]:limits[3]])
+                    nc_sat.close()
+                    indices = np.where(array_here > 0)
+                    if len(indices[0]) == 0:
+                        continue
+
+                    array = np.where(np.logical_and(array_here > 0, array == -999.0), 0, array)
+                    array[indices] = array[indices] + array_here[indices]
+                    count_array[indices] = count_array[indices] + 1
+
+                    xarray[indices] = xarray[indices] + array_here[indices]
+                    x2array[indices] = x2array[indices] + np.power(array_here[indices], 2)
+
+                indices_good = np.where(array > 0)
+                array[indices_good] = array[indices_good] / count_array[indices_good]
+
+                xarray[indices_good] = np.power(xarray[indices_good], 2) / count_array[indices_good]
+                coef_array = np.zeros(count_array.shape)
+                coef_array[indices_good] = 1 / (count_array[indices_good] - 1)
+                error_array[indices_good] = coef_array[indices_good] * (x2array[indices_good] - xarray[indices_good])
+
+                array[mask_array == -999.0] = -999.0
+                count_array[mask_array == -999.0] = -999.0
+                error_array[mask_array == -999.0] = -999.0
+
+                var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [array[:, :]]
+                var_avg_count[limits[0]:limits[1], limits[2]:limits[3]] = [count_array[:, :]]
+                var_avg_error[limits[0]:limits[1], limits[2]:limits[3]] = [error_array[:, :]]
+
+        datasetout.close()
+        datasetgrid.close()
+
+
     def compute_chla_month(self, fileout, timeliness):
         section = 'PROCESSING'
         if self.chla_model is None:
@@ -52,6 +155,7 @@ class ArcProcessing:
         if not os.path.exists(file_base):
             print(f'[ERROR] File base {file_base} could not be found.')
             return
+
         datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
         if datasetout is None:
             print('[ERROR] Output dataset could not be started. Exiting.')
@@ -509,3 +613,5 @@ class ArcProcessing:
                 var.missing_value = -999.0
                 var.valid_min = 0.0
                 var.valid_max = 10.0
+
+        return datasetout
