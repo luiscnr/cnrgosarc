@@ -76,7 +76,7 @@ class ArcProcessing:
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
 
         timeseconds = (dt(year, month, 1) - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
-        datasetout.time[0] = [np.int32(timeseconds)]
+        datasetout.variables['time'][0] = [np.int32(timeseconds)]
 
         if self.output_type == 'CHLA':
             var_avg_name = 'CHL'
