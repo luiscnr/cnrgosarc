@@ -6,8 +6,10 @@ from netCDF4 import Dataset
 from datetime import datetime as dt
 import numpy as np
 import warnings
+
 warnings.simplefilter('ignore', UserWarning)
 warnings.simplefilter('ignore', RuntimeWarning)
+
 
 class ArcProcessing:
 
@@ -41,7 +43,7 @@ class ArcProcessing:
         if os.path.exists(self.file_model):
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
-    def compute_month(self,year,month,timeliness,list_files,file_out):
+    def compute_month(self, year, month, timeliness, list_files, file_out):
         section = 'PROCESSING'
         file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
         if file_base is None:
@@ -58,9 +60,8 @@ class ArcProcessing:
             print(f'[ERROR] File grid {file_grid} could not be found.')
             return
 
-
-        #note that output_type (TRANSP or CHLA) is defined when the class is started
-        datasetout = self.create_nc_file_out_month(file_out,file_base,timeliness)
+        # note that output_type (TRANSP or CHLA) is defined when the class is started
+        datasetout = self.create_nc_file_out_month(file_out, file_base, timeliness)
         if datasetout is None:
             print('[ERROR] Output dataset could not be started. Exiting.')
             return
@@ -68,11 +69,14 @@ class ArcProcessing:
 
         from calendar import monthrange
         last_day = monthrange(year, month)[1]
-        datasetout.start_date = dt(year,month,1).strftime('%Y-%m-%d')
-        datasetout.stop_date = dt(year,month,last_day).strftime('%Y-%m-%d')
+        datasetout.start_date = dt(year, month, 1).strftime('%Y-%m-%d')
+        datasetout.stop_date = dt(year, month, last_day).strftime('%Y-%m-%d')
         cdate = dt.utcnow()
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        timeseconds = (dt(year, month, 1) - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+        datasetout.time[0] = [np.int32(timeseconds)]
 
         if self.output_type == 'CHLA':
             var_avg_name = 'CHL'
@@ -101,9 +105,9 @@ class ArcProcessing:
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
 
-                array = np.array(var_avg[0,limits[0]:limits[1], limits[2]:limits[3]])
-                count_array = np.array(var_avg_count[0,limits[0]:limits[1], limits[2]:limits[3]])
-                error_array = np.array(var_avg_error[0,limits[0]:limits[1], limits[2]:limits[3]])
+                array = np.array(var_avg[0, limits[0]:limits[1], limits[2]:limits[3]])
+                count_array = np.array(var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]])
+                error_array = np.array(var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]])
                 mask_array = np.array(var_smask[limits[0]:limits[1], limits[2]:limits[3]])
 
                 x2array = np.zeros(mask_array.shape)
@@ -136,13 +140,12 @@ class ArcProcessing:
                 count_array[mask_array == -999.0] = -999.0
                 error_array[mask_array == -999.0] = -999.0
 
-                var_avg[0,limits[0]:limits[1], limits[2]:limits[3]] = [array[0,:, :]]
-                var_avg_count[0,limits[0]:limits[1], limits[2]:limits[3]] = [count_array[0,:, :]]
-                var_avg_error[0,limits[0]:limits[1], limits[2]:limits[3]] = [error_array[0,:, :]]
+                var_avg[0, limits[0]:limits[1], limits[2]:limits[3]] = [array[0, :, :]]
+                var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]] = [count_array[0, :, :]]
+                var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]] = [error_array[0, :, :]]
 
         datasetout.close()
         datasetgrid.close()
-
 
     def compute_chla_month(self, fileout, timeliness):
         section = 'PROCESSING'
@@ -228,7 +231,7 @@ class ArcProcessing:
                 for idx in range(len(ifile)):
                     file_here = files[ifile[idx]]
                     nc_sat = Dataset(file_here)
-                    chl_here = np.array((nc_sat.variables['CHL'][0,limits[0]:limits[1], limits[2]:limits[3]]))
+                    chl_here = np.array((nc_sat.variables['CHL'][0, limits[0]:limits[1], limits[2]:limits[3]]))
                     nc_sat.close()
                     indices = np.where(chl_here > 0)
                     chl_here[indices] = np.multiply(chl_here[indices], np.float(iweight[idx]))
@@ -366,10 +369,10 @@ class ArcProcessing:
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-                array_443 = np.array(var443[0,limits[0]:limits[1], limits[2]:limits[3]])
-                array_490 = np.array(var490[0,limits[0]:limits[1], limits[2]:limits[3]])
-                array_560 = np.array(var560[0,limits[0]:limits[1], limits[2]:limits[3]])
-                array_665 = np.array(var665[0,limits[0]:limits[1], limits[2]:limits[3]])
+                array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
                 if self.verbose:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
@@ -434,11 +437,10 @@ class ArcProcessing:
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
                 at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D'
 
-        if self.output_type == 'TRANSP': #ONLY NRT MONTHLY
+        if self.output_type == 'TRANSP':  # ONLY NRT MONTHLY
             at_dict['parameter'] = 'Diffuse attenuation coefficient at 490nm'
             at_dict['parameter_code'] = 'KD490'
             at_dict['timeliness'] = timeliness
-
 
         return at_dict
 
@@ -490,7 +492,7 @@ class ArcProcessing:
 
         return datasetout
 
-    def create_nc_file_out_month(self,ofname, file_base, timeliness):
+    def create_nc_file_out_month(self, ofname, file_base, timeliness):
         if self.verbose:
             print(f'[INFO] Copying file base {file_base} to start output file {ofname}...')
         self.ami.ifile_base = file_base
@@ -512,19 +514,19 @@ class ArcProcessing:
 
         datasetout.product_level = 'L4'
         if self.output_type == 'CHLA':
-            if timeliness=='NR':
+            if timeliness == 'NR':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
                 datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-olci-300m_P1M'
-            if timeliness=='NT':
+            if timeliness == 'NT':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_MY_009_124'
                 datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_my_l4-olci-300m_P1M'
 
         if self.output_type == 'TRANSP':
-            if timeliness=='NR':
+            if timeliness == 'NR':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
                 datasetout.title = 'cmems_obs-oc_arc_bgc-transp_nrt_l4-olci-300m_P1M'
 
-        #CHLA
+        # CHLA
         if self.output_type == 'CHLA':
             if 'CHL' not in datasetout.variables:
                 if self.verbose:
@@ -545,7 +547,8 @@ class ArcProcessing:
                 var.cell_methods = "time: mean (interval: 1 month  comment: sampled instantaneously)"
 
             if 'CHL_count' not in datasetout.variables:
-                var = datasetout.createVariable('CHL_count', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var = datasetout.createVariable('CHL_count', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
                 var.coordinates = 'lon lat'
@@ -557,7 +560,8 @@ class ArcProcessing:
                 var.valid_max = 31.0
 
             if 'CHL_error' not in datasetout.variables:
-                var = datasetout.createVariable('CHL_error', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+                var = datasetout.createVariable('CHL_error', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
                 var.coordinates = 'lon lat'
@@ -568,13 +572,13 @@ class ArcProcessing:
                 var.valid_min = 0.003
                 var.valid_max = 100.0
 
-        #TRANSP
+        # TRANSP
         if self.output_type == 'TRANSP':
             if 'KD490' not in datasetout.variables:
                 if self.verbose:
                     print('[INFO] Creating KD490 variable...')
                 var = datasetout.createVariable('KD490', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
-                                                    complevel=6)
+                                                complevel=6)
                 var[:] = -999
                 var.grid_mapping = 'stereographic'
                 var.coordinates = 'lon lat'
@@ -589,8 +593,8 @@ class ArcProcessing:
                 var.cell_methods = "time: mean (interval: 1 month  comment: sampled instantaneously)"
 
             if 'KD490_count' not in datasetout.variables:
-                var = datasetout.createVariable('KD490_count', 'f4', ('y', 'x'), fill_value=-999, zlib=True,
-                                                    complevel=6)
+                var = datasetout.createVariable('KD490_count', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
                 var.coordinates = 'lon lat'
@@ -602,8 +606,8 @@ class ArcProcessing:
                 var.valid_max = 31.0
 
             if 'KD490_error' not in datasetout.variables:
-                var = datasetout.createVariable('KD490_error', 'f4', ('y', 'x'), fill_value=-999, zlib=True,
-                                                    complevel=6)
+                var = datasetout.createVariable('KD490_error', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
                 var.coordinates = 'lon lat'
