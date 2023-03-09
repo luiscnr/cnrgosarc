@@ -253,9 +253,9 @@ def run_month(arc_opt, mode):
     if file_base is not None:
         if os.path.exists(file_base):
             if timeliness is None:
-                if file_base.find('NR') > 0:
+                if file_base.find('_NR_') > 0:
                     timeliness = 'NR'
-                if file_base.find('NT') > 0:
+                if file_base.find('_NT_') > 0:
                     timeliness = 'NT'
     if args.verbose:
         print(f'[INFO] File base: {file_base}')
