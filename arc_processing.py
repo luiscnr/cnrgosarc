@@ -108,12 +108,10 @@ class ArcProcessing:
                 array = np.array(var_avg[0, limits[0]:limits[1], limits[2]:limits[3]])
                 count_array = np.array(var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]])
                 error_array = np.array(var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]])
-                #print(array.shape)
-                mask_array =np.array(var_smask[0,limits[0]:limits[1], limits[2]:limits[3]])
-                #print(var_smask.shape)
-                #print(mask_array.shape)
-
-
+                # print(array.shape)
+                mask_array = np.array(var_smask[0, limits[0]:limits[1], limits[2]:limits[3]])
+                # print(var_smask.shape)
+                # print(mask_array.shape)
 
                 x2array = np.zeros(array.shape)
                 xarray = np.zeros(array.shape)
@@ -326,9 +324,11 @@ class ArcProcessing:
                     sat_date = dt.strptime(fname[1:8], '%Y%j')
                 except:
                     sat_date = None
+
         if sat_date is None:
             print(
                 f'[ERROR] Satellite date could not be set from file name and start_date attribute is not available/valid')
+            return
 
         jday = int(sat_date.strftime('%j'))
 
@@ -349,6 +349,10 @@ class ArcProcessing:
         cdate = dt.utcnow()
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        timeseconds = (sat_date - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+        ncsat.variables['time'][0] = [np.int32(timeseconds)]
+
 
         if self.verbose:
             print(f'[INFO] Getting sensor mask...')

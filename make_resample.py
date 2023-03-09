@@ -225,7 +225,7 @@ def main():
         return
 
     if args.mode == 'MONTHLY_CHLA':
-        # compute_month_chl(arc_opt)
+        run_month(arc_opt, 'CHLA')
         return
 
     if args.mode == 'MONTHLY_KD490':
