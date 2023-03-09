@@ -210,6 +210,14 @@ class ARC_OPTIONS:
                 print(f'[WARNING] File {file_out} is not available for computing the average.')
         return list_files, ntimeliness
 
+    def get_folder_year(self,path_base,date_here,create):
+        year_str = date_here.strftime('%Y')
+        path_year = os.path.join(path_base, year_str)
+        if create:
+            if not create_folder(path_year):
+                return None
+        return path_year
+
     def get_folder_date(self, path_base, org, date_here, create):
         if org is None:
             return path_base
