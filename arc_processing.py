@@ -88,8 +88,8 @@ class ArcProcessing:
         var_avg_error = datasetout.variables[var_avg_error_name]
         var_smask = datasetgrid.variables['SENSORMASK']
 
-        self.ystep = self.arc_opt.get_value_param(section, 'y_step', 6500, 'int')
-        self.xstep = self.arc_opt.get_value_param(section, 'x_step', 6500, 'int')
+        self.ystep = self.arc_opt.get_value_param(section, 'ystep', 6500, 'int')
+        self.xstep = self.arc_opt.get_value_param(section, 'xstep', 6500, 'int')
 
         iprogress = 1
         iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
@@ -101,13 +101,13 @@ class ArcProcessing:
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
 
-                array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
-                count_array = np.array(var_avg_count[limits[0]:limits[1], limits[2]:limits[3]])
-                error_array = np.array(var_avg_error[limits[0]:limits[1], limits[2]:limits[3]])
+                array = np.array(var_avg[0,limits[0]:limits[1], limits[2]:limits[3]])
+                count_array = np.array(var_avg_count[0,limits[0]:limits[1], limits[2]:limits[3]])
+                error_array = np.array(var_avg_error[0,limits[0]:limits[1], limits[2]:limits[3]])
                 mask_array = np.array(var_smask[limits[0]:limits[1], limits[2]:limits[3]])
 
-                x2array = np.zeros(array.shape)
-                xarray = np.zeros(array.shape)
+                x2array = np.zeros(mask_array.shape)
+                xarray = np.zeros(mask_array.shape)
 
                 for file_here in list_files:
                     nc_sat = Dataset(file_here)
@@ -136,9 +136,9 @@ class ArcProcessing:
                 count_array[mask_array == -999.0] = -999.0
                 error_array[mask_array == -999.0] = -999.0
 
-                var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [array[:, :]]
-                var_avg_count[limits[0]:limits[1], limits[2]:limits[3]] = [count_array[:, :]]
-                var_avg_error[limits[0]:limits[1], limits[2]:limits[3]] = [error_array[:, :]]
+                var_avg[0,limits[0]:limits[1], limits[2]:limits[3]] = [array[0,:, :]]
+                var_avg_count[0,limits[0]:limits[1], limits[2]:limits[3]] = [count_array[0,:, :]]
+                var_avg_error[0,limits[0]:limits[1], limits[2]:limits[3]] = [error_array[0,:, :]]
 
         datasetout.close()
         datasetgrid.close()
