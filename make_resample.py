@@ -622,13 +622,11 @@ def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
 
 def correcting_time_variable_in_plankton_files(start_date,end_date):
     dir_base = '/store/COP2-OC-TAC/arc/integrated'
-    dir_output = '/store/COP2-OC-TAC/arc/dailyplankton'
+    dir_output = '/store/COP2-OC-TAC/arc/daily'
     import stat
     if not os.path.exists(dir_output):
         os.mkdir(dir_output)
         os.chmod(dir_output,0o664)
-    else:
-        os.chmod(dir_output, 0o664)
     run_date = start_date
     while run_date<=end_date:
         print(f'DATE-------------------------------------------------> {run_date}')
