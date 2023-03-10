@@ -626,7 +626,7 @@ def correcting_time_variable_in_plankton_files(start_date,end_date):
     import stat
     if not os.path.exists(dir_output):
         os.mkdir(dir_output)
-        os.chmod(dir_output,0o664)
+        os.chmod(dir_output,0o666)
     run_date = start_date
     while run_date<=end_date:
         print(f'DATE-------------------------------------------------> {run_date}')
@@ -638,11 +638,11 @@ def correcting_time_variable_in_plankton_files(start_date,end_date):
             output_year = os.path.join(dir_output,yearstr)
             if not os.path.exists(output_year):
                 os.mkdir(output_year)
-                os.chmod(output_year,0o664)
+                os.chmod(output_year,0o666)
             output_jday = os.path.join(output_year,jjjstr)
             if not os.path.exists(output_jday):
                 os.mkdir(output_jday)
-                os.chmod(output_jday,0o664)
+                os.chmod(output_jday,0o666)
             output_path = os.path.join(output_jday,name_file)
             copy_nc_setting_time_variable(input_path,output_path)
 
