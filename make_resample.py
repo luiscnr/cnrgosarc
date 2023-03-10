@@ -680,7 +680,7 @@ def copy_nc_setting_time_variable(ifile_base, ofile):
     dst = Dataset(ofile, 'a', format='NETCDF4')
     from datetime import datetime as dt
     date_here = dt.strptime(dst.start_date, '%Y-%m-%d')
-    print(f'[INFO] Setting time: {dst.start_time}')
+    print(f'[INFO] Setting time: {dst.start_date}')
     timeseconds = (date_here - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
     var_time = dst.variables['time']
     var_time[0] = [np.int32(timeseconds)]
