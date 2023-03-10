@@ -609,6 +609,10 @@ class ArcIntegration():
             print(f'[INFO] # Number of good pixels (flag-based mask) First check: {ngood}')
         dataset_mask.close()
 
+        if ngood==0:
+            print(f'[WARNING] No valid pixels were found. All the pixels are masked')
+            return
+
 
 
         # AVERAGE VARIABLES
