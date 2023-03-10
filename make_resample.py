@@ -44,8 +44,14 @@ def main():
     if args.mode == "CHECK":
 
         from datetime import datetime as dt
-        correcting_time_variable_in_plankton_files(dt(2016,5,1),dt(2016,5,31))
+        correcting_time_variable_in_plankton_files(dt(2016,6,1),dt(2016,9,30))
+        correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
+        correcting_time_variable_in_plankton_files(dt(2018, 5, 1), dt(2018, 9, 30))
+        correcting_time_variable_in_plankton_files(dt(2020, 5, 1), dt(2020, 9, 30))
 
+        correcting_time_variable_in_plankton_files(dt(2019, 1, 1), dt(2019, 2, 28))
+        correcting_time_variable_in_plankton_files(dt(2019, 4, 1), dt(2019, 9, 30))
+        correcting_time_variable_in_plankton_files(dt(2019, 11, 1), dt(2019, 12, 31))
         # ami = ArcMapInfo(None,True)
         # adding_time()
         # add_vega_changes()
