@@ -42,14 +42,18 @@ def main():
     import os
 
     if args.mode == "CHECK":
+
+        from datetime import datetime as dt
+        correcting_time_variable_in_plankton_files(dt(2016,5,1),dt(2016,5,31))
+
         # ami = ArcMapInfo(None,True)
         # adding_time()
         # add_vega_changes()
         # modify_chunksizes()
-        path_input = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-        path_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
-        vars = ['SENSORMASK']
-        copy_nc_excluding_variables(path_input, path_output, vars)
+        # path_input = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
+        # path_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
+        # vars = ['SENSORMASK']
+        # copy_nc_excluding_variables(path_input, path_output, vars)
 
         # check_chla()
         # check_model()
@@ -614,6 +618,74 @@ def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
 
     if args.verbose:
         print('COMPLETED')
+
+
+def correcting_time_variable_in_plankton_files(start_date,end_date):
+    dir_base = '/store/COP2-OC-TAC/arc/integrated'
+    dir_output = '/store/COP2-OC-TAC/arc/dailyplankton'
+    import stat
+    if not os.path.exists(dir_output):
+        os.mkdir(dir_output)
+        os.chmod(dir_output,stat.S_IWGRP)
+    run_date = start_date
+    while run_date<=end_date:
+        print(f'DATE-------------------------------------------------> {run_date}')
+        yearstr = run_date.strftime('%Y')
+        jjjstr = run_date.strftime('%j')
+        name_file = f'O{yearstr}{jjjstr}_plankton-arc-fr.nc'
+        input_path = os.path.join(dir_base,yearstr,jjjstr,name_file)
+        if os.path.exists(input_path):
+            output_year = os.path.join(dir_output,yearstr)
+            if not os.path.exists(output_year):
+                os.mkdir(output_year)
+                os.chmod(output_year,stat.S_IWGRP)
+            output_jday = os.path.join(output_year,jjjstr)
+            if not os.path.exists(output_jday):
+                os.mkdir(output_jday)
+                os.chmod(output_jday,stat.S_IWGRP)
+            output_path = os.path.join(output_jday,name_file)
+            copy_nc_setting_time_variable(input_path,output_path)
+
+        run_date = run_date + timedelta(hours=24)
+
+def copy_nc_setting_time_variable(ifile_base, ofile):
+    dst = None
+    if not os.path.exists(ifile_base):
+        print(f'[ERROR] File base: {ifile_base} does not exist')
+        return dst
+    if args.verbose:
+        print(f'[INFO] Copying file grid: {ifile_base}...')
+
+    # shutil.copy(self.ifile_base,ofile)
+
+    cmd = f'cp -a {ifile_base} {ofile}'
+    if args.verbose:
+        print(f'[INFO] cmd: {cmd}')
+    import subprocess
+    import time
+    subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+    originalSize = os.path.getsize(ifile_base)
+    historicalSize = -1
+    while historicalSize != originalSize:
+        if os.path.exists(ofile):
+            historicalSize = os.path.getsize(ofile)
+            if args.verbose:
+                porc = (historicalSize / originalSize) * 100
+                print(f'[INFO] Copying {porc:.2f} %')
+        time.sleep(1)
+    if args.verbose:
+        print('[INFO] Copy completed')
+
+    from netCDF4 import Dataset
+    dst = Dataset(ofile, 'a', format='NETCDF4')
+    from datetime import datetime as dt
+    date_here = dt.strptime(dst.start_date, '%Y-%m-%d')
+    print(f'[INFO] Setting time: {dst.start_time}')
+    timeseconds = (date_here - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+    var_time = dst.variables['time']
+    var_time[0] = [np.int32(timeseconds)]
+
+    dst.close()
 
 
 def copy_nc_adding_time_variable(ifile, ofile):
