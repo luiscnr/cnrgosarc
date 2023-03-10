@@ -351,7 +351,7 @@ class ArcProcessing:
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
 
         timeseconds = (sat_date - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
-        ncsat.variables['time'][0] = [np.int32(timeseconds)]
+        datasetout.variables['time'][0] = [np.int32(timeseconds)]
 
 
         if self.verbose:

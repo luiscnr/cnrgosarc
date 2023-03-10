@@ -274,7 +274,7 @@ def run_month(arc_opt, mode):
 
     if output_type == 'CHLA':
         file_date = 'ODATE_plankton-arc-fr.nc'
-        param_name ='plankton'
+        param_name = 'plankton'
     if output_type == 'TRANSP':
         file_date = 'ODATE_transp-arc-fr.nc'
         param_name = 'transp'
@@ -286,14 +286,12 @@ def run_month(arc_opt, mode):
             print('*****************************')
             print(f'[INFO] Date: {date_run.month}/{date_run.year}')
 
-        output_path = arc_opt.get_folder_year(options['output_path'], date_run,True)
+        output_path = arc_opt.get_folder_year(options['output_path'], date_run, True)
         if output_path is None:
             print(f'[WARNING] Output path {output_path} for date {date_run} is not available. Skiping...')
             continue
 
-
         nfiles_month = monthrange(date_run.year, date_run.month)[1]
-
 
         input_files, ntimeliness = arc_opt.get_list_files_month(options['input_path'],
                                                                 options['input_path_organization'], date_run.year,
@@ -309,17 +307,15 @@ def run_month(arc_opt, mode):
         if ntimeliness < nfiles_available:
             print(f'[WARNING] Only {ntimeliness} of {nfiles_available} are in the correct timeliness {timeliness}')
 
-
         sdate = date_run.replace(day=1).strftime('%Y%j')
         edate = date_run.replace(day=nfiles_month).strftime('%j')
 
-
-        name_out_end = f'O{sdate}{edate}_{param_name}_monthly-arc-fr.nc'
+        name_out_end = f'O{sdate}{edate}-{param_name}_monthly-arc-fr.nc'
         file_out = os.path.join(output_path, name_out_end)
         if args.verbose:
             print(f'[INFO] Output file: {file_out}')
 
-        arc_proc.compute_month(date_run.year,date_run.month,timeliness,input_files,file_out)
+        arc_proc.compute_month(date_run.year, date_run.month, timeliness, input_files, file_out)
 
         date_run = date_run + timedelta(days=30)
         date_run = date_run.replace(day=15)
