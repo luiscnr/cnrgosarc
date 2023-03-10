@@ -840,6 +840,10 @@ class ArcIntegration():
             dataset_granule = Dataset(file)
             weigthed_mask_granule = np.array(dataset_granule.variables['mask'][yini:yfin, xini:xfin])
 
+            #TEMPORAL
+            indices = np.where(weigthed_mask_granule==1)
+            print('Numero de pixeles validos mascara: ',indices[0])
+
             # assuring that pixels lower than 65 degress are masked
             weigthed_mask_granule[sensor_mask == -999] = -999
 
