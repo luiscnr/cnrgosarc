@@ -600,6 +600,17 @@ class ArcIntegration():
         ##AVERAGE MASK
         self.create_basic_mask(file_mask, infof, nvalidgranules)
 
+        # CHECKING MASK
+        dataset_mask = Dataset(file_mask, 'r+')
+        var_mask = dataset_mask.variables['sum_weights']
+        var_mask_array = np.array(var_mask)
+        ngood = np.count_nonzero(var_mask_array > 0)
+        if self.verbose:
+            print(f'[INFO] # Number of good pixels (flag-based mask) First check: {ngood}')
+        dataset_mask.close()
+
+
+
         # AVERAGE VARIABLES
         if self.apply_pool == 0:
             for var_avg_name in self.average_variables:
@@ -840,9 +851,6 @@ class ArcIntegration():
             dataset_granule = Dataset(file)
             weigthed_mask_granule = np.array(dataset_granule.variables['mask'][yini:yfin, xini:xfin])
 
-            #TEMPORAL
-            indices = np.where(weigthed_mask_granule==1)
-            print('Numero de pixeles validos mascara: ',indices[0])
 
             # assuring that pixels lower than 65 degress are masked
             weigthed_mask_granule[sensor_mask == -999] = -999
