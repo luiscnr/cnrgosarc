@@ -42,9 +42,8 @@ def main():
     import os
 
     if args.mode == "CHECK":
-
         from datetime import datetime as dt
-        correcting_time_variable_in_plankton_files(dt(2016,6,1),dt(2016,9,30))
+        correcting_time_variable_in_plankton_files(dt(2016, 6, 1), dt(2016, 9, 30))
         correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
         correcting_time_variable_in_plankton_files(dt(2018, 5, 1), dt(2018, 9, 30))
         correcting_time_variable_in_plankton_files(dt(2020, 5, 1), dt(2020, 9, 30))
@@ -186,7 +185,7 @@ def main():
         # arcProc.create_nc_file_out_month(fout, file_base, 'NT')
         return
 
-    ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL
+    ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL. DATES COULD BE ALSO PASSED AS ARGS
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
         return
@@ -202,8 +201,17 @@ def main():
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
+    #check if dates from args should be used
+    start_date = None
+    end_date = None
+    if args.start_date:
+        start_date, end_date = get_dates_from_arg()
+        if start_date is None or end_date is None:
+            ##error definint start or end dates
+            return
 
-    if args.mode == 'RESAMPLE' and args.base_file and args.product:
+
+    if args.mode == 'RESAMPLE' and args.base_file and args.product: ##options are required
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
@@ -223,28 +231,32 @@ def main():
         return
 
     if args.mode == 'RESAMPLE':
-        run_resample(arc_opt)
+        run_resample(arc_opt,start_date,end_date)
         return
 
     if args.mode == 'INTEGRATE':
-        run_integration(arc_opt)
+        run_integration(arc_opt,start_date,end_date)
         return
 
     if args.mode == 'CHLA':
-        run_chla(arc_opt)
+        run_chla(arc_opt,start_date,end_date)
         return
 
     if args.mode == 'MONTHLY_CHLA':
-        run_month(arc_opt, 'CHLA')
+        run_month(arc_opt, 'CHLA',start_date,end_date)
         return
 
     if args.mode == 'MONTHLY_KD490':
-        run_month(arc_opt, 'TRANSP')
+        run_month(arc_opt, 'TRANSP',start_date,end_date)
         return
+
+    if args.mode == 'QL':
+        print('to be done')
+        run_ql(arc_opt,start_date,end_date)
 
 
 # mode: CHLA or TRANSP
-def run_month(arc_opt, mode):
+def run_month(arc_opt, mode,start_date,end_date):
     options = arc_opt.get_processing_options()
     if mode is None:
         output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
@@ -272,8 +284,9 @@ def run_month(arc_opt, mode):
         print(f'[INFO] Timeliness: {timeliness}')
     arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
 
-    start_date = options['start_date']
-    end_date = options['end_date']
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
     start_date = start_date.replace(day=15)
     end_date = end_date.replace(day=15)
     date_run = start_date
@@ -626,33 +639,34 @@ def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
         print('COMPLETED')
 
 
-def correcting_time_variable_in_plankton_files(start_date,end_date):
+def correcting_time_variable_in_plankton_files(start_date, end_date):
     dir_base = '/store/COP2-OC-TAC/arc/integrated'
     dir_output = '/store/COP2-OC-TAC/arc/daily'
     import stat
     if not os.path.exists(dir_output):
         os.mkdir(dir_output)
-        #os.chmod(dir_output,0o666)
+        # os.chmod(dir_output,0o666)
     run_date = start_date
-    while run_date<=end_date:
+    while run_date <= end_date:
         print(f'DATE-------------------------------------------------> {run_date}')
         yearstr = run_date.strftime('%Y')
         jjjstr = run_date.strftime('%j')
         name_file = f'O{yearstr}{jjjstr}_plankton-arc-fr.nc'
-        input_path = os.path.join(dir_base,yearstr,jjjstr,name_file)
+        input_path = os.path.join(dir_base, yearstr, jjjstr, name_file)
         if os.path.exists(input_path):
-            output_year = os.path.join(dir_output,yearstr)
+            output_year = os.path.join(dir_output, yearstr)
             if not os.path.exists(output_year):
                 os.mkdir(output_year)
-                #os.chmod(output_year,0o666)
-            output_jday = os.path.join(output_year,jjjstr)
+                # os.chmod(output_year,0o666)
+            output_jday = os.path.join(output_year, jjjstr)
             if not os.path.exists(output_jday):
                 os.mkdir(output_jday)
-                #os.chmod(output_jday,0o666)
-            output_path = os.path.join(output_jday,name_file)
-            copy_nc_setting_time_variable(input_path,output_path)
+                # os.chmod(output_jday,0o666)
+            output_path = os.path.join(output_jday, name_file)
+            copy_nc_setting_time_variable(input_path, output_path)
 
         run_date = run_date + timedelta(hours=24)
+
 
 def copy_nc_setting_time_variable(ifile_base, ofile):
     dst = None
@@ -973,7 +987,7 @@ def run_resampling_info_dir(base_path):
     f1.close()
 
 
-def run_resample(arc_opt):
+def run_resample(arc_opt,start_date,end_date):
     options = arc_opt.get_resample_options()
     if options is None:
         print('[ERROR] Error getting the RESAMPLE options. Please review the config file')
@@ -983,8 +997,12 @@ def run_resample(arc_opt):
         for option in options:
             print(f'[INFO]  {option} -> {options[option]}')
         print('[INFO] ------------------------------------------------------------------------')
-    date_ref = options['start_date']
-    date_fin = options['end_date']
+    if start_date is not None and end_date is not None:
+        date_ref = start_date
+        date_fin = end_date
+    else:
+        date_ref = options['start_date']
+        date_fin = options['end_date']
     while date_ref <= date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')
         input_dir = arc_opt.get_folder_date_o(options, 'input_path', 'input_path_organization', date_ref, False)
@@ -1006,7 +1024,7 @@ def run_resample(arc_opt):
         date_ref = date_ref + timedelta(hours=24)
 
 
-def run_integration(arc_opt):
+def run_integration(arc_opt,start_date, end_date):
     options = arc_opt.get_integrate_options()
     if options is None:
         return
@@ -1015,8 +1033,10 @@ def run_integration(arc_opt):
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
 
-    start_date = options['start_date']
-    end_date = options['end_date']
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
+
     platform = options['platform']
     date_run = start_date
 
@@ -1091,7 +1111,7 @@ def run_integration(arc_opt):
         date_run = date_run + timedelta(hours=24)
 
 
-def run_chla(arc_opt):
+def run_chla(arc_opt,start_date, end_date):
     options = arc_opt.get_processing_options()
     if options is None:
         return
@@ -1139,8 +1159,9 @@ def run_chla(arc_opt):
         return
 
     ##WORKING WITH DATES
-    start_date = options['start_date']
-    end_date = options['end_date']
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
     date_run = start_date
     arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
     while date_run <= end_date:
@@ -1173,6 +1194,92 @@ def run_chla(arc_opt):
                 print(f'[INFO] Output file: {output_file}')
             arc_proc.compute_chla_image(input_file, output_file, timeliness)
         date_run = date_run + timedelta(hours=24)
+
+
+def run_ql(arc_opt,start_date,end_date):
+    options = arc_opt.get_ql_options()
+    if options is None:
+        return
+    output_type = arc_opt.get_value_param('QL', 'output_type', 'CHL', 'str')
+    if not output_type == 'CHL':
+        return
+
+
+    if args.verbose:
+        print('[INFO] QL OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+
+    from arc_mapinfo import ArcMapInfo
+    ami = ArcMapInfo(None, args.verbose)
+
+    ##WORKING WITH SINGLE GRANULE, ONLY CHLA
+    input_name = arc_opt.get_value_param('QL', 'name_input', None, 'str')
+    if input_name is not None:
+        input_file = os.path.join(options['input_path'], input_name)
+        if os.path.exists(input_file):
+            if args.verbose:
+                print(f'[INFO] Working with the single file: {input_file}')
+        else:
+            print(f'[ERROR] File {input_file} does not exist')
+        output_name = arc_opt.get_value_param('QL', 'name_output', None, 'str')
+        if output_name is None:
+            output_name = 'QuickLookChla.nc'
+        output_file = os.path.join(options['output_path'], output_name)
+        if args.verbose:
+            print(f'[INFO] Output file: {output_file}')
+        ami.save_quick_look_fdata(output_file, input_file, output_type)
+
+        return
+
+    ##WORKING WITH DATES
+    name_file_format_default = None
+    name_file_date_format_default = '%Y%j'
+    if output_type=='CHL':
+        name_file_format_default='O$DATE$_plankton-arc-fr.nc'
+    name_file_format = arc_opt.get_value_param('QL','name_file_format',name_file_format_default,'str')
+    name_file_date_format = arc_opt.get_value_param('QL','name_file_date_format_default',name_file_date_format_default,'str')
+
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
+    date_run = start_date
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run}')
+        make_ql = True
+        input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
+        date_file_str = date_run.strftime(name_file_date_format)
+        name_file = name_file_format.replace('$DATE$',date_file_str)
+        input_file = os.path.join(input_path, name_file)
+        if not os.path.exists(input_file):
+            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
+            make_ql = False
+        output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
+                                              True)
+        if output_path is None:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+            make_ql = False
+
+        output_name = f'{name_file[:-3]}_{output_type}'
+        output_file = os.path.join(output_path, output_name)
+        if os.path.exists(output_file):
+            print(f'[INFO] Output file {output_file} already exists. Skipping...')
+            make_ql = False
+
+        if make_ql:
+            if args.verbose:
+                print(f'[INFO] Input file: {input_file}')
+                print(f'[INFO] Output file: {output_file}.jpg')
+            ami.save_quick_look_fdata(output_file, input_file, output_type)
+        date_run = date_run + timedelta(hours=24)
+
+    # file_out = args.outputpath
+    # fdataset = args.product
+    # # ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
+    # ami.save_quick_look_fdata(file_out, fdataset, 'chla')
 
 
 def do_check7():
@@ -1783,6 +1890,35 @@ def do_check():
     olimage = OLCI_L2(folci, args.verbose)
     array = olimage.get_observation_angle_array()
     print(array.shape)
+
+def get_dates_from_arg():
+    from datetime import datetime as dt
+    start_date = None
+    end_date = None
+    if args.start_date:
+        try:
+            start_date = dt.strptime(args.start_date,'%Y-%m-%d')
+        except:
+            try:
+                tdelta = int(args.start_date)
+                start_date = dt.now() + timedelta(days=tdelta)
+                start_date = start_date.replace(hour=12, minute=0, second=0, microsecond=0)
+            except:
+                print(f'[ERROR] Start date {args.start_date} is not in the correct format: YYYY-mm-dd or integer')
+    if args.end_date:
+        try:
+            end_date = dt.strptime(args.end_date,'%Y-%m-%d')
+        except:
+            try:
+                tdelta = int(args.end_date)
+                end_date = dt.now() + timedelta(days=tdelta)
+                end_date = end_date.replace(hour=12, minute=0, second=0, microsecond=0)
+            except:
+                print(f'[ERROR] End date {args.end_date} is not in the correct format: YYYY-mm-dd or integer')
+    if args.start_date and not args.end_date:
+        end_date = start_date
+
+    return start_date, end_date
 
 
 if __name__ == '__main__':

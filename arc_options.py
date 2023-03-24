@@ -61,6 +61,9 @@ class ARC_OPTIONS:
     def get_processing_options(self):
         return self.get_basic_options('PROCESSING')
 
+    def get_ql_options(self):
+        return self.get_basic_options('QL')
+
     def get_basic_options(self, section):
         # section = 'INTEGRATE'
         if not self.options.has_section(section):

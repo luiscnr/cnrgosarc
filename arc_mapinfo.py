@@ -4,6 +4,7 @@ import shutil
 
 from pyresample.geometry import AreaDefinition
 from pyresample import save_quicklook, SwathDefinition, utils, image
+
 from pyresample.kd_tree import resample_nearest
 from pyresample.kd_tree import get_sample_from_neighbour_info, get_neighbour_info
 import numpy as np
@@ -318,11 +319,11 @@ class ArcMapInfo:
 
     def save_quick_look_fdata(self, fileout, fdata, name_var):
         dataset = Dataset(fdata)
-        data = np.ma.array(dataset.variables[name_var][:, :])
+        data = np.ma.array(dataset.variables[name_var][0,:, :])
         # data = np.ma.masked_values(data, 0)
-        print(type(data))
-        import numpy.ma as ma
-        data = ma.masked_greater(data, 0.5)
+        # print(type(data))
+        # import numpy.ma as ma
+        # data = ma.masked_greater(data, 0.5)
         self.save_quick_look_impl(fileout, data)
 
     def get_lat_min_spherical(self):
