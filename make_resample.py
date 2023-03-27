@@ -1273,7 +1273,8 @@ def run_ql(arc_opt,start_date,end_date):
             if args.verbose:
                 print(f'[INFO] Input file: {input_file}')
                 print(f'[INFO] Output file: {output_file}.jpg')
-            ami.save_quick_look_fdata(output_file, input_file, output_type)
+            #ami.save_quick_look_fdata(output_file, input_file, output_type)
+            ami.save_full_fdata(output_file,input_file,output_type)
         date_run = date_run + timedelta(hours=24)
 
     # file_out = args.outputpath
@@ -1890,6 +1891,8 @@ def do_check():
     olimage = OLCI_L2(folci, args.verbose)
     array = olimage.get_observation_angle_array()
     print(array.shape)
+
+
 
 def get_dates_from_arg():
     from datetime import datetime as dt

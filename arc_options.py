@@ -14,16 +14,27 @@ def create_folder(folder):
 
 
 def get_dates_from_stroptions(start_date_str, end_date_str):
+    from datetime import timedelta
     start_date = None
     end_date = None
     try:
         start_date = dt.strptime(start_date_str, '%Y-%m-%d')
     except:
-        print(f'[ERROR] Start date {start_date_str} is not valid')
+        try:
+            tdelta = int(start_date_str)
+            start_date = dt.now() + timedelta(days=tdelta)
+            start_date = start_date.replace(hour=12, minute=0, second=0, microsecond=0)
+        except:
+            print(f'[ERROR] Start date {start_date_str} is not valid')
     try:
         end_date = dt.strptime(end_date_str, '%Y-%m-%d')
     except:
-        print(f'[ERROR] End date {end_date_str} is not valid')
+        try:
+            tdelta = int(end_date_str)
+            end_date = dt.now() + timedelta(days=tdelta)
+            end_date = end_date.replace(hour=12, minute=0, second=0, microsecond=0)
+        except:
+            print(f'[ERROR] End date {end_date_str} is not valid')
     return start_date, end_date
 
 

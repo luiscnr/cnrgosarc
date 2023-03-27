@@ -300,6 +300,17 @@ class ArcMapInfo:
         dst = Dataset(ofile, 'a', format='NETCDF4')
         return dst
 
+    def save_full_map_impl(self, fileout,data):
+        import matplotlib as plt
+        import cartopy
+        crs = self.area_def.to_cartopy_crs()
+        fig, ax = plt.subplots(subplot_kw=dict(projection=crs))
+        coastlines = ax.coastlines()
+        ax.set_global()
+        img = plt.imshow(data, transform=crs, extent=crs.bounds, origin='upper')
+        cbar = plt.colorbar()
+        fig.savefig(fileout)
+
     def save_quick_look_impl(self, fileout, data):
         save_quicklook(fileout, self.area_def, data)
 
@@ -325,6 +336,11 @@ class ArcMapInfo:
         # import numpy.ma as ma
         # data = ma.masked_greater(data, 0.5)
         self.save_quick_look_impl(fileout, data)
+
+    def save_full_fdata(self,fileout,fdata,name_var):
+        dataset = Dataset(fdata)
+        data = np.ma.array(dataset.variables[name_var][0, :, :])
+        self.save_full_map_impl(fileout,data)
 
     def get_lat_min_spherical(self):
         xmid = math.floor(self.area_def.width / 2)
