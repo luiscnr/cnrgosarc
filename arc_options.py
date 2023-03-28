@@ -64,6 +64,11 @@ class ARC_OPTIONS:
             unzip_path = options['input_path']
             print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
         options['unzip_path'] = unzip_path
+
+
+
+
+
         return options
 
     def get_integrate_options(self):

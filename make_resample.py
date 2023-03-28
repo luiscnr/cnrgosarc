@@ -1589,6 +1589,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     section = 'RESAMPLE'
     doresample = arc_opt.get_value_param(section, 'do_resample', True, 'boolean')
     dokml = arc_opt.get_value_param(section, 'do_kml', False, 'boolean')
+    timeliness = arc_opt.get_value_param(section,'timeliness','NT','str')
     if dirdest is None:
         dirdest = dirorig
     apply_pool = arc_opt.get_value_param(section, 'apply_pool', 0, 'int')
@@ -1625,10 +1626,14 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     idx = 1
     nfiles = len(os.listdir(dirorig))
     for name in os.listdir(dirorig):
+
         if args.verbose:
             print('------------------------------------------------------------------------')
             print(f'[INFO] File: {name} ({idx}/{nfiles})')
             idx = idx + 1
+        pt = f'_{timeliness}_'
+        if name.find(pt)<0:
+            continue
         prod_path = os.path.join(dirorig, name)
         do_zip_here = False
         if name.endswith('.SEN3'):
@@ -1644,6 +1649,8 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             output_name = path_prod_u.split('/')[-1][0:-5]
         else:
             output_name = path_prod_u.split('/')[-1]
+
+
 
         resample_done = False
         if doresample:
