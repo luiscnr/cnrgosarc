@@ -312,6 +312,8 @@ def run_month(arc_opt, mode,start_date,end_date):
         output_path = arc_opt.get_folder_year(options['output_path'], date_run, True)
         if output_path is None:
             print(f'[WARNING] Output path {output_path} for date {date_run} is not available. Skiping...')
+            date_run = date_run + timedelta(days=30)
+            date_run = date_run.replace(day=15)
             continue
 
         nfiles_month = monthrange(date_run.year, date_run.month)[1]
@@ -324,6 +326,8 @@ def run_month(arc_opt, mode,start_date,end_date):
         if nfiles_available == 0:
             print(
                 f'[ERROR] No files avaiable for computing the {output_type} average for {date_run.year}/{date_run.month}. Skipping...')
+            date_run = date_run + timedelta(days=30)
+            date_run = date_run.replace(day=15)
             continue
         if nfiles_available < nfiles_month:
             print(f'[WARNING] Only {nfiles_available} of {nfiles_month} are available for computing the average')
