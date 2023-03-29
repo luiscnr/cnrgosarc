@@ -1121,6 +1121,7 @@ def run_chla(arc_opt,start_date, end_date):
         return
     ##ONLY CHLA MODE IS IMPLEMENTED
     output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
+    overwrite = arc_opt.get_value_param('PROCESSING','overwrite',False,'boolean')
     if not output_type == 'CHLA':
         return
     from arc_processing import ArcProcessing
@@ -1188,7 +1189,7 @@ def run_chla(arc_opt,start_date, end_date):
 
         output_name = f'O{dateyj}_plankton-arc-fr.nc'
         output_file = os.path.join(output_path, output_name)
-        if os.path.exists(output_file):
+        if os.path.exists(output_file) and not overwrite:
             print(f'[INFO] Output file {output_file} already exists. Skipping...')
             make_processing = False
 
