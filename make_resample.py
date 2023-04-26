@@ -1329,12 +1329,13 @@ def do_check9():
     from netCDF4 import Dataset
     import numpy.ma as ma
     dir_in = '/store/COP2-OC-TAC/arc/integrated'
-    bands = ['RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510', 'RRS560', 'RRS620', 'RRS665', 'RRS673_75',
-             'RRS681_25', 'RRS708_75']
+    # bands = ['RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510', 'RRS560', 'RRS620', 'RRS665', 'RRS673_75',
+    #          'RRS681_25', 'RRS708_75']
     first_line = ['Date']
+    bands = ['RRS400', 'RRS442_5']
     for band in bands:
         first_line.append(band)
-    first_line.append('KD490')
+    #first_line.append('KD490')
     first_line_str=';'.join(first_line)
     lines = [first_line_str]
     date_here = dt(2023,4,18)
@@ -1356,14 +1357,14 @@ def do_check9():
                 nvalid_all = compute_statistics(variable)
                 line = f'{line};{nvalid_all}'
             dataset_rrs.close()
-            print(f'-->KD490')
-            dataset_transp = Dataset(file_transp)
-            variable = dataset_transp.variables['KD490']
-            # array = ma.array(variable[:])
-            # nvalid_all = ma.count(array)
-            nvalid_all = compute_statistics(variable)
-            line = f'{line};{nvalid_all}'
-            dataset_transp.close()
+            # print(f'-->KD490')
+            # dataset_transp = Dataset(file_transp)
+            # variable = dataset_transp.variables['KD490']
+            # # array = ma.array(variable[:])
+            # # nvalid_all = ma.count(array)
+            # nvalid_all = compute_statistics(variable)
+            # line = f'{line};{nvalid_all}'
+            # dataset_transp.close()
             lines.append(line)
         date_here = date_here + timedelta(hours=24)
     file_out = '/store/COP2-OC-TAC/arc/nvalid_bydate.csv'
