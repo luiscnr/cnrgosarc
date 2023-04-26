@@ -1298,7 +1298,8 @@ def do_check9():
         file_in = os.path.join(dir_in,name)
         name_out = f'{name[:-3]}.jpg'
         file_out = os.path.join(dir_out,name_out)
-        ami.save_quick_look_fdata(file_in, file_out, 'KD490_M07')
+        print(file_in,'->',file_out)
+        ami.save_quick_look_fdata(file_out, file_in, 'KD490_M07')
 
 def do_check7():
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
