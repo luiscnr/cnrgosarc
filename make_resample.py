@@ -1289,25 +1289,106 @@ def run_ql(arc_opt,start_date,end_date):
     # ami.save_quick_look_fdata(file_out, fdataset, 'chla')
 
 
-def do_check9():
-    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/TEST/resampled'
-    dir_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/TEST/resampledql'
-    from arc_mapinfo import ArcMapInfo
-    ami = ArcMapInfo(None, args.verbose)
-    from netCDF4 import Dataset
+def compute_statistics(variable):
+    # print(variable)
+    width = variable.shape[1]
+    height = variable.shape[2]
+    ystep = 1000
+    xstep = 1000
     import numpy.ma as ma
-    for name in os.listdir(dir_in):
-        file_in = os.path.join(dir_in,name)
-        name_out = f'{name[:-3]}.png'
-        file_out = os.path.join(dir_out,name_out)
-        #print(file_in,'->',file_out)
-        dataset = Dataset(file_in)
-        mask = ma.array(dataset.variables['mask'][:])
-        mvalues = mask[~mask.mask]
-        nvalues = ma.count(mvalues)
-        if nvalues>1000000:
-            print('-------------------------------->',name,nvalues)
-        dataset.close()
+    min_values = []
+    max_values = []
+    avg_values = []
+    nvalid_all = 0
+    for y in range(0, height, ystep):
+        for x in range(0, width, xstep):
+            try:
+                limits = get_limits(y, x, ystep, xstep, height, width)
+                array_lim = ma.array(variable[0, limits[0]:limits[1], limits[2]:limits[3]])
+                nvalid = ma.count(array_lim)
+                nvalid_all = nvalid_all + nvalid
+                if nvalid > 0:
+                    min_values.append(ma.min(array_lim))
+                    max_values.append(ma.max(array_lim))
+                    avg_values.append(ma.mean(array_lim))
+            except:
+                return -1, -1, -1, -1
+    if nvalid_all == 0:
+        return nvalid_all, -1, -1, -1
+    else:
+        avgv = ma.mean(ma.array([avg_values]))
+        minv = ma.min(ma.array([min_values]))
+        maxv = ma.max(ma.array([max_values]))
+        return nvalid_all, avgv, minv, maxv
+def get_limits(y, x, ystep, xstep, ny, nx):
+    yini = y
+    xini = x
+    yfin = y + ystep
+    xfin = x + xstep
+    if yfin > ny:
+        yfin = ny
+    if xfin > nx:
+        xfin = nx
+
+    limits = [yini, yfin, xini, xfin]
+    return limits
+def do_check9():
+    from datetime import datetime as dt
+    from netCDF4 import Dataset
+    dir_in = '/store/COP2-OC-TAC/arc/integrated'
+    bands = ['RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510', 'RRS560', 'RRS620', 'RRS665', 'RRS673_75',
+             'RRS681_25', 'RRS708_75']
+    first_line = ['Date']
+    for band in bands:
+        first_line.append(band)
+    first_line.apend('KD490')
+    first_line_str=';'.join(first_line)
+    lines = [first_line_str]
+    date_here = dt(2023,4,18)
+    end_date = dt(2023,4,25)
+    while date_here<=end_date:
+        line = date_here.strftime('%Y-%m-%d')
+        year = date_here.strftime('%Y')
+        jday = date_here.strftime('%j')
+        file_rrs = os.path.join(dir_in,year,jday,f'O{year}{jday}_rrs-arc-fr.nc')
+        file_transp = os.path.join(dir_in,year,jday,f'O{year}{jday}_transp-arc-fr.nc')
+        if os.path.exists(file_rrs) & os.path.exists(file_transp):
+            print(f'DATE: {date_here}')
+            dataset_rrs = Dataset(file_rrs)
+            for band in bands:
+                variable = dataset_rrs.variables[band]
+                nvalid_all, avgv, minv, maxv = compute_statistics(variable)
+                line = f'{line};{nvalid_all}'
+            dataset_rrs.close()
+            dataset_transp = Dataset(file_transp)
+            variable = dataset_rrs.variables['KD490']
+            nvalid_all, avgv, minv, maxv = compute_statistics(variable)
+            line = f'{line};{nvalid_all}'
+            dataset_transp.close()
+            lines.append(line)
+        date_here = date_here + timedelta(hours=24)
+    file_out = '/store/COP2-OC-TAC/arc/nvalid_bydate.csv'
+    f1 = open(file_out,'w')
+    for line in lines:
+        f1.write(line)
+        f1.write('\n')
+    f1.close()
+    # from arc_mapinfo import ArcMapInfo
+    # ami = ArcMapInfo(None, args.verbose)
+    # from netCDF4 import Dataset
+    # import numpy.ma as ma
+    # for name in os.listdir(dir_in):
+    #     file_in = os.path.join(dir_in,name)
+    #     # name_out = f'{name[:-3]}.png'
+    #     # file_out = os.path.join(dir_out,name_out)
+    #     #print(file_in,'->',file_out)
+    #     dataset = Dataset(file_in)
+    #     mask = ma.array(dataset.variables['mask'][:])
+    #     mvalues = mask[~mask.mask]
+    #     nvalues = ma.count(mvalues)
+    #     if nvalues>1000000:
+    #         print('-------------------------------->',name,nvalues)
+    #     dataset.close()
         #ami.save_quick_look_fdata(file_out, file_in, 'mask')
 
 def do_check7():
