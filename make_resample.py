@@ -1332,7 +1332,9 @@ def get_limits(y, x, ystep, xstep, ny, nx):
 
     limits = [yini, yfin, xini, xfin]
     return limits
+
 def do_check9():
+    print('STARTED DO CHECK 9')
     from datetime import datetime as dt
     from netCDF4 import Dataset
     dir_in = '/store/COP2-OC-TAC/arc/integrated'
@@ -1341,7 +1343,7 @@ def do_check9():
     first_line = ['Date']
     for band in bands:
         first_line.append(band)
-    first_line.apend('KD490')
+    first_line.append('KD490')
     first_line_str=';'.join(first_line)
     lines = [first_line_str]
     date_here = dt(2023,4,18)
