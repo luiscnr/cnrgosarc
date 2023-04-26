@@ -1293,11 +1293,12 @@ def compute_statistics(variable):
     # print(variable)
     width = variable.shape[1]
     height = variable.shape[2]
-    ystep = 5000
-    xstep = 5000
+    ystep = 1000
+    xstep = 1000
     import numpy.ma as ma
     nvalid_all = 0
     for y in range(0, height, ystep):
+        print(y)
         for x in range(0, width, xstep):
             try:
                 limits = get_limits(y, x, ystep, xstep, height, width)
@@ -1350,17 +1351,17 @@ def do_check9():
             for band in bands:
                 print(f'-->{band}')
                 variable = dataset_rrs.variables[band]
-                array = ma.array(variable[:])
-                nvalid_all = ma.count(array)
-                #nvalid_all = compute_statistics(variable)
+                # array = ma.array(variable[:])
+                # nvalid_all = ma.count(array)
+                nvalid_all = compute_statistics(variable)
                 line = f'{line};{nvalid_all}'
             dataset_rrs.close()
             print(f'-->KD490')
             dataset_transp = Dataset(file_transp)
             variable = dataset_transp.variables['KD490']
-            array = ma.array(variable[:])
-            nvalid_all = ma.count(array)
-            #nvalid_all = compute_statistics(variable)
+            # array = ma.array(variable[:])
+            # nvalid_all = ma.count(array)
+            nvalid_all = compute_statistics(variable)
             line = f'{line};{nvalid_all}'
             dataset_transp.close()
             lines.append(line)
