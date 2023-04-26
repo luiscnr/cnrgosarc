@@ -98,7 +98,7 @@ def main():
         file_out = args.outputpath
         fdataset = args.product
         # ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
-        ami.save_quick_look_fdata(file_out, fdataset, 'chla')
+        ami.save_quick_look_fdata(file_out, fdataset, 'SENSORMASK')
         return
 
     if args.mode == 'INTEGRATE' and args.base_file and args.outputpath:
@@ -1290,16 +1290,25 @@ def run_ql(arc_opt,start_date,end_date):
 
 
 def do_check9():
-    dir_in = '/store/COP2-OC-TAC/arc/resampled/2023/04/21'
-    dir_out = '/store/COP2-OC-TAC/arc/TEST_LUIS'
+    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/TEST/resampled'
+    dir_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/TEST/resampledql'
     from arc_mapinfo import ArcMapInfo
     ami = ArcMapInfo(None, args.verbose)
+    from netCDF4 import Dataset
+    import numpy.ma as ma
     for name in os.listdir(dir_in):
         file_in = os.path.join(dir_in,name)
-        name_out = f'{name[:-3]}.jpg'
+        name_out = f'{name[:-3]}.png'
         file_out = os.path.join(dir_out,name_out)
-        print(file_in,'->',file_out)
-        ami.save_quick_look_fdata(file_out, file_in, 'KD490_M07')
+        #print(file_in,'->',file_out)
+        dataset = Dataset(file_in)
+        mask = ma.array(dataset.variables['mask'][:])
+        mvalues = mask[~mask.mask]
+        nvalues = ma.count(mvalues)
+        if nvalues>1000000:
+            print('-------------------------------->',name,nvalues)
+        dataset.close()
+        #ami.save_quick_look_fdata(file_out, file_in, 'mask')
 
 def do_check7():
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'

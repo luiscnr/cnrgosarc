@@ -8,7 +8,6 @@ from netCDF4 import Dataset
 from datetime import datetime as dt
 
 
-
 class ArcIntegration():
 
     def __init__(self, arc_opt, verbose, dir_input, output_type, file_attributes):
@@ -163,17 +162,14 @@ class ArcIntegration():
         if datasetout is None:
             return datasetout
 
-
-
         ##global attributes
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib is None, atribs ard defined in file base
             for at in atribs:
-                if at=='conventions':
+                if at == 'conventions':
                     datasetout.setncattr('Conventions', atribs[at])
                 else:
                     datasetout.setncattr(at, atribs[at])
-
 
         ##create rrs variables
         if self.output_type == 'RRS' or self.output_type == 'TEST' or self.output_type == 'OPERATIVE':
@@ -209,10 +205,10 @@ class ArcIntegration():
         addtransp = False
         if bandname in self.average_variables and not bandname in datasetout.variables:
             addtransp = True
-        if self.output_type=='RRS':
+        if self.output_type == 'RRS':
             addtransp = False
         if addtransp:
-            var = datasetout.createVariable(bandname, 'f4', ('time','y', 'x'), fill_value=-999, zlib=True, complevel=6)
+            var = datasetout.createVariable(bandname, 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True, complevel=6)
             # var[:] = 0
             var.band_name = 'OLCI band name KD490_M07'
             var.long_name = 'OLCI Diffuse Attenuation Coefficient at 490nm'
@@ -615,7 +611,7 @@ class ArcIntegration():
 
 
 
-        # AVERAGE VARIABLES
+        #AVERAGE VARIABLES
         if self.apply_pool == 0:
             for var_avg_name in self.average_variables:
                 file_var = os.path.join(output_path, f'{var_avg_name}.nc')
@@ -653,8 +649,9 @@ class ArcIntegration():
                 file_var = os.path.join(output_path, f'{var_avg_name}.nc')
                 dataset_var = Dataset(file_var)
                 var_avg_array = np.array(dataset_var.variables['average'])
-                var_mask_array[var_avg_array <= 0] = var_avg_array[var_avg_array <= 0]
+                var_mask_array[var_avg_array < 0] = 0
                 dataset_var.close()
+        #var_mask_array[var_mask_array==0] = -999
         var_mask[:] = [var_mask_array[:]]
         ngood = np.count_nonzero(var_mask_array > 0)
         if self.verbose:
@@ -682,7 +679,7 @@ class ArcIntegration():
         var_sensor_mask = datasetout.variables['SENSORMASK']
         file_mask = os.path.join(output_path, 'Mask.nc')
 
-        #Mask.nc only exist if there are data valid
+        # Mask.nc only exist if there are data valid
         wmask = None
         if os.path.exists(file_mask):
             dataset_mask = Dataset(file_mask)
@@ -709,7 +706,7 @@ class ArcIntegration():
                     if self.verbose:
                         print(f'[INFO] Adapting mask for variable {avg_name}')
                     var_array[wmask <= 0] = -999.0
-                variable[0,:,:] = [var_array[:,:]]
+                variable[0, :, :] = [var_array[:, :]]
                 dataset_var.close()
 
         datasetout.close()
@@ -728,7 +725,7 @@ class ArcIntegration():
                 variable = datasetout.variables[avg_name]
                 dataset_var = Dataset(file_avg)
                 var_array = np.array(dataset_var.variables['average'])
-                variable[0,:,:] = [var_array[:,:]]
+                variable[0, :, :] = [var_array[:, :]]
                 dataset_var.close()
         datasetout.close()
         if self.verbose:
@@ -762,7 +759,7 @@ class ArcIntegration():
         igranule = 1
         for name in infof:
             if self.verbose:
-                print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
+                print(f'[INFO] Working with granule: {name} ({igranule}/{nvalidgranules})')
                 igranule = igranule + 1
 
             file = os.path.join(self.dir_input, name)
@@ -805,7 +802,8 @@ class ArcIntegration():
             var_num[yini:yfin, xini:xfin] = [num_array]
 
             dataset_granule.close()
-        print('ystep: ',self.ystep, ' xstep: ',self.xstep)
+
+        #print('ystep: ', self.ystep, ' xstep: ', self.xstep)
         for y in range(0, self.height, self.ystep):
             if self.verbose:
                 print(f'[INFO] -> {y}')
@@ -813,9 +811,10 @@ class ArcIntegration():
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
                 sum_array = np.array(var_sum[limits[0]:limits[1], limits[2]:limits[3]])
                 if np.max(sum_array[:]) == 0:
+                    sum_array[:] = -999
+                    var_sum[limits[0]:limits[1], limits[2]:limits[3]] = [sum_array[:, :]]
                     continue
                 num_array = np.array(var_num[limits[0]:limits[1], limits[2]:limits[3]])
-
                 indices_good = np.where(num_array > 0)
                 indices_mask = np.where(num_array <= 0)
                 sum_array[indices_good] = sum_array[indices_good] / num_array[indices_good]
@@ -837,7 +836,7 @@ class ArcIntegration():
         igranule = 1
         for name in infof:
             if self.verbose:
-                print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
+                print(f'[INFO] Working with granule: {name} ({igranule}/{nvalidgranules})')
                 igranule = igranule + 1
 
             file = os.path.join(self.dir_input, name)
@@ -854,7 +853,6 @@ class ArcIntegration():
             # weighted mask granule
             dataset_granule = Dataset(file)
             weigthed_mask_granule = np.array(dataset_granule.variables['mask'][yini:yfin, xini:xfin])
-
 
             # assuring that pixels lower than 65 degress are masked
             weigthed_mask_granule[sensor_mask == -999] = -999
@@ -915,7 +913,7 @@ class ArcIntegration():
         igranule = 1
         for name in infof:
             if self.verbose:
-                print(f'[INFO]Working with granule: {name} ({igranule}/{nvalidgranules})')
+                print(f'[INFO] Working with granule: {name} ({igranule}/{nvalidgranules})')
                 igranule = igranule + 1
 
             file = os.path.join(self.dir_input, name)
