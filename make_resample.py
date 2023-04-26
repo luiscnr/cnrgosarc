@@ -1298,7 +1298,7 @@ def compute_statistics(variable):
     import numpy.ma as ma
     nvalid_all = 0
     for y in range(0, height, ystep):
-        print(y)
+        #print(y)
         for x in range(0, width, xstep):
             try:
                 limits = get_limits(y, x, ystep, xstep, height, width)
@@ -1338,7 +1338,7 @@ def do_check9():
     #first_line.append('KD490')
     first_line_str=';'.join(first_line)
     lines = [first_line_str]
-    date_here = dt(2023,4,18)
+    date_here = dt(2016,4,26)
     end_date = dt(2023,4,25)
     while date_here<=end_date:
         line = date_here.strftime('%Y-%m-%d')
