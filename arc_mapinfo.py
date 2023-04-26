@@ -330,7 +330,10 @@ class ArcMapInfo:
 
     def save_quick_look_fdata(self, fileout, fdata, name_var):
         dataset = Dataset(fdata)
-        data = np.ma.array(dataset.variables[name_var][0,:, :])
+        if dataset.variables[name_var].ndim==3:
+            data = np.ma.array(dataset.variables[name_var][0,:, :])
+        if dataset.variables[name_var].ndim==2:
+            data = np.ma.array(dataset.variables[name_var][:, :])
         # data = np.ma.masked_values(data, 0)
         # print(type(data))
         # import numpy.ma as ma
