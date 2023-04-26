@@ -1293,12 +1293,9 @@ def compute_statistics(variable):
     # print(variable)
     width = variable.shape[1]
     height = variable.shape[2]
-    ystep = 1000
-    xstep = 1000
+    ystep = 5000
+    xstep = 5000
     import numpy.ma as ma
-    min_values = []
-    max_values = []
-    avg_values = []
     nvalid_all = 0
     for y in range(0, height, ystep):
         for x in range(0, width, xstep):
@@ -1307,19 +1304,11 @@ def compute_statistics(variable):
                 array_lim = ma.array(variable[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = ma.count(array_lim)
                 nvalid_all = nvalid_all + nvalid
-                if nvalid > 0:
-                    min_values.append(ma.min(array_lim))
-                    max_values.append(ma.max(array_lim))
-                    avg_values.append(ma.mean(array_lim))
             except:
-                return -1, -1, -1, -1
-    if nvalid_all == 0:
-        return nvalid_all, -1, -1, -1
-    else:
-        avgv = ma.mean(ma.array([avg_values]))
-        minv = ma.min(ma.array([min_values]))
-        maxv = ma.max(ma.array([max_values]))
-        return nvalid_all, avgv, minv, maxv
+                return -1
+
+    return nvalid_all
+
 def get_limits(y, x, ystep, xstep, ny, nx):
     yini = y
     xini = x
@@ -1358,13 +1347,15 @@ def do_check9():
             print(f'DATE: {date_here}')
             dataset_rrs = Dataset(file_rrs)
             for band in bands:
+                print(f'-->{band}')
                 variable = dataset_rrs.variables[band]
-                nvalid_all, avgv, minv, maxv = compute_statistics(variable)
+                nvalid_all = compute_statistics(variable)
                 line = f'{line};{nvalid_all}'
             dataset_rrs.close()
+            print(f'KD490')
             dataset_transp = Dataset(file_transp)
             variable = dataset_rrs.variables['KD490']
-            nvalid_all, avgv, minv, maxv = compute_statistics(variable)
+            nvalid_all = compute_statistics(variable)
             line = f'{line};{nvalid_all}'
             dataset_transp.close()
             lines.append(line)
