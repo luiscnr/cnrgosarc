@@ -1326,6 +1326,7 @@ def do_check9():
     print('STARTED DO CHECK 9')
     from datetime import datetime as dt
     from netCDF4 import Dataset
+    import numpy.ma as ma
     dir_in = '/store/COP2-OC-TAC/arc/integrated'
     bands = ['RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510', 'RRS560', 'RRS620', 'RRS665', 'RRS673_75',
              'RRS681_25', 'RRS708_75']
@@ -1349,13 +1350,17 @@ def do_check9():
             for band in bands:
                 print(f'-->{band}')
                 variable = dataset_rrs.variables[band]
-                nvalid_all = compute_statistics(variable)
+                array = ma.array(variable[:])
+                nvalid_all = ma.count(array)
+                #nvalid_all = compute_statistics(variable)
                 line = f'{line};{nvalid_all}'
             dataset_rrs.close()
-            print(f'KD490')
+            print(f'-->KD490')
             dataset_transp = Dataset(file_transp)
-            variable = dataset_rrs.variables['KD490']
-            nvalid_all = compute_statistics(variable)
+            variable = dataset_transp.variables['KD490']
+            array = ma.array(variable[:])
+            nvalid_all = ma.count(array)
+            #nvalid_all = compute_statistics(variable)
             line = f'{line};{nvalid_all}'
             dataset_transp.close()
             lines.append(line)
