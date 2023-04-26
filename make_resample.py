@@ -42,15 +42,16 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        from datetime import datetime as dt
-        correcting_time_variable_in_plankton_files(dt(2016, 6, 1), dt(2016, 9, 30))
-        correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
-        correcting_time_variable_in_plankton_files(dt(2018, 5, 1), dt(2018, 9, 30))
-        correcting_time_variable_in_plankton_files(dt(2020, 5, 1), dt(2020, 9, 30))
-
-        correcting_time_variable_in_plankton_files(dt(2019, 1, 1), dt(2019, 2, 28))
-        correcting_time_variable_in_plankton_files(dt(2019, 4, 1), dt(2019, 9, 30))
-        correcting_time_variable_in_plankton_files(dt(2019, 11, 1), dt(2019, 12, 31))
+        do_check9()
+        # from datetime import datetime as dt
+        # correcting_time_variable_in_plankton_files(dt(2016, 6, 1), dt(2016, 9, 30))
+        # correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
+        # correcting_time_variable_in_plankton_files(dt(2018, 5, 1), dt(2018, 9, 30))
+        # correcting_time_variable_in_plankton_files(dt(2020, 5, 1), dt(2020, 9, 30))
+        #
+        # correcting_time_variable_in_plankton_files(dt(2019, 1, 1), dt(2019, 2, 28))
+        # correcting_time_variable_in_plankton_files(dt(2019, 4, 1), dt(2019, 9, 30))
+        # correcting_time_variable_in_plankton_files(dt(2019, 11, 1), dt(2019, 12, 31))
         # ami = ArcMapInfo(None,True)
         # adding_time()
         # add_vega_changes()
@@ -1287,6 +1288,17 @@ def run_ql(arc_opt,start_date,end_date):
     # # ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
     # ami.save_quick_look_fdata(file_out, fdataset, 'chla')
 
+
+def do_check9():
+    dir_in = '/store/COP2-OC-TAC/arc/resampled/2023/04/21'
+    dir_out = '/store/COP2-OC-TAC/arc/TEST_LUIS'
+    from arc_mapinfo import ArcMapInfo
+    ami = ArcMapInfo(None, args.verbose)
+    for name in os.listdir(dir_in):
+        file_in = os.path.join(dir_in,name)
+        name_out = f'{name[:-3]}.jpg'
+        file_out = os.path.join(dir_out,name_out)
+        ami.save_quick_look_fdata(file_in, file_out, 'KD490_M07')
 
 def do_check7():
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
