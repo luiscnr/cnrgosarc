@@ -27,6 +27,8 @@ parser.add_argument('-ed', "--end_date", help="End date (yyyy-mm-dd")
 parser.add_argument('-c', "--config_file", help="Configuration file (Default: arc_config.ini)")
 parser.add_argument('-bf', "--base_file", help="Create base file for the following mode: RESAMPLE,INTEGRATE.",
                     action="store_true")
+parser.add_argument('-var', "--variable_plot", help="Variable to be plot using QL mode. Default: CHL",
+                    choices=["CHL", "KD490"])
 parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true")
 args = parser.parse_args()
 
@@ -97,8 +99,10 @@ def main():
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
         fdataset = args.product
-        # ami.save_quick_look_fdata(file_out, fdataset, 'sensor_mask')
-        ami.save_quick_look_fdata(file_out, fdataset, 'SENSORMASK')
+        variable = 'CHL'
+        if args.variable_plot:
+            variable = args.variable_plot
+        ami.save_full_fdata(file_out, fdataset, variable)
         return
 
     if args.mode == 'INTEGRATE' and args.base_file and args.outputpath:
@@ -202,7 +206,7 @@ def main():
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
-    #check if dates from args should be used
+    # check if dates from args should be used
     start_date = None
     end_date = None
     if args.start_date:
@@ -211,8 +215,7 @@ def main():
             ##error definint start or end dates
             return
 
-
-    if args.mode == 'RESAMPLE' and args.base_file and args.product: ##options are required
+    if args.mode == 'RESAMPLE' and args.base_file and args.product:  ##options are required
         folci = args.product
         olimage = OLCI_L2(folci, args.verbose)
         olimage.get_geo_and_params()
@@ -232,32 +235,32 @@ def main():
         return
 
     if args.mode == 'RESAMPLE':
-        run_resample(arc_opt,start_date,end_date)
+        run_resample(arc_opt, start_date, end_date)
         return
 
     if args.mode == 'INTEGRATE':
-        run_integration(arc_opt,start_date,end_date)
+        run_integration(arc_opt, start_date, end_date)
         return
 
     if args.mode == 'CHLA':
-        run_chla(arc_opt,start_date,end_date)
+        run_chla(arc_opt, start_date, end_date)
         return
 
     if args.mode == 'MONTHLY_CHLA':
-        run_month(arc_opt, 'CHLA',start_date,end_date)
+        run_month(arc_opt, 'CHLA', start_date, end_date)
         return
 
     if args.mode == 'MONTHLY_KD490':
-        run_month(arc_opt, 'TRANSP',start_date,end_date)
+        run_month(arc_opt, 'TRANSP', start_date, end_date)
         return
 
     if args.mode == 'QL':
         print('to be done')
-        run_ql(arc_opt,start_date,end_date)
+        run_ql(arc_opt, start_date, end_date)
 
 
 # mode: CHLA or TRANSP
-def run_month(arc_opt, mode,start_date,end_date):
+def run_month(arc_opt, mode, start_date, end_date):
     options = arc_opt.get_processing_options()
     if mode is None:
         output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
@@ -992,7 +995,7 @@ def run_resampling_info_dir(base_path):
     f1.close()
 
 
-def run_resample(arc_opt,start_date,end_date):
+def run_resample(arc_opt, start_date, end_date):
     options = arc_opt.get_resample_options()
     if options is None:
         print('[ERROR] Error getting the RESAMPLE options. Please review the config file')
@@ -1029,7 +1032,7 @@ def run_resample(arc_opt,start_date,end_date):
         date_ref = date_ref + timedelta(hours=24)
 
 
-def run_integration(arc_opt,start_date, end_date):
+def run_integration(arc_opt, start_date, end_date):
     options = arc_opt.get_integrate_options()
     if options is None:
         return
@@ -1116,13 +1119,13 @@ def run_integration(arc_opt,start_date, end_date):
         date_run = date_run + timedelta(hours=24)
 
 
-def run_chla(arc_opt,start_date, end_date):
+def run_chla(arc_opt, start_date, end_date):
     options = arc_opt.get_processing_options()
     if options is None:
         return
     ##ONLY CHLA MODE IS IMPLEMENTED
     output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
-    overwrite = arc_opt.get_value_param('PROCESSING','overwrite',False,'boolean')
+    overwrite = arc_opt.get_value_param('PROCESSING', 'overwrite', False, 'boolean')
     if not output_type == 'CHLA':
         return
     from arc_processing import ArcProcessing
@@ -1202,7 +1205,7 @@ def run_chla(arc_opt,start_date, end_date):
         date_run = date_run + timedelta(hours=24)
 
 
-def run_ql(arc_opt,start_date,end_date):
+def run_ql(arc_opt, start_date, end_date):
     options = arc_opt.get_ql_options()
     if options is None:
         return
@@ -1210,12 +1213,10 @@ def run_ql(arc_opt,start_date,end_date):
     if not output_type == 'CHL':
         return
 
-
     if args.verbose:
         print('[INFO] QL OPTIONS:')
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
-
 
     from arc_mapinfo import ArcMapInfo
     ami = ArcMapInfo(None, args.verbose)
@@ -1235,17 +1236,18 @@ def run_ql(arc_opt,start_date,end_date):
         output_file = os.path.join(options['output_path'], output_name)
         if args.verbose:
             print(f'[INFO] Output file: {output_file}')
-        ami.save_quick_look_fdata(output_file, input_file, output_type)
-
+        # ami.save_quick_look_fdata(output_file, input_file, output_type)
+        ami.save_full_fdata(output_file, input_file, output_file)
         return
 
     ##WORKING WITH DATES
     name_file_format_default = None
     name_file_date_format_default = '%Y%j'
-    if output_type=='CHL':
-        name_file_format_default='O$DATE$_plankton-arc-fr.nc'
-    name_file_format = arc_opt.get_value_param('QL','name_file_format',name_file_format_default,'str')
-    name_file_date_format = arc_opt.get_value_param('QL','name_file_date_format_default',name_file_date_format_default,'str')
+    if output_type == 'CHL':
+        name_file_format_default = 'O$DATE$_plankton-arc-fr.nc'
+    name_file_format = arc_opt.get_value_param('QL', 'name_file_format', name_file_format_default, 'str')
+    name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format_default',
+                                                    name_file_date_format_default, 'str')
 
     if start_date is None or end_date is None:
         start_date = options['start_date']
@@ -1258,7 +1260,7 @@ def run_ql(arc_opt,start_date,end_date):
         make_ql = True
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
         date_file_str = date_run.strftime(name_file_date_format)
-        name_file = name_file_format.replace('$DATE$',date_file_str)
+        name_file = name_file_format.replace('$DATE$', date_file_str)
         input_file = os.path.join(input_path, name_file)
         if not os.path.exists(input_file):
             print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
@@ -1269,7 +1271,7 @@ def run_ql(arc_opt,start_date,end_date):
             print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
             make_ql = False
 
-        output_name = f'{name_file[:-3]}_{output_type}'
+        output_name = f'{name_file[:-3]}_{output_type}.png'
         output_file = os.path.join(output_path, output_name)
         if os.path.exists(output_file):
             print(f'[INFO] Output file {output_file} already exists. Skipping...')
@@ -1278,9 +1280,9 @@ def run_ql(arc_opt,start_date,end_date):
         if make_ql:
             if args.verbose:
                 print(f'[INFO] Input file: {input_file}')
-                print(f'[INFO] Output file: {output_file}.jpg')
-            #ami.save_quick_look_fdata(output_file, input_file, output_type)
-            ami.save_full_fdata(output_file,input_file,output_type)
+                print(f'[INFO] Output file: {output_file}')
+            # ami.save_quick_look_fdata(output_file, input_file, output_type)
+            ami.save_full_fdata(output_file, input_file, output_type)
         date_run = date_run + timedelta(hours=24)
 
     # file_out = args.outputpath
@@ -1298,7 +1300,7 @@ def compute_statistics(variable):
     import numpy.ma as ma
     nvalid_all = 0
     for y in range(0, height, ystep):
-        #print(y)
+        # print(y)
         for x in range(0, width, xstep):
             try:
                 limits = get_limits(y, x, ystep, xstep, height, width)
@@ -1309,6 +1311,7 @@ def compute_statistics(variable):
                 return -1
 
     return nvalid_all
+
 
 def get_limits(y, x, ystep, xstep, ny, nx):
     yini = y
@@ -1323,6 +1326,7 @@ def get_limits(y, x, ystep, xstep, ny, nx):
     limits = [yini, yfin, xini, xfin]
     return limits
 
+
 def do_check9():
     print('STARTED DO CHECK 9')
     from datetime import datetime as dt
@@ -1335,17 +1339,17 @@ def do_check9():
     bands = ['RRS400', 'RRS442_5']
     for band in bands:
         first_line.append(band)
-    #first_line.append('KD490')
-    first_line_str=';'.join(first_line)
+    # first_line.append('KD490')
+    first_line_str = ';'.join(first_line)
     lines = [first_line_str]
-    date_here = dt(2016,4,26)
-    end_date = dt(2023,4,25)
-    while date_here<=end_date:
+    date_here = dt(2016, 4, 26)
+    end_date = dt(2023, 4, 25)
+    while date_here <= end_date:
         line = date_here.strftime('%Y-%m-%d')
         year = date_here.strftime('%Y')
         jday = date_here.strftime('%j')
-        file_rrs = os.path.join(dir_in,year,jday,f'O{year}{jday}_rrs-arc-fr.nc')
-        file_transp = os.path.join(dir_in,year,jday,f'O{year}{jday}_transp-arc-fr.nc')
+        file_rrs = os.path.join(dir_in, year, jday, f'O{year}{jday}_rrs-arc-fr.nc')
+        file_transp = os.path.join(dir_in, year, jday, f'O{year}{jday}_transp-arc-fr.nc')
         if os.path.exists(file_rrs) & os.path.exists(file_transp):
             print(f'DATE: {date_here}')
             dataset_rrs = Dataset(file_rrs)
@@ -1368,7 +1372,7 @@ def do_check9():
             lines.append(line)
         date_here = date_here + timedelta(hours=24)
     file_out = '/store/COP2-OC-TAC/arc/nvalid_bydate.csv'
-    f1 = open(file_out,'w')
+    f1 = open(file_out, 'w')
     for line in lines:
         f1.write(line)
         f1.write('\n')
@@ -1389,7 +1393,8 @@ def do_check9():
     #     if nvalues>1000000:
     #         print('-------------------------------->',name,nvalues)
     #     dataset.close()
-        #ami.save_quick_look_fdata(file_out, file_in, 'mask')
+    # ami.save_quick_look_fdata(file_out, file_in, 'mask')
+
 
 def do_check7():
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
@@ -1693,7 +1698,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     section = 'RESAMPLE'
     doresample = arc_opt.get_value_param(section, 'do_resample', True, 'boolean')
     dokml = arc_opt.get_value_param(section, 'do_kml', False, 'boolean')
-    timeliness = arc_opt.get_value_param(section,'timeliness','NT','str')
+    timeliness = arc_opt.get_value_param(section, 'timeliness', 'NT', 'str')
     if dirdest is None:
         dirdest = dirorig
     apply_pool = arc_opt.get_value_param(section, 'apply_pool', 0, 'int')
@@ -1736,7 +1741,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             print(f'[INFO] File: {name} ({idx}/{nfiles})')
             idx = idx + 1
         pt = f'_{timeliness}_'
-        if name.find(pt)<0:
+        if name.find(pt) < 0:
             continue
         prod_path = os.path.join(dirorig, name)
         do_zip_here = False
@@ -1753,8 +1758,6 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             output_name = path_prod_u.split('/')[-1][0:-5]
         else:
             output_name = path_prod_u.split('/')[-1]
-
-
 
         resample_done = False
         if doresample:
@@ -2008,14 +2011,13 @@ def do_check():
     print(array.shape)
 
 
-
 def get_dates_from_arg():
     from datetime import datetime as dt
     start_date = None
     end_date = None
     if args.start_date:
         try:
-            start_date = dt.strptime(args.start_date,'%Y-%m-%d')
+            start_date = dt.strptime(args.start_date, '%Y-%m-%d')
         except:
             try:
                 tdelta = int(args.start_date)
@@ -2025,7 +2027,7 @@ def get_dates_from_arg():
                 print(f'[ERROR] Start date {args.start_date} is not in the correct format: YYYY-mm-dd or integer')
     if args.end_date:
         try:
-            end_date = dt.strptime(args.end_date,'%Y-%m-%d')
+            end_date = dt.strptime(args.end_date, '%Y-%m-%d')
         except:
             try:
                 tdelta = int(args.end_date)

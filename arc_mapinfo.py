@@ -10,7 +10,10 @@ from pyresample.kd_tree import get_sample_from_neighbour_info, get_neighbour_inf
 import numpy as np
 import numpy.ma as ma
 from netCDF4 import Dataset
-
+import warnings
+warnings.resetwarnings()
+warnings.simplefilter('ignore', UserWarning)
+warnings.simplefilter('ignore', DeprecationWarning)
 
 class ArcMapInfo:
     def __init__(self, arc_options, verbose):
@@ -300,16 +303,27 @@ class ArcMapInfo:
         dst = Dataset(ofile, 'a', format='NETCDF4')
         return dst
 
-    def save_full_map_impl(self, fileout,data):
-        import matplotlib as plt
+    def show_map_chl_impl(self, ax, data, lats, lons):
+        limits, subareadef = self.get_subarea_def(lats, lons)
+        crs = subareadef.to_cartopy_crs()
+        from matplotlib.colors import LogNorm
+        img = ax.imshow(data, transform=crs, extent=crs.bounds, origin='upper',norm=LogNorm(vmin=0.001, vmax=100))
+        return img
+
+    def save_full_map_impl(self, fileout, data, lats, lons):
+        import matplotlib.pyplot as plt
         import cartopy
-        crs = self.area_def.to_cartopy_crs()
-        fig, ax = plt.subplots(subplot_kw=dict(projection=crs))
+        if lats is not None and lons is not None:
+            limits, subareadef = self.get_subarea_def(lats, lons)
+            crs = subareadef.to_cartopy_crs()
+        else:
+            crs = self.area_def.to_cartopy_crs()
+
+        ax = plt.axes(projection=crs)
         coastlines = ax.coastlines()
-        ax.set_global()
         img = plt.imshow(data, transform=crs, extent=crs.bounds, origin='upper')
         cbar = plt.colorbar()
-        fig.savefig(fileout)
+        plt.savefig(fileout)
 
     def save_quick_look_impl(self, fileout, data):
         save_quicklook(fileout, self.area_def, data)
@@ -330,9 +344,9 @@ class ArcMapInfo:
 
     def save_quick_look_fdata(self, fileout, fdata, name_var):
         dataset = Dataset(fdata)
-        if dataset.variables[name_var].ndim==3:
-            data = np.ma.array(dataset.variables[name_var][0,:, :])
-        if dataset.variables[name_var].ndim==2:
+        if dataset.variables[name_var].ndim == 3:
+            data = np.ma.array(dataset.variables[name_var][0, :, :])
+        if dataset.variables[name_var].ndim == 2:
             data = np.ma.array(dataset.variables[name_var][:, :])
         # data = np.ma.masked_values(data, 0)
         # print(type(data))
@@ -340,10 +354,133 @@ class ArcMapInfo:
         # data = ma.masked_greater(data, 0.5)
         self.save_quick_look_impl(fileout, data)
 
-    def save_full_fdata(self,fileout,fdata,name_var):
+    def save_full_fdata(self, fileout, fdata, name_var):
+        if self.verbose:
+            print(f'[INFO] Saving Quick Look Image from file: {fdata}')
+            print(f'[INFO] Variable: {name_var}')
+
+
         dataset = Dataset(fdata)
-        data = np.ma.array(dataset.variables[name_var][0, :, :])
-        self.save_full_map_impl(fileout,data)
+
+        dateherestr = None
+        if 'time' in dataset.variables:
+            from datetime import datetime as dt
+            from datetime import timedelta
+            datehere = dt(1981,1,1)+timedelta(seconds=float(dataset.variables['time'][0]))
+            dateherestr = datehere.strftime('%Y-%m-%d')
+
+        if self.verbose:
+            print(f'[INFO] Date: {dateherestr}')
+            print(f'[INFO] Starting figure and axes')
+
+
+        fig, ax = self.start_full_figure()
+
+        ##plotting images
+        xstep = int(np.ceil(self.area_def.width / 2))
+        ystep = int(np.ceil(self.area_def.height / 2))
+        nsteps = 4
+        iprogress = 1
+
+        for y in range(0, self.area_def.height, ystep):
+            for x in range(0, self.area_def.width, xstep):
+                if self.verbose:
+                    print(f'[INFO] Plotting image({iprogress}/{nsteps})...')
+                iprogress = iprogress + 1
+                limits = self.get_limits(y, x, ystep, xstep, self.area_def.height, self.area_def.width)
+                yini = limits[0]
+                yfin = limits[1]
+                xini = limits[2]
+                xfin = limits[3]
+                data = np.ma.array(dataset.variables[name_var][0,yini:yfin,xini:xfin])
+                lats = np.array(dataset.variables['lat'][yini:yfin, xini:xfin])
+                lons = np.array(dataset.variables['lon'][yini:yfin, xini:xfin])
+                if name_var=='CHL':
+                    img = self.show_map_chl_impl(ax,data,lats,lons)
+
+        if self.verbose:
+            print(f'[INFO] Setting colorbar and title...')
+
+        #color bar
+        if name_var=='CHL':
+            cbar = fig.colorbar(img,format="$%.2f$",anchor=(0.1,0.5))
+            cbar.ax.tick_params(labelsize=20)
+            units = r'mg m$^-$$^3$'
+            cbar.set_label(label=f'CHL ({units})', size=20)
+            title = f'Chlorophyll a concentration ({units})'
+            if dateherestr is not None:
+                title = f'{title} - {dateherestr}'
+            ax.set_title(title,fontsize=25,pad=36)
+        fig.savefig(fileout, dpi=150, bbox_inches='tight')
+        dataset.close()
+
+        if self.verbose:
+            print(f'[INFO] Completed')
+
+    ##CREATE FIGURE AND AXES
+    def start_full_figure(self):
+        from matplotlib import pyplot as plt
+        import matplotlib.path as mpath
+        import matplotlib.ticker as mticker
+
+        #start figure and axes
+        crs = self.area_def.to_cartopy_crs()
+        fig, ax = plt.subplots(subplot_kw=dict(projection=crs))
+        fig.set_figwidth(15)
+        fig.set_figheight(15)
+
+        #coastlines
+        ax.coastlines(resolution='50m')
+
+        # Prep circular boundary
+        r_extent = self.area_def.area_extent[1]
+        r_extent *= 1.005
+        circle_path = mpath.Path.unit_circle()
+        circle_path = mpath.Path(circle_path.vertices.copy() * r_extent, circle_path.codes.copy())
+        ax.set_boundary(circle_path)
+        ax.set_frame_on(False)
+
+        #gri lines
+        gl = ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=True)
+        gl.xlocator = mticker.FixedLocator([-180, -135, -90, -45, 0, 45, 90, 135, 180])
+        gl.ylocator = mticker.FixedLocator([65, 70, 75, 80, 85])
+        gl.rigth_labels = True
+        gl.left_labels = True
+        gl.bottom_labels = True
+        gl.top_labels = True
+        gl.xlabel_style = {'size': 15}
+        gl.ylabel_style = {'size': 15}
+        plt.draw()
+        for ea in gl.label_artists:
+            txt = ea.get_text()
+            pos = ea.get_position()
+            if txt == '135°W' and pos[0] < (-2000000):
+                ea.set_visible(True)
+            if txt == '45°E' and pos[0] > 2000000:
+                ea.set_visible(True)
+            if pos[0] == 90:
+                ea.set_visible(True)
+                ea.set_position([135, pos[1]])
+            if pos[0] == -90:
+                ea.set_visible(True)
+                ea.set_position([-45, pos[1]])
+            if pos[1] == 65:
+                ea.set_visible(False)
+
+        return fig,ax
+
+    def get_limits(self, y, x, ystep, xstep, ny, nx):
+        yini = y
+        xini = x
+        yfin = y + ystep
+        xfin = x + xstep
+        if yfin > ny:
+            yfin = ny
+        if xfin > nx:
+            xfin = nx
+
+        limits = [yini, yfin, xini, xfin]
+        return limits
 
     def get_lat_min_spherical(self):
         xmid = math.floor(self.area_def.width / 2)

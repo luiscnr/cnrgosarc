@@ -39,7 +39,7 @@ def get_dates_from_stroptions(start_date_str, end_date_str):
 
 
 def check_folder_organization(organization):
-    valid_options = ['YYYYmmdd', 'YYYY/mm/dd', 'YYYY/jjj']
+    valid_options = ['YYYYmmdd', 'YYYY/mm/dd', 'YYYY/jjj','YYYY']
     if organization in valid_options:
         return True
     else:
@@ -269,6 +269,13 @@ class ARC_OPTIONS:
             if create:
                 if not create_folder(path_year):
                     return None
+                if not create_folder(path_date):
+                    return None
+
+        if org == 'YYYY':
+            year_str = date_here.strftime('%Y')
+            path_date = os.path.join(path_base, year_str)
+            if create:
                 if not create_folder(path_date):
                     return None
 
