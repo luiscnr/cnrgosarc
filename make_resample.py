@@ -1735,7 +1735,7 @@ def do_check44():
 
 
 # ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
-# params: 0: ami; 1 olimage; 2: file_out; 3: granule_index; 4: orbit_index; 5: arc_opt
+# params: 0: ami; 1 olimage; 2: file_out; 3: granule_index; 4: orbit_index; 5: arc_opt; 6:param_mask
 def make_resample_dir_parallel(params):
     ami = params[0]
     ami.make_resample_impl(params[1], params[2], params[3], params[4], params[5], params[6])

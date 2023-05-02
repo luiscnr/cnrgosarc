@@ -677,6 +677,11 @@ class ArcMapInfo:
         olimage.set_reflectance_bands_mask(rrs_bands)
         mask, res_original, line_original = olimage.get_mask_default()
         th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
+
+        print('ATTENTION: results from mask: ',res_original)
+        print(line_original)
+        print(res_original[7])
+
         if res_original[7] <= th_nvalid and th_nvalid >= 0:
             print('[WARNING] No valid pixels were found. Skipping granule...')
             return None
