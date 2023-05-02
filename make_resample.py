@@ -1898,7 +1898,14 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 for fn in os.listdir(path_prod_u):
                     os.remove(os.path.join(path_prod_u, fn))
 
-    if doresample and apply_pool != 0 and len(params_list) > 0:
+    if doresample and apply_pool != 0 and len(params_list)==1:
+        if args.verbose:
+            print(f'[INFO] Starting processs for last pending product')
+        params_here = params_list[0]
+        make_resample_dir_parallel(params_here)
+
+    if doresample and apply_pool != 0 and len(params_list) > 1:
+
         if args.verbose:
             print(f'[INFO]******************************************************************************************')
             print(f'[INFO] Starting parallel processing. Number of products: {len(params_list)}')
@@ -1909,11 +1916,8 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         if apply_pool < 0:
             poolhere = Pool()
         else:
-            print('aqui me debe empezar a hacer el pool...')
             poolhere = Pool(apply_pool)
-            print('y ya me lo hizo')
-        print(params_list)
-        print('OJO LONGITUD DE PARAM LIST: ',len(params_list))
+
         poolhere.map(make_resample_dir_parallel, params_list)
 
     if doresample and apply_pool == 0:
