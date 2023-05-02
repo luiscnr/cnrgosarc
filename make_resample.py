@@ -1909,7 +1909,9 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         if apply_pool < 0:
             poolhere = Pool()
         else:
+            print('aqui me debe empezar a hacer el pool...')
             poolhere = Pool(apply_pool)
+            print('y ya me lo hizo')
         print(params_list)
         print('OJO LONGITUD DE PARAM LIST: ',len(params_list))
         poolhere.map(make_resample_dir_parallel, params_list)
