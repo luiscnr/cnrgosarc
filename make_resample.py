@@ -247,17 +247,61 @@ def main():
         return
 
     if args.mode == 'MONTHLY_CHLA':
-        run_month(arc_opt, 'CHLA', start_date, end_date)
+        operative_mode = arc_opt.get_value_param('PROCESSING', 'operative_mode', False, 'boolean')
+        if operative_mode:
+            date = check_monthly_operative_mode(arc_opt)
+            if date is not None:
+                run_month(arc_opt,'CHLA',date,date)
+        else:
+            run_month(arc_opt, 'CHLA', start_date, end_date)
         return
 
     if args.mode == 'MONTHLY_KD490':
-        run_month(arc_opt, 'TRANSP', start_date, end_date)
+        operative_mode = arc_opt.get_value_param('PROCESSING', 'operative_mode', False, 'boolean')
+        if operative_mode:
+            date = check_monthly_operative_mode(arc_opt)
+            if date is not None:
+                run_month(arc_opt, 'TRANSP', date, date)
+        else:
+            run_month(arc_opt, 'TRANSP', start_date, end_date)
         return
 
+
     if args.mode == 'QL':
-        print('to be done')
+        #print('to be done')
         run_ql(arc_opt, start_date, end_date)
 
+def check_monthly_operative_mode(arc_opt):
+    from datetime import datetime as dt
+    file_base, timeliness = get_monthly_timeliness(arc_opt)
+    day_today = dt.utcnow().day
+    if timeliness=='NR' and day_today>=8:
+        print('[WARNING] Month operative NR files are only processed between days 1 and 8 of the month')
+        return None
+    if timeliness=='NR' and day_today>=8:
+        print('[WARNING] Month operative NT files are only processed after day 8 of the month')
+        return None
+    month_today = dt.utcnow().month
+    year_today = dt.utcnow().year
+    if month_today == 1:
+        month_processing = 12
+        year_processing = year_today - 1
+    else:
+        month_processing = month_today - 1
+        year_processing = year_today
+    date = dt(year_processing, month_processing, 15)
+    return date
+def get_monthly_timeliness(arc_opt):
+    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
+    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
+    if file_base is not None:
+        if os.path.exists(file_base):
+            if timeliness is None:
+                if file_base.find('_NR_') > 0:
+                    timeliness = 'NR'
+                if file_base.find('_NT_') > 0:
+                    timeliness = 'NT'
+    return file_base,timeliness
 
 # mode: CHLA or TRANSP
 def run_month(arc_opt, mode, start_date, end_date):
@@ -274,15 +318,8 @@ def run_month(arc_opt, mode, start_date, end_date):
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
 
-    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
-    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
-    if file_base is not None:
-        if os.path.exists(file_base):
-            if timeliness is None:
-                if file_base.find('_NR_') > 0:
-                    timeliness = 'NR'
-                if file_base.find('_NT_') > 0:
-                    timeliness = 'NT'
+    file_base,timeliness = get_monthly_timeliness(arc_opt)
+
     if args.verbose:
         print(f'[INFO] File base: {file_base}')
         print(f'[INFO] Timeliness: {timeliness}')
@@ -322,11 +359,14 @@ def run_month(arc_opt, mode, start_date, end_date):
 
         nfiles_month = monthrange(date_run.year, date_run.month)[1]
 
-        input_files, ntimeliness = arc_opt.get_list_files_month(options['input_path'],
-                                                                options['input_path_organization'], date_run.year,
-                                                                date_run.month, file_date, file_date_format, timeliness)
+        input_files, input_files_timeliness = arc_opt.get_list_files_month(options['input_path'],
+                                                                           options['input_path_organization'],
+                                                                           date_run.year,
+                                                                           date_run.month, file_date, file_date_format,
+                                                                           timeliness)
 
         nfiles_available = len(input_files)
+        ntimeliness = len(input_files_timeliness)
         if nfiles_available == 0:
             print(
                 f'[ERROR] No files avaiable for computing the {output_type} average for {date_run.year}/{date_run.month}. Skipping...')
@@ -346,7 +386,28 @@ def run_month(arc_opt, mode, start_date, end_date):
         if args.verbose:
             print(f'[INFO] Output file: {file_out}')
 
-        arc_proc.compute_month(date_run.year, date_run.month, timeliness, input_files, file_out)
+        name_source = f'O{sdate}{edate}-{param_name}_monthly-arc-fr.sources'
+        file_source = os.path.join(output_path, name_source)
+        name_source_timeliness = f'O{sdate}{edate}-{param_name}_monthly-arc-fr_{timeliness}.sources'
+        file_source_timeliness = os.path.join(output_path, name_source_timeliness)
+
+        compute_month = True
+        # CHECK IF FILE MUST BE RUN AGAIN
+        if os.path.exists(file_out) and os.path.exists(file_source_timeliness):
+            nsources_prev = 0
+            f1 = open(file_source_timeliness, 'r')
+            for line in f1:
+                if len(line.strip()) > 0:
+                    nsources_prev = nsources_prev + 1
+            f1.close()
+            if nsources_prev == ntimeliness:
+                compute_month = False
+                print(f'[INFO] Month file has already been computed. Skipping...')
+
+        if compute_month:
+            arc_proc.create_source_list(input_files,file_source)
+            arc_proc.create_source_list(input_files_timeliness,file_source_timeliness)
+            arc_proc.compute_month(date_run.year, date_run.month, timeliness, input_files, file_out)
 
         date_run = date_run + timedelta(days=30)
         date_run = date_run.replace(day=15)
@@ -1106,16 +1167,6 @@ def run_integration(arc_opt, start_date, end_date):
                 arc_integration.output_type = 'TRANSP'
                 arc_integration.create_transp_file(output_path, file_out, date_run, timeliness)
 
-            #     fout_end = os.path.join(output_path, name_out_end)
-            #     excluded_variables = ['n_granules', 'sum_weights', 'KD490']
-            #     copy_nc_excluding_variables(fout, fout_end, excluded_variables)
-            # if output_type == 'TRANSP' or output_type == 'OPERATIVE':
-            #     name_out_end = f'O{pl}{datestr}_transp-arc-fr.nc'
-            #     fout_end = os.path.join(output_path, name_out_end)
-            #     excluded_variables = ['n_granules', 'sum_weights', 'RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510',
-            #                           'RRS560', 'RRS620', 'RRS665', 'RRS673_75', 'RRS681_25', 'RRS708_75']
-            #     copy_nc_excluding_variables(fout, fout_end, excluded_variables)
-
         date_run = date_run + timedelta(hours=24)
 
 
@@ -1826,6 +1877,12 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                         poolhere.map(make_resample_dir_parallel, params_list)
                         params_list = []
 
+        #if resample is done, we must delete unzipped file
+        if not dokml and doresample and resample_done:
+            if zp.is_zipfile(prod_path):
+                for fn in os.listdir(path_prod_u):
+                    os.remove(os.path.join(path_prod_u, fn))
+
         if dokml:
             start_date = olimage.get_start_date()
             start_date_s = 'UNKNOWN START DATE'
@@ -1853,6 +1910,8 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             poolhere = Pool()
         else:
             poolhere = Pool(apply_pool)
+        print(params_list)
+        print('OJO LONGITUD DE PARAM LIST: ',len(params_list))
         poolhere.map(make_resample_dir_parallel, params_list)
 
     if doresample and apply_pool == 0:

@@ -43,6 +43,16 @@ class ArcProcessing:
         if os.path.exists(self.file_model):
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
+    def create_source_list(self,list_files,file_out):
+        if os.path.exists(file_out):
+            os.remove(file_out)
+        f1 = open(file_out,'w')
+        for file in list_files:
+            f1.write(file)
+            f1.write('\n')
+        f1.close()
+
+
     def compute_month(self, year, month, timeliness, list_files, file_out):
         section = 'PROCESSING'
         file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')

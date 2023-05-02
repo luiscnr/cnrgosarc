@@ -208,7 +208,8 @@ class ARC_OPTIONS:
         from netCDF4 import Dataset
         ndays = monthrange(year, month)[1]
         list_files = []
-        ntimeliness = 0
+        list_files_timeliness = []
+        #ntimeliness = 0
         for iday in range(1, ndays + 1):
             date_here = dt(year, month, iday)
             folder_date = self.get_folder_date(path_base, org, date_here, False)
@@ -220,14 +221,15 @@ class ARC_OPTIONS:
                 dataset = Dataset(file_out)
                 if 'timeliness' in dataset.ncattrs():
                     if timeliness == dataset.timeliness:
-                        ntimeliness = ntimeliness + 1
+                        #ntimeliness = ntimeliness + 1
+                        list_files_timeliness.append(file_out)
                         print(f'[INFO] File {file_out} is added for computing the average..')
                     else:
                         print(f'[WARNING] File {file_out} is {timeliness} but should be {timeliness}. Added anyway...')
                 dataset.close()
             else:
                 print(f'[WARNING] File {file_out} is not available for computing the average.')
-        return list_files, ntimeliness
+        return list_files, list_files_timeliness
 
     def get_folder_year(self,path_base,date_here,create):
         year_str = date_here.strftime('%Y')
