@@ -1898,15 +1898,9 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 for fn in os.listdir(path_prod_u):
                     os.remove(os.path.join(path_prod_u, fn))
 
-    if doresample and apply_pool != 0 and len(params_list)==1:
-        if args.verbose:
-            print(f'[INFO] Starting processs for last pending product')
-        params_here = params_list[0]
-        for param_h in params_here:
-            print(param_h)
-        #make_resample_dir_parallel(params_here)
 
-    if doresample and apply_pool != 0 and len(params_list) > 1:
+
+    if doresample and apply_pool != 0 and len(params_list) > 0:
 
         if args.verbose:
             print(f'[INFO]******************************************************************************************')

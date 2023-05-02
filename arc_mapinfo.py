@@ -11,9 +11,11 @@ import numpy as np
 import numpy.ma as ma
 from netCDF4 import Dataset
 import warnings
+
 warnings.resetwarnings()
 warnings.simplefilter('ignore', UserWarning)
 warnings.simplefilter('ignore', DeprecationWarning)
+
 
 class ArcMapInfo:
     def __init__(self, arc_options, verbose):
@@ -307,7 +309,7 @@ class ArcMapInfo:
         limits, subareadef = self.get_subarea_def(lats, lons)
         crs = subareadef.to_cartopy_crs()
         from matplotlib.colors import LogNorm
-        img = ax.imshow(data, transform=crs, extent=crs.bounds, origin='upper',norm=LogNorm(vmin=0.001, vmax=100))
+        img = ax.imshow(data, transform=crs, extent=crs.bounds, origin='upper', norm=LogNorm(vmin=0.001, vmax=100))
         return img
 
     def save_full_map_impl(self, fileout, data, lats, lons):
@@ -359,20 +361,18 @@ class ArcMapInfo:
             print(f'[INFO] Saving Quick Look Image from file: {fdata}')
             print(f'[INFO] Variable: {name_var}')
 
-
         dataset = Dataset(fdata)
 
         dateherestr = None
         if 'time' in dataset.variables:
             from datetime import datetime as dt
             from datetime import timedelta
-            datehere = dt(1981,1,1)+timedelta(seconds=float(dataset.variables['time'][0]))
+            datehere = dt(1981, 1, 1) + timedelta(seconds=float(dataset.variables['time'][0]))
             dateherestr = datehere.strftime('%Y-%m-%d')
 
         if self.verbose:
             print(f'[INFO] Date: {dateherestr}')
             print(f'[INFO] Starting figure and axes')
-
 
         fig, ax = self.start_full_figure()
 
@@ -392,25 +392,25 @@ class ArcMapInfo:
                 yfin = limits[1]
                 xini = limits[2]
                 xfin = limits[3]
-                data = np.ma.array(dataset.variables[name_var][0,yini:yfin,xini:xfin])
+                data = np.ma.array(dataset.variables[name_var][0, yini:yfin, xini:xfin])
                 lats = np.array(dataset.variables['lat'][yini:yfin, xini:xfin])
                 lons = np.array(dataset.variables['lon'][yini:yfin, xini:xfin])
-                if name_var=='CHL':
-                    img = self.show_map_chl_impl(ax,data,lats,lons)
+                if name_var == 'CHL':
+                    img = self.show_map_chl_impl(ax, data, lats, lons)
 
         if self.verbose:
             print(f'[INFO] Setting colorbar and title...')
 
-        #color bar
-        if name_var=='CHL':
-            cbar = fig.colorbar(img,format="$%.2f$",anchor=(0.1,0.5))
+        # color bar
+        if name_var == 'CHL':
+            cbar = fig.colorbar(img, format="$%.2f$", anchor=(0.1, 0.5))
             cbar.ax.tick_params(labelsize=20)
             units = r'mg m$^-$$^3$'
             cbar.set_label(label=f'CHL ({units})', size=20)
             title = f'Chlorophyll a concentration ({units})'
             if dateherestr is not None:
                 title = f'{title} - {dateherestr}'
-            ax.set_title(title,fontsize=25,pad=36)
+            ax.set_title(title, fontsize=25, pad=36)
         fig.savefig(fileout, dpi=150, bbox_inches='tight')
         dataset.close()
 
@@ -423,13 +423,13 @@ class ArcMapInfo:
         import matplotlib.path as mpath
         import matplotlib.ticker as mticker
 
-        #start figure and axes
+        # start figure and axes
         crs = self.area_def.to_cartopy_crs()
         fig, ax = plt.subplots(subplot_kw=dict(projection=crs))
         fig.set_figwidth(15)
         fig.set_figheight(15)
 
-        #coastlines
+        # coastlines
         ax.coastlines(resolution='50m')
 
         # Prep circular boundary
@@ -440,7 +440,7 @@ class ArcMapInfo:
         ax.set_boundary(circle_path)
         ax.set_frame_on(False)
 
-        #gri lines
+        # gri lines
         gl = ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=True)
         gl.xlocator = mticker.FixedLocator([-180, -135, -90, -45, 0, 45, 90, 135, 180])
         gl.ylocator = mticker.FixedLocator([65, 70, 75, 80, 85])
@@ -467,7 +467,7 @@ class ArcMapInfo:
             if pos[1] == 65:
                 ea.set_visible(False)
 
-        return fig,ax
+        return fig, ax
 
     def get_limits(self, y, x, ystep, xstep, ny, nx):
         yini = y
@@ -677,10 +677,6 @@ class ArcMapInfo:
         olimage.set_reflectance_bands_mask(rrs_bands)
         mask, res_original, line_original = olimage.get_mask_default()
         th_nvalid = arc_opt.get_value_param(section, 'th_nvalid', -1, 'int')
-
-        print('ATTENTION: results from mask: ',res_original)
-        print(line_original)
-        print(res_original[7])
 
         if res_original[7] <= th_nvalid and th_nvalid >= 0:
             print('[WARNING] No valid pixels were found. Skipping granule...')
