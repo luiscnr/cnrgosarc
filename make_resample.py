@@ -1902,7 +1902,9 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         if args.verbose:
             print(f'[INFO] Starting processs for last pending product')
         params_here = params_list[0]
-        make_resample_dir_parallel(params_here)
+        for param_h in params_here:
+            print(param_h)
+        #make_resample_dir_parallel(params_here)
 
     if doresample and apply_pool != 0 and len(params_list) > 1:
 
