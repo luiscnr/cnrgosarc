@@ -738,6 +738,9 @@ class ArcIntegration():
         if self.verbose:
             print(f'[INFO] Creating basic average file: {file_var}')
 
+        if os.path.exists(file_var):
+            os.remove(file_var)
+
         min_value = 0.0
         max_value = 1.0
         if var_avg_name in self.rrs_variables_all:
@@ -828,6 +831,10 @@ class ArcIntegration():
     def create_basic_mask(self, file_mask, infof, nvalidgranules):
         if self.verbose:
             print(f'[INFO] Creating basic mask file: {file_mask}')
+
+        if os.path.exists(file_mask):
+            os.remove(file_mask)
+
         datasetout = self.create_nc_file_out_avg(file_mask)
 
         var_sensor_mask = datasetout.variables['SENSORMASK']

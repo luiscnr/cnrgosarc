@@ -1156,6 +1156,8 @@ def run_integration(arc_opt, start_date, end_date):
                 arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
                 file_out = os.path.join(output_path, name_out_end)
+                if os.path.exists(file_out):
+                    os.remove(file_out)
                 arc_integration.output_type = 'RRS'
                 arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness)
 
@@ -1164,6 +1166,8 @@ def run_integration(arc_opt, start_date, end_date):
                 arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_transp-arc-fr.nc'
                 file_out = os.path.join(output_path, name_out_end)
+                if os.path.exists(file_out):
+                    os.remove(file_out)
                 arc_integration.output_type = 'TRANSP'
                 arc_integration.create_transp_file(output_path, file_out, date_run, timeliness)
 
@@ -1174,6 +1178,7 @@ def run_chla(arc_opt, start_date, end_date):
     options = arc_opt.get_processing_options()
     if options is None:
         return
+
     ##ONLY CHLA MODE IS IMPLEMENTED
     output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
     overwrite = arc_opt.get_value_param('PROCESSING', 'overwrite', False, 'boolean')
