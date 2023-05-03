@@ -2,6 +2,7 @@ import math, os
 import configparser
 import shutil
 
+import matplotlib.pyplot as plt
 from pyresample.geometry import AreaDefinition
 from pyresample import save_quicklook, SwathDefinition, utils, image
 
@@ -412,12 +413,17 @@ class ArcMapInfo:
                 title = f'{title} - {dateherestr}'
             ax.set_title(title, fontsize=25, pad=36)
         fig.savefig(fileout, dpi=150, bbox_inches='tight')
+        self.close_figure(fig)
         dataset.close()
 
         if self.verbose:
             print(f'[INFO] Completed')
 
     ##CREATE FIGURE AND AXES
+    def close_figure(self,fig):
+        from matplotlib import pyplot as plt
+        plt.close(fig)
+
     def start_full_figure(self):
         from matplotlib import pyplot as plt
         import matplotlib.path as mpath
