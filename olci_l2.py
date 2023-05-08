@@ -325,8 +325,13 @@ class OLCI_L2():
 
         nmasked = np.count_nonzero(flag_mask)
         nvalid = ntotal - nmasked
-        pvalid = (nvalid / nwater2) * 100
-        print(f'[INFO] Number of non-masked pixels: {nvalid} ({pvalid:.2f}%)')
+        if nwater2==0:
+            pvalid = 0
+            print(f'[INFO] Number of non-masked pixels: {nvalid} ({pvalid:.2f}%)')
+            print(f'----------------------------------------------> {file_path}')
+        else:
+            pvalid = (nvalid / nwater2) * 100
+            print(f'[INFO] Number of non-masked pixels: {nvalid} ({pvalid:.2f}%)')
 
         # lines = ['Source;Width;Height;NTotal;NFlagged;NWater1;NWater2;NValid;PValid']
         res = [self.name_source, self.width, self.height, ntotal, nflagged, nwater1, nwater2, nvalid, pvalid]
