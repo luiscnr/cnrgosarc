@@ -393,6 +393,23 @@ class ArcProcessing:
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if nvalid>500000:
+                    self.ystep = 500
+                    self.xstep = 500
+                    break
+
+
+        iprogress = 1
+        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        for y in range(0, self.height, self.ystep):
+            for x in range(0, self.width, self.xstep):
+                iprogress = iprogress + 1
+                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
+                nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
                 if self.verbose:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 if nvalid > 0:
