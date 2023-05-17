@@ -1158,6 +1158,13 @@ class ArcIntegration():
 
         return info_agrup
 
+    def check_datasets_attrs(self,dataset):
+        at_list = ['rel_orbit','y_min','y_max','x_min','x_max','n_total','n_valid','granule_index','start_date']
+        at_list_dataset = dataset.ncattrs()
+        for at in at_list:
+            if at not in at_list_dataset:
+                return False
+        return True
     def get_info(self):
         self.info = {}
         for name in os.listdir(self.dir_input):
@@ -1171,6 +1178,11 @@ class ArcIntegration():
                 dataset = Dataset(finput)
             except:
                 print(f'[WARNING] File: {finput} is not a valid NetCDF4 dataset. Skipping...')
+                continue
+
+            b = self.check_dataset_attrs(dataset)
+            if not b:
+                print(f'[WARNING] File: {finput} is not a valid resampled dataset. Skipping...')
                 continue
 
             self.info[name] = {
