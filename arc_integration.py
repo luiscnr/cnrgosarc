@@ -622,6 +622,9 @@ class ArcIntegration():
             if self.apply_pool < 0:
                 poolhere = Pool()
             else:
+                #POOL THRESHOLD
+                if ngood>5000000:
+                    self.apply_pool = 7
                 poolhere = Pool(self.apply_pool)
 
             for var_avg_name in self.average_variables:

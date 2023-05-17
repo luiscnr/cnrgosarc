@@ -380,7 +380,7 @@ class ArcProcessing:
             var_diff = datasetout.variables['DIFF']
 
         if self.verbose:
-            print(f'[INFO] Computing chla. YStep: {self.ystep} XStep: {self.xstep}')
+            print(f'[INFO] Checking chla pixels: YStep: {self.ystep} XStep: {self.xstep}')
 
         iprogress = 1
         iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
@@ -393,12 +393,15 @@ class ArcProcessing:
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if self.verbose:
+                    print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 if nvalid>500000:
                     self.ystep = 500
                     self.xstep = 500
                     break
 
-
+        if self.verbose:
+            print(f'[INFO] Computing chla: YStep: {self.ystep} XStep: {self.xstep}')
         iprogress = 1
         iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
         for y in range(0, self.height, self.ystep):
