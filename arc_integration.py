@@ -1161,8 +1161,11 @@ class ArcIntegration():
     def check_dataset_attrs(self,dataset):
         at_list = ['rel_orbit','y_min','y_max','x_min','x_max','n_total','n_valid','granule_index','start_date']
         at_list_dataset = dataset.ncattrs()
+        for atd in at_list_dataset:
+            print(f'[INFO] Dataset include attribute:{atd}:')
         for at in at_list:
             if at not in at_list_dataset:
+                print(f'[ERROR] Attribute {at} is not available in dataset')
                 return False
         return True
 
