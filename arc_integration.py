@@ -623,7 +623,7 @@ class ArcIntegration():
                 poolhere = Pool()
             else:
                 #POOL THRESHOLD
-                if ngood>5000000:
+                if ngood>2000000:
                     self.apply_pool = 7
                 poolhere = Pool(self.apply_pool)
 
@@ -1161,8 +1161,6 @@ class ArcIntegration():
     def check_dataset_attrs(self,dataset):
         at_list = ['relative_orbit','resampled_ymin','resampled_ymax','resampled_xmin','resampled_xmax','resampled_n_total','resampled_n_valid','granule_index','start_date']
         at_list_dataset = dataset.ncattrs()
-        for atd in at_list_dataset:
-            print(f'[INFO] Dataset include attribute:{atd}:')
         for at in at_list:
             if at not in at_list_dataset:
                 print(f'[ERROR] Attribute {at} is not available in dataset')
