@@ -985,7 +985,6 @@ def check_py():
     except:
         print('[ERROR] shapely was not found')
         check = False
-
     try:
         import multiprocessing
         print(f'[INFO] Multiprocessing is allowed with {os.cpu_count()} CPUs')

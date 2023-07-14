@@ -38,6 +38,7 @@ class ArcMapInfo:
 
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
 
+    #option config_file for adding globat attributes
     def create_nc_filegrid(self, ofname, createMask, createLatLong):
 
         try:
@@ -49,17 +50,19 @@ class ArcMapInfo:
 
         OFILE.createDimension('y', self.area_def.height)  # ny
         OFILE.createDimension('x', self.area_def.width)  # nx
+        OFILE.createDimension('time', 1)
 
         # variable stereographic
         stereographic = OFILE.createVariable('stereographic', 'i4')
         stereographic.grid_mapping_name = "polar_stereographic"
         stereographic.latitude_of_projection_origin = 90.0
-        # stereographic.longitude_of_projection_origin = -45.0
-        # stereographic.scale_factor_at_projection_origin = 1.0
+        stereographic.longitude_of_projection_origin = -45.0
         stereographic.standard_parallel = 70.0
         stereographic.straight_vertical_longitude_from_pole = -45.0
         stereographic.false_easting = 0.0
         stereographic.false_northing = 0.0
+        stereographic.earth_radius = 6378273
+        stereographic.proj4 = '+proj=stere +lon_0=-45 +lat_0=90 +k=1 +R=6378273 +no_defs'
 
         # y
         satellite_y = OFILE.createVariable('y', 'f4', ('y',), zlib=True, shuffle=True, complevel=4)
@@ -81,6 +84,15 @@ class ArcMapInfo:
         array = np.linspace(xmin, xmax, self.area_def.width)
         satellite_x[:] = [array[:]]
 
+        # time
+        time = OFILE.createVariable('time', 'i4', ('time',), zlib=True, shuffle=True, complevel=4)
+        time.long_name = 'reference time'
+        time.standard_name = 'time'
+        time.axis = 'T'
+        time.calendar = 'Gregorian'
+        time.units = 'seconds since 1981-01-01 00:00:00'
+        time[0] = 0
+
         if createLatLong:
             # latitude
             satellite_latitude = OFILE.createVariable('lat', 'f4', ('y', 'x'), zlib=True, shuffle=True,
@@ -88,9 +100,9 @@ class ArcMapInfo:
             satellite_latitude.units = "degrees_north"
             satellite_latitude.standard_name = "latitude"
             satellite_latitude.long_name = "latitude"
-            satellite_latitude.valid_min = self.get_lat_min()
-            satellite_latitude.valid_max = 90.0
-            satellite_latitude.comment = "Spherical min. latidude: 65 degrees north"
+            # satellite_latitude.valid_min = self.get_lat_min()
+            # satellite_latitude.valid_max = 90.0
+            satellite_latitude.comment = "Spherical latidude from 65 to 90 degrees north"
 
             # longitude
             satellite_longitude = OFILE.createVariable('lon', 'f4', ('y', 'x'), zlib=True, shuffle=True,
@@ -98,16 +110,18 @@ class ArcMapInfo:
             satellite_longitude.units = "degrees_east"
             satellite_longitude.standard_name = "longitude"
             satellite_longitude.long_name = "longitude"
-            satellite_longitude.valid_min = -180.0
-            satellite_longitude.valid_max = 180.0
+            # satellite_longitude.valid_min = -180.0
+            # satellite_longitude.valid_max = 180.0
+            satellite_longitude.comment = "Spherical longitude from -180 to 180 degrees east"
 
         # mask
         if createMask:
             min_lat = self.get_lat_min_spherical()
-            satellite_mask = OFILE.createVariable('SENSORMASK', 'i2', ('y', 'x'), fill_value=-999, zlib=True,
+            satellite_mask = OFILE.createVariable('SENSORMASK', 'i2', ('time', 'y', 'x'), fill_value=-999, zlib=True,
                                                   shuffle=True, complevel=4)
             satellite_mask.long_name = f'Sensor Mask'
-            satellite_mask.comment = 'OLCI Sentinel-3A=1; OLCI Sentinel-3B=2. Each SENSORMASK pixel is the sum of all available sensor values. For example, if a pixel is observed by OLCI Sentinel-3A and OLCI Sentinel-3B then SENSORMASK = 3. Pixels with latitude lower than 65 degrees are masked'
+            satellite_mask.comment = 'Each SENSORMASK pixel is the sum of all available sensor values. Pixels with ' \
+                                     'latitude lower than 65 degrees are masked '
             satellite_mask.grid_mapping = "stereographic"
             satellite_mask.coordinates = "longitude latitude"
 
@@ -144,7 +158,8 @@ class ArcMapInfo:
                     mask[lats < min_lat] = -999
                     # mask[np.where((lats >= 70) & (lats <= 75))] = 10
                     # mask[np.where((lons >= 10) & (lons <= 20))] = mask[np.where((lons >= 10) & (lons <= 20))] + 10
-                    satellite_mask[yini:yend, xini:xend] = [mask[:, :]]
+                    satellite_mask[0, yini:yend, xini:xend] = [mask[:, :]]
+
 
         OFILE.close()
 
@@ -420,7 +435,7 @@ class ArcMapInfo:
             print(f'[INFO] Completed')
 
     ##CREATE FIGURE AND AXES
-    def close_figure(self,fig):
+    def close_figure(self, fig):
         from matplotlib import pyplot as plt
         plt.close(fig)
 
@@ -554,6 +569,16 @@ class ArcMapInfo:
                                   area_info['width'], area_info['height'], extent)
         return area_def
 
+    def set_area_definition(self, area_id):
+        self.area_def = self.get_area_definition(area_id)
+        if area_id == 'polar_stereographic_4km':
+            self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
+        if self.verbose:
+            print('--------------------------------------------------------------------------------------------')
+            print('UPDATE AREA DEFINITION')
+            self.print_area_def_info()
+            print('---------------------------------------------------------------------------------------------')
+
     def get_projection_info(self, proj_id):
         projections = {
             'npsn': '+proj=stere +lat_0=90 +lon_0=-45 +k_0=1 +x_0=0 +y_0=0 +ellps=WGS84',
@@ -607,6 +632,13 @@ class ArcMapInfo:
                 'height': 1892,
                 'extent': (-2837300, -2837300, 2837200, 2837200)
             },
+            'polar_stereographic_4km': {
+                'description': 'WGS 84 / Polar Stereographic North',
+                'proj_id': 'polarn',
+                'width': 1375,
+                'height': 1375,
+                'extent': (-2752500, 2747500, 2747500, -2752500)
+            },
             'polar_stereographic_600m': {
                 'description': 'WGS 84 / Polar Stereographic North',
                 'proj_id': 'polarn',
@@ -627,21 +659,19 @@ class ArcMapInfo:
     def get_subarea_def(self, lats, lons):
 
         xcoords, ycoords = self.area_def.get_array_coordinates_from_lonlat(lons, lats)
-        # print(xcoords.shape)
-        # print(ycoords.shape)
 
         xmin = np.floor(np.min(xcoords))
         if xmin < 0:
             xmin = 0
         xmax = np.ceil(np.max(xcoords)) + 1
-        if xmax >= self.area_def.width:
-            xmax = self.area_def.width - 1
+        if xmax > self.area_def.width:
+            xmax = self.area_def.width
         ymin = np.floor(np.min(ycoords))
         if ymin < 0:
             ymin = 0
         ymax = np.ceil(np.max(ycoords)) + 1
-        if ymax >= self.area_def.height:
-            ymax = self.area_def.height - 1
+        if ymax > self.area_def.height:
+            ymax = self.area_def.height
         # print(xmin)
         # print(xmax)
         # print(ymin)
@@ -848,6 +878,132 @@ class ArcMapInfo:
             print(f'[INFO][{granuleindex}] Completed. Output file: {fileout}')
 
         return line_output
+
+    def make_resample_from_file_orig_multi(self, input_file, output_file, date_here):
+
+        if not os.path.exists(self.ifile_base):
+            print(f'[ERROR] File grid base: {self.ifile_base} does not exist')
+            return
+        if self.verbose:
+            print('[INFO] Starting resample...')
+            print(f'[INFO] Output file: {output_file}')
+
+        datasetout = self.copy_nc_base(output_file)
+
+        if datasetout is None:
+            return datasetout
+
+        if self.verbose:
+            print(f'[INFO] Adding variables from file orig: {input_file}')
+
+        ncdataset = Dataset(input_file, 'r')
+        vartime = False
+        for name in ncdataset.variables:
+            if name.lower().startswith('lat'):
+                variable_lat = name
+            if name.lower().startswith('lon'):
+                variable_lon = name
+            if name.lower().startswith('time'):
+                vartime = True
+
+        lat_array = ncdataset.variables[variable_lat][0:600]
+        lon_array = ncdataset.variables[variable_lon][:]
+        nlon = len(lon_array)
+        xstep = 600
+
+        for name, variable in ncdataset.variables.items():
+            if name.lower().startswith('lat') or name.lower().startswith('lon') or name.lower().startswith('time'):
+                continue
+            if name.startswith('ZSD') or name.startswith('SPM') or name=='flags' or name.endswith('uncertainty'):
+                continue
+
+            if self.verbose:
+                print(f'[INFO]  Adding variable: {name}')
+
+            var_output = datasetout.createVariable(name, 'f4', ('time', 'y', 'x'), fill_value=-999.0, zlib=True,
+                                                   complevel=4,
+                                                   shuffle=True)
+
+            var_output.stardard_name = ncdataset[name].standard_name
+            var_output.type = ncdataset[name].type
+            var_output.coordinates = 'time lon lat'
+            var_output.grid_mapping = 'stereographic'
+
+            valid_min_at = None
+            valid_max_at = None
+            missing_value_at = -999.0
+            if 'valid_min' in ncdataset[name].ncattrs():
+                valid_min_at = ncdataset[name].valid_min
+            elif 'min_val' in ncdataset[name].ncattrs():
+                valid_min_at = ncdataset[name].min_val
+
+            if 'valid_max' in ncdataset[name].ncattrs():
+                valid_max_at = ncdataset[name].valid_min
+            elif 'max_val' in ncdataset[name].ncattrs():
+                valid_max_at = ncdataset[name].max_val
+
+            if 'missing_value' in ncdataset[name].ncattrs():
+                missing_value_at = ncdataset[name].missing_value
+            elif '_FillValue' in ncdataset[name].ncattrs():
+                missing_value_at = ncdataset[name]._FillValue
+
+            var_output.valid_min = valid_min_at
+            var_output.valid_max = valid_max_at
+            var_output.missing_value = missing_value_at
+
+            if name.startswith('RRS'):
+                var_output.long_name = f'Remote Sensing Reflectance at {name.lower()}'
+                var_output.units = 'sr^-1'
+
+            if name=='KD490':
+                var_output.long_name = 'Diffuse Attenuation Coefficient at 490nm'
+                var_output.units = 'm^-1'
+
+
+
+            for x in range(0, nlon, xstep):
+                yini = 0
+                yfin = 600
+                xini = x
+                xfin = x + xstep
+                if xfin > nlon:
+                    xfin = nlon
+                # height = (yfin - yini)
+                # width = (xfin - xini)
+                # shape = (height, width)
+                lon_here = lon_array[xini:xfin]
+                lat_here = lat_array[yini:yfin]
+                lat2D, lon2D = self.get_2D_lat_lon_arrays(lat_here, lon_here)
+                limits, sub_area_def = self.get_subarea_def(lat2D, lon2D)
+                swath_def = SwathDefinition(lons=lon2D, lats=lat2D)
+                valid_input_index, valid_output_index, index_array, distance_array = get_neighbour_info(swath_def,
+                                                                                                        sub_area_def,
+                                                                                                        6800,
+                                                                                                        neighbours=1)
+                rrsarray = np.array(variable[0, yini:yfin, xini:xfin])
+                result = get_sample_from_neighbour_info('nn', sub_area_def.shape, rrsarray, valid_input_index,
+                                                        valid_output_index, index_array,
+                                                        distance_array=distance_array,
+                                                        fill_value=-999)
+                ymin = int(limits[2])
+                ymax = int(limits[3])
+                xmin = int(limits[0])
+                xmax = int(limits[1])
+                var_output_array = np.array(var_output[0, ymin:ymax, xmin:xmax])
+                var_output_array[result != -999] = result[result != -999]
+                var_output[0, ymin:ymax, xmin:xmax] = var_output_array[:, :]
+        from datetime import datetime as dt
+        if date_here is not None:
+            nsec = (date_here-dt(1970,1,1)).total_seconds()
+            datasetout.variables['time'][0] = [np.int(nsec)]
+            datasetout.start_date = date_here.strftime('%Y-%m-%d')
+            datasetout.stop_date = date_here.strftime('%Y-%m-%d')
+        cdate = dt.utcnow()
+        datasetout.creation_date = cdate.strftime('%Y-%m-%d')
+        datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        ncdataset.close()
+        datasetout.close()
 
     def make_resample_pml(self, fpml, fileout):
         if self.verbose:

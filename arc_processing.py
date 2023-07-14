@@ -300,8 +300,15 @@ class ArcProcessing:
             print('[INFO] Checking RRS bands')
         for band in rrs_bands:
             if band not in ncsat.variables:
-                print(f'[ERROR] RRS variable {band} is not available. Exiting...')
-                return
+                if band=='RRS442_5':
+                    if 'RRS443' in ncsat.variables:
+                        rrs_bands[0] = 'RRS443'
+                    else:
+                        print(f'[ERROR] RRS variable {band} is not available. Exiting...')
+                        return
+                else:
+                    print(f'[ERROR] RRS variable {band} is not available. Exiting...')
+                    return
         var443 = ncsat.variables[rrs_bands[0]]
         var490 = ncsat.variables[rrs_bands[1]]
         var560 = ncsat.variables[rrs_bands[2]]
@@ -364,10 +371,11 @@ class ArcProcessing:
         datasetout.variables['time'][0] = [np.int32(timeseconds)]
 
 
-        if self.verbose:
-            print(f'[INFO] Getting sensor mask...')
-        sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
-        datasetout.variables['SENSORMASK'] = [sensor_mask_array]
+        if 'SENSORMASK' in ncsat.variables:
+            if self.verbose:
+                print(f'[INFO] Getting sensor mask...')
+            sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
+            datasetout.variables['SENSORMASK'] = [sensor_mask_array]
 
         if self.verbose:
             print(f'[INFO] Getting chl variable...')
@@ -431,6 +439,15 @@ class ArcProcessing:
         ncsat.close()
         if ncgrid is not None:
             ncgrid.close()
+
+        # month july
+        print('TEMPORAL MODIFICATION FOR MONTH.......')
+        sdate = dt(2022, 8, 1)
+        timeseconds = (sdate - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+        datasetout.variables['time'][0] = [np.int32(timeseconds)]
+        datasetout.start_date = '2022-08-01'
+        datasetout.stop_date = '2022-08-31'
+
         datasetout.close()
         if self.verbose:
             print('[INFO] Chla computation completed. ')
@@ -464,17 +481,28 @@ class ArcProcessing:
         at_dict = dict(options['GLOBAL_ATTRIBUTES'])
         if timeliness is None:
             return at_dict
+
+        sensor = 'Ocean and Land Colour Instrument'
+        if 'sensor' in at_dict.keys():
+            sensor = at_dict['sensor']
+
         if self.output_type == 'CHLA':
             at_dict['parameter'] = 'Chlorophyll-a concentration'
             at_dict['parameter_code'] = 'PLANKTON'
             if timeliness == 'NR':
                 at_dict['timeliness'] = 'NR'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
-                at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_nrt_l3-olci-300m_P1D'
+                if sensor=='Ocean and Land Colour Instrument':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_nrt_l3-olci-300m_P1D'
+                if sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_nrt_l3-multi-4km_P1D'
             if timeliness == 'NT':
                 at_dict['timeliness'] = 'NT'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
-                at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D'
+                if sensor == 'Ocean and Land Colour Instrument':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D'
+                if sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_my_l3-multi-4km_P1D'
 
         if self.output_type == 'TRANSP':  # ONLY NRT MONTHLY
             at_dict['parameter'] = 'Diffuse attenuation coefficient at 490nm'
@@ -512,7 +540,7 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = -999
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
+                var.coordinates = 'time lon lat'
                 var.long_name = "Chlorophyll a concentration"
                 var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
                 var.type = "surface"
@@ -520,7 +548,11 @@ class ArcProcessing:
                 var.missing_value = -999.0
                 var.valid_min = 0.003
                 var.valid_max = 100.0
-                var.comment = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) Algorithm"
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.comment = "OLCI WFR - Gaussian Processor Regressor (GPR) Algorithm"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.comment = "OC-CCI v6 - Gaussian Processor Regressor (GPR) Algorithm"
+
 
         if self.output_type == 'COMPARISON':
             if self.verbose:
@@ -555,16 +587,24 @@ class ArcProcessing:
         if self.output_type == 'CHLA':
             if timeliness == 'NR':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
-                datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-olci-300m_P1M'
+                if datasetout.sensor=='Ocean and Land Colour Instrument':
+                    datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-olci-300m_P1M'
+                if datasetout.sensor=='ESA Ocean Colour Climate Initiative v6':
+                    datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-multi-4km_P1M'
             if timeliness == 'NT':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_MY_009_124'
-                datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_my_l4-olci-300m_P1M'
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_my_l4-olci-300m_P1M'
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_my_l4-multi-4km_P1M'
 
         if self.output_type == 'TRANSP':
             if timeliness == 'NR':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
-                datasetout.title = 'cmems_obs-oc_arc_bgc-transp_nrt_l4-olci-300m_P1M'
-
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    datasetout.title = 'cmems_obs-oc_arc_bgc-transp_nrt_l4-olci-300m_P1M'
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    datasetout.title = 'cmems_obs-oc_arc_bgc-transp_nrt_l4-multi-4km_P1M'
         # CHLA
         if self.output_type == 'CHLA':
             if 'CHL' not in datasetout.variables:
@@ -574,7 +614,7 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = -999
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
+                var.coordinates = 'time lon lat'
                 var.long_name = "Chlorophyll a concentration"
                 var.standard_name = "mass_concentration_of_chlorophyll_a_in_sea_water"
                 var.type = "surface"
@@ -582,7 +622,10 @@ class ArcProcessing:
                 var.missing_value = -999.0
                 var.valid_min = 0.003
                 var.valid_max = 100.0
-                var.comment = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) Algorithm"
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.comment = "OLCI - WFR STANDARD PROCESSOR - Gaussian Processor Regressor (GPR) Algorithm"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.comment = "MULTI - OC-CCI v6 - Gaussian Processor Regressor (GPR) Algorithm"
                 var.cell_methods = "time: mean (interval: 1 month  comment: sampled instantaneously)"
 
             if 'CHL_count' not in datasetout.variables:
@@ -590,8 +633,11 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
-                var.long_name = "OLCI Number Of Observations Of Monthly Chlorophyll a concentration"
+                var.coordinates = 'time lon lat'
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.long_name = "OLCI Number Of Observations Of Monthly Chlorophyll a concentration"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.long_name = "MULTI Number Of Observations Of Monthly Chlorophyll a concentration"
                 var.type = "surface"
                 var.units = "1"
                 var.missing_value = -999.0
@@ -603,8 +649,11 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
-                var.long_name = "OLCI Standard Deviation Of Monthly Chlorophyll a concentration"
+                var.coordinates = 'time lon lat'
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.long_name = "OLCI Standard Deviation Of Monthly Chlorophyll a concentration"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.long_name = "MULTI Standard Deviation Of Monthly Chlorophyll a concentration"
                 var.type = "surface"
                 var.units = "milligram m^-3"
                 var.missing_value = -999.0
@@ -620,15 +669,21 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = -999
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
-                var.long_name = "OLCI Diffuse Attenuation Coefficient at 490nm"
+                var.coordinates = 'time lon lat'
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.long_name = "OLCI Diffuse Attenuation Coefficient at 490nm"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.long_name = "MULTI Diffuse Attenuation Coefficient at 490nm"
                 var.standard_name = "volume_attenuation_coefficient_of_downwelling_radiative_flux_in_sea_water"
                 var.type = "surface"
                 var.units = "m^-1"
                 var.missing_value = -999.0
                 var.valid_min = 0.0
                 var.valid_max = 10.0
-                var.comment = "OLCI - WFR STANDARD PROCESSOR"
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.comment = "OLCI - WFR STANDARD PROCESSOR"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.comment = "MULTI - OC-CCI v6"
                 var.cell_methods = "time: mean (interval: 1 month  comment: sampled instantaneously)"
 
             if 'KD490_count' not in datasetout.variables:
@@ -636,8 +691,11 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
-                var.long_name = "OLCI Number Of Observations Of Monthly Diffuse Attenuation Coefficient at 490nm"
+                var.coordinates = 'time lon lat'
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.long_name = "OLCI Number Of Observations Of Monthly Diffuse Attenuation Coefficient at 490nm"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.long_name = "MULTI Number Of Observations Of Monthly Diffuse Attenuation Coefficient at 490nm"
                 var.type = "surface"
                 var.units = "1"
                 var.missing_value = -999.0
@@ -649,8 +707,11 @@ class ArcProcessing:
                                                 complevel=6)
                 var[:] = 0
                 var.grid_mapping = 'stereographic'
-                var.coordinates = 'lon lat'
-                var.long_name = "OLCI Standard Deviation Of Monthly Diffuse Attenuation Coefficient at 490nm"
+                var.coordinates = 'time lon lat'
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
+                    var.long_name = "OLCI Standard Deviation Of Monthly Diffuse Attenuation Coefficient at 490nm"
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    var.long_name = "MULTI Standard Deviation Of Monthly Diffuse Attenuation Coefficient at 490nm"
                 var.type = "surface"
                 var.units = "m^-1"
                 var.missing_value = -999.0

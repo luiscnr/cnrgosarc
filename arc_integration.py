@@ -106,17 +106,28 @@ class ArcIntegration():
         at_dict = dict(options['GLOBAL_ATTRIBUTES'])
         if timeliness is None:
             return at_dict
+
+        sensor = 'Ocean and Land Colour Instrument'
+        if 'sensor' in at_dict.keys():
+            sensor = at_dict['sensor']
+
         if self.output_type == 'RRS':
             at_dict['parameter'] = 'Remote Sensing Reflectance'
             at_dict['parameter_code'] = 'RRS'
             if timeliness == 'NR':
                 at_dict['timeliness'] = 'NR'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
-                at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D'
+                if sensor=='Ocean and Land Colour Instrument':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D'
+                if sensor=='ESA Ocean Colour Climate Initiative v6':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_nrt_l3-multi-4km_P1D'
             if timeliness == 'NT':
                 at_dict['timeliness'] = 'NT'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
-                at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_my_l3-olci-300m_P1D'
+                if sensor=='Ocean and Land Colour Instrument':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_my_l3-olci-300m_P1D'
+                if sensor=='ESA Ocean Colour Climate Initiative v6':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_my_l3-multi-4km_P1D'
 
         if self.output_type == 'TRANSP':
             at_dict['parameter'] = 'Diffuse attenuation coefficient at 490nm'
@@ -124,11 +135,17 @@ class ArcIntegration():
             if timeliness == 'NR':
                 at_dict['timeliness'] = 'NR'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
-                at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_nrt_l3-olci-300m_P1D'
+                if sensor=='Ocean and Land Colour Instrument':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_nrt_l3-olci-300m_P1D'
+                if sensor=='ESA Ocean Colour Climate Initiative v6':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_nrt_l3-multi-4km_P1D'
             if timeliness == 'NT':
                 at_dict['timeliness'] = 'NT'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
-                at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_my_l3-olci-300m_P1D'
+                if sensor == 'Ocean and Land Colour Instrument':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_my_l3-olci-300m_P1D'
+                if sensor == 'ESA Ocean Colour Climate Initiative v6':
+                    at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_my_l3-multi-4km_P1D'
 
         return at_dict
 
@@ -162,7 +179,8 @@ class ArcIntegration():
         if datasetout is None:
             return datasetout
 
-        ##global attributes
+
+        create_variables = True
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib is None, atribs ard defined in file base
             for at in atribs:
@@ -170,6 +188,11 @@ class ArcIntegration():
                     datasetout.setncattr('Conventions', atribs[at])
                 else:
                     datasetout.setncattr(at, atribs[at])
+                if at == 'sensor' and atribs[at]=='ESA Ocean Colour Climate Initiative v6':
+                    create_variables = False
+
+        if not create_variables:
+            return datasetout
 
         ##create rrs variables
         if self.output_type == 'RRS' or self.output_type == 'TEST' or self.output_type == 'OPERATIVE':
@@ -225,8 +248,10 @@ class ArcIntegration():
                                 'ADJAC, RWNEG_O2, RWNEG_O3, RWNEG_O4, RWNEG_O5, RWNEG_O6, RWNEG_O7, RWNEG_O8) '
             var.source = 'OLCI - Level2'
 
-        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE':
+        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE' or self.output_type=='NONE':
             return datasetout
+
+
 
         if self.verbose:
             print(f'[INFO] Creating other bands...')

@@ -55,19 +55,29 @@ class ARC_OPTIONS:
         # options.read(config_file)
         self.options = options
 
+    def add_moi_credentials(self,options):
+        if options is None:
+            return options
+        section = 'GENERAL'
+
+        options['moi_user'] = self.get_value_param(section,'moi_user','lgonzalezvilas','str')
+        options['moi_pass'] = self.get_value_param(section,'moi_pass','MegaRoma17!','str')
+
+        return options
+
     def get_resample_options(self):
         # input path, output path, path organizations, platform, start date, end date
         section = 'RESAMPLE'
         options = self.get_basic_options(section)
+        if options is None:
+            return options
+        if options['platform']=='MULTI':
+            return options
         unzip_path = self.get_path(section, 'unzip_path', False)
         if unzip_path is None:
             unzip_path = options['input_path']
             print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
         options['unzip_path'] = unzip_path
-
-
-
-
 
         return options
 
@@ -126,6 +136,9 @@ class ARC_OPTIONS:
             return None
 
     def get_path(self, section, key, create):
+        if not self.options.has_option(section,key):
+            print(f'[WARNING] {key} is not available in {section}')
+            return None
         path = self.options[section][key]
         if not os.path.exists(path):
             if not create:
@@ -143,7 +156,7 @@ class ARC_OPTIONS:
         platform = 'S3'
         if self.options.has_option(section, 'platform'):
             platform = self.options[section]['platform']
-            valid_values = ['S3', 'S3A', 'S3B']
+            valid_values = ['S3', 'S3A', 'S3B','MULTI']
             if not platform in valid_values:
                 print(f'[ERROR] Platform value {platform} is not valid (valid options: S3, S3A, S3B')
                 return None
@@ -170,6 +183,11 @@ class ARC_OPTIONS:
             return value
         if type == 'int':
             return int(value)
+        if type == 'file':
+            if not os.path.exists(value):
+                return default
+            else:
+                return value
         if type == 'boolean':
             if value == '1' or value.upper() == 'TRUE':
                 return True
