@@ -248,8 +248,8 @@ def run_resample(arc_opt, start_date, end_date):
         file_output = os.path.join(output_path,name_output)
 
         if os.path.exists(file_output) and not overwrite:
-            ate_ref = date_ref + timedelta(hours=24)
-            print(f'[WARNING] Ouput file: {output_path} already exists. Skipping...')
+            date_ref = date_ref + timedelta(hours=24)
+            print(f'[WARNING] Output file: {output_path} already exists. Skipping...')
             continue
 
 
@@ -264,17 +264,14 @@ def run_resample(arc_opt, start_date, end_date):
 
         if file_date is None:
             date_ref = date_ref + timedelta(hours=24)
-            os.rmdir(output_path)
             print(f'[ERROR] File for date: {date_ref} is not available and could not be downloaded')
             continue
         if file_date == 'NOFILE':
             date_ref = date_ref + timedelta(hours=24)
-            os.rmdir(output_path)
             print(f'[ERROR] File for date: {date_ref} is not available')
             continue
         if file_date == 'INVALIDFILE':
             date_ref = date_ref + timedelta(hours=24)
-            os.rmdir(output_path)
             print(f'[ERROR] File for date: {date_ref} is not valid, maybe it was not downloaded correctly')
             continue
 
