@@ -245,7 +245,7 @@ def run_resample(arc_opt, start_date, end_date):
             continue
 
         dateyj = date_ref.strftime('%Y%j')
-        name_output = f'O{dateyj}_rrs-arc-hr.nc'
+        name_output = f'C{dateyj}_rrs-arc-4km.nc'
         # name_output = f'{date_here_str}_{dname}.nc'
         file_output = os.path.join(output_path, name_output)
 
@@ -369,7 +369,7 @@ def run_chla(arc_opt, start_date, end_date):
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
         dateyj = date_run.strftime('%Y%j')
         # dateymd = date_run.strftime('%Y%m%d')
-        name_rrs = f'O{dateyj}_rrs-arc-hr.nc'
+        name_rrs = f'C{dateyj}_rrs-arc-4km.nc'
         # name_rrs = f'{dateymd}_cmems_obs-oc_arc_bgc-reflectance_my_l3-multi-4km_P1D.nc'
         input_file = os.path.join(input_path, name_rrs)
         if not os.path.exists(input_file):
@@ -382,7 +382,7 @@ def run_chla(arc_opt, start_date, end_date):
             print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
             make_processing = False
 
-        output_name = f'O{dateyj}_plankton-arc-hr.nc'
+        output_name = f'C{dateyj}_chl-arc-4km.nc'
         output_file = os.path.join(output_path, output_name)
         if os.path.exists(output_file) and not overwrite:
             print(f'[INFO] Output file {output_file} already exists. Skipping...')
