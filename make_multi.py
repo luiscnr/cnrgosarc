@@ -222,6 +222,7 @@ def run_resample(arc_opt, start_date, end_date):
         date_fin = options['end_date']
     options = arc_opt.add_moi_credentials(options)
     options['file_base'] = arc_opt.get_value_param('RESAMPLE','file_base',None,'file')
+    overwrite = arc_opt.get_value_param('RESAMPLE','overwrite',False,'boolean')
     if options['file_base'] is None:
         print(f'[ERROR] Option file_base is not available in RESAMPLE section, or file does not exist')
         return
@@ -246,6 +247,12 @@ def run_resample(arc_opt, start_date, end_date):
         name_output = f'{date_here_str}_{dname}.nc'
         file_output = os.path.join(output_path,name_output)
 
+        if os.path.exists(file_output) and not overwrite:
+            ate_ref = date_ref + timedelta(hours=24)
+            print(f'[WARNING] Ouput file: {output_path} already exists. Skipping...')
+            continue
+
+
         ##implements 3 attemps to download the file
         nattemps = 0
         file_date = None
@@ -254,9 +261,21 @@ def run_resample(arc_opt, start_date, end_date):
             if os.path.exists(file_date):
                 break
             nattemps = nattemps + 1
+
         if file_date is None:
             date_ref = date_ref + timedelta(hours=24)
+            os.rmdir(output_path)
             print(f'[ERROR] File for date: {date_ref} is not available and could not be downloaded')
+            continue
+        if file_date == 'NOFILE':
+            date_ref = date_ref + timedelta(hours=24)
+            os.rmdir(output_path)
+            print(f'[ERROR] File for date: {date_ref} is not available')
+            continue
+        if file_date == 'INVALIDFILE':
+            date_ref = date_ref + timedelta(hours=24)
+            os.rmdir(output_path)
+            print(f'[ERROR] File for date: {date_ref} is not valid, maybe it was not downloaded correctly')
             continue
 
         from arc_mapinfo import ArcMapInfo
