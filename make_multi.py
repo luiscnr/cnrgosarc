@@ -2,6 +2,8 @@ import argparse
 import os
 from datetime import timedelta
 from arc_multi_sources import ARC_MULTI_SOURCES
+import warnings
+warnings.filterwarnings(action='ignore', category=ResourceWarning)
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",

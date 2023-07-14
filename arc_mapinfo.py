@@ -16,6 +16,7 @@ import warnings
 warnings.resetwarnings()
 warnings.simplefilter('ignore', UserWarning)
 warnings.simplefilter('ignore', DeprecationWarning)
+warnings.simplefilter('ignore', ResourceWarning)
 
 
 class ArcMapInfo:
@@ -306,7 +307,7 @@ class ArcMapInfo:
             print(f'[INFO] cmd: {cmd}')
         import subprocess
         import time
-        subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+        pro = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
         originalSize = os.path.getsize(self.ifile_base)
         historicalSize = -1
         while historicalSize != originalSize:
@@ -318,6 +319,7 @@ class ArcMapInfo:
             time.sleep(1)
         if self.verbose:
             print('[INFO] Copy completed')
+
         dst = Dataset(ofile, 'a', format='NETCDF4')
         return dst
 
