@@ -43,15 +43,14 @@ class ArcProcessing:
         if os.path.exists(self.file_model):
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
-    def create_source_list(self,list_files,file_out):
+    def create_source_list(self, list_files, file_out):
         if os.path.exists(file_out):
             os.remove(file_out)
-        f1 = open(file_out,'w')
+        f1 = open(file_out, 'w')
         for file in list_files:
             f1.write(file)
             f1.write('\n')
         f1.close()
-
 
     def compute_month(self, year, month, timeliness, list_files, file_out):
         section = 'PROCESSING'
@@ -300,7 +299,7 @@ class ArcProcessing:
             print('[INFO] Checking RRS bands')
         for band in rrs_bands:
             if band not in ncsat.variables:
-                if band=='RRS442_5':
+                if band == 'RRS442_5':
                     if 'RRS443' in ncsat.variables:
                         rrs_bands[0] = 'RRS443'
                     else:
@@ -370,7 +369,6 @@ class ArcProcessing:
         timeseconds = (sat_date - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
         datasetout.variables['time'][0] = [np.int32(timeseconds)]
 
-
         if 'SENSORMASK' in ncsat.variables:
             if self.verbose:
                 print(f'[INFO] Getting sensor mask...')
@@ -390,8 +388,10 @@ class ArcProcessing:
         if self.verbose:
             print(f'[INFO] Checking chla pixels: YStep: {self.ystep} XStep: {self.xstep}')
 
-        iprogress = 1
+        iprogress = 0
         iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        if self.height < self.ystep and self.width < self.xstep:
+            iprogress_end = 1
         for y in range(0, self.height, self.ystep):
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
@@ -402,16 +402,22 @@ class ArcProcessing:
                 array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
                 if self.verbose:
-                    print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
-                if nvalid>500000:
+                    if self.height < self.ystep and self.width < self.xstep:
+                        print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
+                    else:
+                        print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+                if nvalid > 500000:
                     self.ystep = 500
                     self.xstep = 500
                     break
 
         if self.verbose:
             print(f'[INFO] Computing chla: YStep: {self.ystep} XStep: {self.xstep}')
-        iprogress = 1
+        iprogress = 0
         iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        if self.height < self.ystep and self.width < self.xstep:
+            iprogress_end = 1
+
         for y in range(0, self.height, self.ystep):
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
@@ -421,8 +427,11 @@ class ArcProcessing:
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
-                if self.verbose:
+                if self.height < self.ystep and self.width < self.xstep:
+                    print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
+                else:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+
                 if nvalid > 0:
                     array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
 
@@ -441,12 +450,13 @@ class ArcProcessing:
             ncgrid.close()
 
         # month july
-        print('TEMPORAL MODIFICATION FOR MONTH.......')
-        sdate = dt(2022, 8, 1)
-        timeseconds = (sdate - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
-        datasetout.variables['time'][0] = [np.int32(timeseconds)]
-        datasetout.start_date = '2022-08-01'
-        datasetout.stop_date = '2022-08-31'
+        # print('TEMPORAL MODIFICATION FOR MONTH.......')
+        # sdate = dt(2022, 8, 1)
+        # timeseconds = (sdate - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+        # print(timeseconds)
+        # datasetout.variables['time'][0] = [np.int32(timeseconds)]
+        # datasetout.start_date = '2022-08-01'
+        # datasetout.stop_date = '2022-08-31'
 
         datasetout.close()
         if self.verbose:
@@ -492,7 +502,7 @@ class ArcProcessing:
             if timeliness == 'NR':
                 at_dict['timeliness'] = 'NR'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
-                if sensor=='Ocean and Land Colour Instrument':
+                if sensor == 'Ocean and Land Colour Instrument':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_nrt_l3-olci-300m_P1D'
                 if sensor == 'ESA Ocean Colour Climate Initiative v6':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-plankton_nrt_l3-multi-4km_P1D'
@@ -553,7 +563,6 @@ class ArcProcessing:
                 if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
                     var.comment = "OC-CCI v6 - Gaussian Processor Regressor (GPR) Algorithm"
 
-
         if self.output_type == 'COMPARISON':
             if self.verbose:
                 print('[INFO] Creating DIFF variable')
@@ -587,9 +596,9 @@ class ArcProcessing:
         if self.output_type == 'CHLA':
             if timeliness == 'NR':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_NRT_009_122'
-                if datasetout.sensor=='Ocean and Land Colour Instrument':
+                if datasetout.sensor == 'Ocean and Land Colour Instrument':
                     datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-olci-300m_P1M'
-                if datasetout.sensor=='ESA Ocean Colour Climate Initiative v6':
+                if datasetout.sensor == 'ESA Ocean Colour Climate Initiative v6':
                     datasetout.title = 'cmems_obs-oc_arc_bgc-plankton_nrt_l4-multi-4km_P1M'
             if timeliness == 'NT':
                 datasetout.cmems_product_id = 'OCEANCOLOUR_ARC_BGC_L4_MY_009_124'

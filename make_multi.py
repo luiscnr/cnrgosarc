@@ -91,7 +91,7 @@ def main():
         if not os.path.isfile(file_at):
             print(f'[ERROR] Attributes files: {file_at} is not valid')
         file_base = args.base_file
-        if not os.path.isfile(file_at):
+        if not os.path.isfile(file_base):
             print(f'[ERROR] File base: {file_base} is not valid')
         modes = ['NR', 'NT']
         mode = None
@@ -221,17 +221,16 @@ def run_resample(arc_opt, start_date, end_date):
         date_ref = options['start_date']
         date_fin = options['end_date']
     options = arc_opt.add_moi_credentials(options)
-    options['file_base'] = arc_opt.get_value_param('RESAMPLE','file_base',None,'file')
-    overwrite = arc_opt.get_value_param('RESAMPLE','overwrite',False,'boolean')
+    options['file_base'] = arc_opt.get_value_param('RESAMPLE', 'file_base', None, 'file')
+    overwrite = arc_opt.get_value_param('RESAMPLE', 'overwrite', False, 'boolean')
     if options['file_base'] is None:
         print(f'[ERROR] Option file_base is not available in RESAMPLE section, or file does not exist')
         return
     from netCDF4 import Dataset
     base_file = options['file_base']
-    dbase = Dataset(base_file)
-    dname = dbase.title
-    dbase.close()
-
+    # dbase = Dataset(base_file)
+    # dname = dbase.title
+    # dbase.close()
 
     ams = ARC_MULTI_SOURCES(options['input_path'], options['input_path_organization'], options['moi_user'],
                             options['moi_pass'], args.verbose)
@@ -239,19 +238,21 @@ def run_resample(arc_opt, start_date, end_date):
         print(f'[INFO]******************************************************************************->{date_ref}')
 
         date_here_str = date_ref.strftime('%Y%m%d')
-        output_path = ams.get_folder_date(date_ref,True,options['output_path'],options['output_path_organization'])
+        output_path = ams.get_folder_date(date_ref, True, options['output_path'], options['output_path_organization'])
         if output_path is None:
             date_ref = date_ref + timedelta(hours=24)
             print(f'[ERROR] Output path: {output_path} is not available and could not be created')
             continue
-        name_output = f'{date_here_str}_{dname}.nc'
-        file_output = os.path.join(output_path,name_output)
+
+        dateyj = date_ref.strftime('%Y%j')
+        name_output = f'O{dateyj}_rrs-arc-hr.nc'
+        # name_output = f'{date_here_str}_{dname}.nc'
+        file_output = os.path.join(output_path, name_output)
 
         if os.path.exists(file_output) and not overwrite:
             date_ref = date_ref + timedelta(hours=24)
             print(f'[WARNING] Output file: {output_path} already exists. Skipping...')
             continue
-
 
         ##implements 3 attemps to download the file
         nattemps = 0
@@ -283,66 +284,83 @@ def run_resample(arc_opt, start_date, end_date):
             print(f'[INFO] Make resample from file {file_date} to file: {file_output}')
         ami.make_resample_from_file_orig_multi(file_date, file_output, date_ref)
 
-
         date_ref = date_ref + timedelta(hours=24)
 
 
 def run_chla(arc_opt, start_date, end_date):
+    section = 'CHLA'
     from datetime import timedelta
-    options = arc_opt.get_processing_options()
+    options = arc_opt.get_basic_options(section)
     if options is None:
         return
-
-    ##ONLY CHLA MODE IS IMPLEMENTED
-    output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
-    overwrite = arc_opt.get_value_param('PROCESSING', 'overwrite', False, 'boolean')
-    if not output_type == 'CHLA':
+    overwrite = arc_opt.get_value_param(section, 'overwrite', False, 'boolean')
+    file_base = arc_opt.get_value_param(section, 'file_base', None, 'file')
+    file_att = arc_opt.get_value_param(section, 'file_att', None, 'file')
+    if file_att is None:
+        print(f'[ERROR] file_att does not exist or is not available in the config file. Please review it')
         return
+    if file_base is None:
+        print(f'[ERROR] file_base does not exist or is not available in the config file. Please review it')
+        return
+
+    timelinesses = ['NR', 'NT']
+    for t in timelinesses:
+        if file_base.split('/')[-1].find(t) > 0:
+            timeliness = t
+    if timeliness is None:
+        print(f'[ERROR] Timeliness is not defined in the file base. It should be NR or NT')
+        return
+
     from arc_processing import ArcProcessing
     if args.verbose:
-        print('[INFO] PROCESSING OPTIONS:')
+        print('[INFO] CHLA PROCESSING OPTIONS:')
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
+        print(f'[INFO]  file_base:->{file_base}')
+        # print(f'[INFO]  file_att:->{file_att}')
+        print(f'[INFO]  overwrite:->{overwrite}')
+        print(f'[INFO]  timeliness:->{timeliness}')
 
-    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
-    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
-    if file_base is not None:
-        if os.path.exists(file_base):
-            if timeliness is None:
-                if file_base.find('NR') > 0:
-                    timeliness = 'NR'
-                if file_base.find('NT') > 0:
-                    timeliness = 'NT'
-    if args.verbose:
-        print(f'[INFO] File base: {file_base}')
-        print(f'[INFO] Timeliness: {timeliness}')
-
-    ##WORKING WITH SINGLE GRANULE, ONLY CHLA
-    input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
-    if input_name is not None:
-        input_file = os.path.join(options['input_path'], input_name)
-        if os.path.exists(input_file):
-            if args.verbose:
-                print(f'[INFO] Working with the single file: {input_file}')
-        else:
-            print(f'[ERROR] File {input_file} does not exist')
-        output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
-        if output_name is None:
-            output_name = 'SingleOutputChla.nc'
-        output_file = os.path.join(options['output_path'], output_name)
-        if args.verbose:
-            print(f'[INFO] Output file: {output_file}')
-        # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
-        arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
-        arc_proc.compute_chla_image(input_file, output_file, timeliness)
-        return
-
+    # file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
+    # timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
+    # if file_base is not None:
+    #     if os.path.exists(file_base):
+    #         if timeliness is None:
+    #             if file_base.find('NR') > 0:
+    #                 timeliness = 'NR'
+    #             if file_base.find('NT') > 0:
+    #                 timeliness = 'NT'
+    # if args.verbose:
+    #     print(f'[INFO] File base: {file_base}')
+    #     print(f'[INFO] Timeliness: {timeliness}')
+    #
+    # ##WORKING WITH SINGLE GRANULE, ONLY CHLA
+    # input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
+    # if input_name is not None:
+    #     input_file = os.path.join(options['input_path'], input_name)
+    #     if os.path.exists(input_file):
+    #         if args.verbose:
+    #             print(f'[INFO] Working with the single file: {input_file}')
+    #     else:
+    #         print(f'[ERROR] File {input_file} does not exist')
+    #     output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
+    #     if output_name is None:
+    #         output_name = 'SingleOutputChla.nc'
+    #     output_file = os.path.join(options['output_path'], output_name)
+    #     if args.verbose:
+    #         print(f'[INFO] Output file: {output_file}')
+    #     # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
+    #     arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+    #     arc_proc.compute_chla_image(input_file, output_file, timeliness)
+    #     return
+    #
     ##WORKING WITH DATES
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
     date_run = start_date
-    arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+
+    arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', file_att)
     while date_run <= end_date:
         if args.verbose:
             print('*****************************')
@@ -350,18 +368,21 @@ def run_chla(arc_opt, start_date, end_date):
         make_processing = True
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
         dateyj = date_run.strftime('%Y%j')
-        name_rrs = f'O{dateyj}_rrs-arc-fr.nc'
+        # dateymd = date_run.strftime('%Y%m%d')
+        name_rrs = f'O{dateyj}_rrs-arc-hr.nc'
+        # name_rrs = f'{dateymd}_cmems_obs-oc_arc_bgc-reflectance_my_l3-multi-4km_P1D.nc'
         input_file = os.path.join(input_path, name_rrs)
         if not os.path.exists(input_file):
             print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
-            make_processing = True
+            make_processing = False
+
         output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
                                               True)
         if output_path is None:
             print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
             make_processing = False
 
-        output_name = f'O{dateyj}_plankton-arc-fr.nc'
+        output_name = f'O{dateyj}_plankton-arc-hr.nc'
         output_file = os.path.join(output_path, output_name)
         if os.path.exists(output_file) and not overwrite:
             print(f'[INFO] Output file {output_file} already exists. Skipping...')
