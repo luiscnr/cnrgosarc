@@ -3,11 +3,12 @@ import os
 from datetime import timedelta
 from arc_multi_sources import ARC_MULTI_SOURCES
 import warnings
+
 warnings.filterwarnings(action='ignore', category=ResourceWarning)
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "QL",
+                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
                              "MONTHLY_CHLA", "MONTHLY_KD490"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
@@ -24,7 +25,70 @@ parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true"
 args = parser.parse_args()
 
 
+def only_test():
+    path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20220715T232353_20220715T232653_20220717T115842_0179_087_301_1800_MAR_O_NT_003.SEN3'
+    from netCDF4 import Dataset
+    import numpy as np
+    from kd_algorithm import KD_ALGORITHMS
+    path_kd = os.path.join(path, 'trsp.nc')
+    dataset_kd = Dataset(path_kd)
+    kd_array_olci = np.array(dataset_kd.variables['KD490_M07'][2100:2800, 4000:4700])
+    dataset_kd.close()
+
+    path_490 = os.path.join(path, 'Oa04_reflectance.nc')
+    dataset_490 = Dataset(path_490)
+    array_490 = np.array(dataset_490.variables['Oa04_reflectance'][2100:2800, 4000:4700])
+
+    path_560 = os.path.join(path, 'Oa06_reflectance.nc')
+    dataset_560 = Dataset(path_560)
+    array_560 = np.array(dataset_560.variables['Oa06_reflectance'][2100:2800, 4000:4700])
+
+    path_chla = os.path.join(path, 'chl_oc4me.nc')
+    dataset_chla = Dataset(path_chla)
+    array_chla = np.array(dataset_chla.variables['CHL_OC4ME'][2100:2800, 4000:4700])
+
+
+    kda = KD_ALGORITHMS('OK2-560')
+    kda.qratio = 0.97941
+    kd_array_new = kda.compute_kd490_ok2_560(array_490, array_560)
+
+
+    kd_array_olci[kd_array_olci != 255] = np.power(10, kd_array_olci[kd_array_olci != 255])
+    array_chla[array_chla != 255] = np.power(10,array_chla[array_chla != 255])
+
+
+    kd_array_new[kd_array_olci == 255] = -999.0
+    kd_array_new[kd_array_olci == 10.0] = -999.0
+    kd_array_new[array_chla == 255] = -999.0
+
+    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/kdcomparison.csv'
+    f1 = open(file_out,'w')
+    f1.write('Y;X;OLCI;COMPUTED;CHLA;RATIO')
+    for y in range(kd_array_olci.shape[0]):
+        for x in range(kd_array_olci.shape[1]):
+            ypoint = y + 2100
+            xpoint = x + 4000
+            if kd_array_new[y,x]!=-999.0:
+                val_old = kd_array_olci[y, x]
+                val_new = kd_array_new[y, x]
+                val_chla = array_chla[y,x]
+                ron = kd_array_olci[y, x]/kd_array_new[y, x]
+                if y==691 and x==4:
+                    print(f'OLCI: {val_old:.4f};COMPUTED: {val_new:.4f}; CHLA: {val_chla:.4f}; RON: {ron:.4f}')
+                line = f'{ypoint};{xpoint};{val_old};{val_new};{val_chla};{ron}'
+                f1.write('\n')
+                f1.write(line)
+    f1.close()
+
+    dataset_490.close()
+    dataset_560.close()
+
+    return True
+
+
 def main():
+    # if only_test():
+    #     return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
         check_py()
@@ -205,6 +269,10 @@ def main():
         run_chla(arc_opt, start_date, end_date)
         return
 
+    if args.mode == 'KD490':
+        run_kd490(arc_opt, start_date, end_date)
+        return
+
 
 def run_resample(arc_opt, start_date, end_date):
     options = arc_opt.get_resample_options()
@@ -298,9 +366,6 @@ def run_chla(arc_opt, start_date, end_date):
     overwrite = arc_opt.get_value_param(section, 'overwrite', False, 'boolean')
     file_base = arc_opt.get_value_param(section, 'file_base', None, 'file')
     file_att = arc_opt.get_value_param(section, 'file_att', None, 'file')
-    if file_att is None:
-        print(f'[ERROR] file_att does not exist or is not available in the config file. Please review it')
-        return
     if file_base is None:
         print(f'[ERROR] file_base does not exist or is not available in the config file. Please review it')
         return
@@ -319,50 +384,38 @@ def run_chla(arc_opt, start_date, end_date):
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
         print(f'[INFO]  file_base:->{file_base}')
-        # print(f'[INFO]  file_att:->{file_att}')
+        print(f'[INFO]  file_att:->{file_att}')
         print(f'[INFO]  overwrite:->{overwrite}')
         print(f'[INFO]  timeliness:->{timeliness}')
 
-    # file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
-    # timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
-    # if file_base is not None:
-    #     if os.path.exists(file_base):
-    #         if timeliness is None:
-    #             if file_base.find('NR') > 0:
-    #                 timeliness = 'NR'
-    #             if file_base.find('NT') > 0:
-    #                 timeliness = 'NT'
-    # if args.verbose:
-    #     print(f'[INFO] File base: {file_base}')
-    #     print(f'[INFO] Timeliness: {timeliness}')
-    #
-    # ##WORKING WITH SINGLE GRANULE, ONLY CHLA
-    # input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
-    # if input_name is not None:
-    #     input_file = os.path.join(options['input_path'], input_name)
-    #     if os.path.exists(input_file):
-    #         if args.verbose:
-    #             print(f'[INFO] Working with the single file: {input_file}')
-    #     else:
-    #         print(f'[ERROR] File {input_file} does not exist')
-    #     output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
-    #     if output_name is None:
-    #         output_name = 'SingleOutputChla.nc'
-    #     output_file = os.path.join(options['output_path'], output_name)
-    #     if args.verbose:
-    #         print(f'[INFO] Output file: {output_file}')
-    #     # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
-    #     arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
-    #     arc_proc.compute_chla_image(input_file, output_file, timeliness)
-    #     return
-    #
+    ##WORKING WITH SINGLE GRANULE, ONLY CHLA
+    input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
+    if input_name is not None:
+        input_file = os.path.join(options['input_path'], input_name)
+        if os.path.exists(input_file):
+            if args.verbose:
+                print(f'[INFO] Working with the single file: {input_file}')
+        else:
+            print(f'[ERROR] File {input_file} does not exist')
+        output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
+        if output_name is None:
+            output_name = 'SingleOutputChla.nc'
+        output_file = os.path.join(options['output_path'], output_name)
+        if args.verbose:
+            print(f'[INFO] Output file: {output_file}')
+        # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
+        arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', file_att)
+
+        arc_proc.compute_chla_image(input_file, output_file, timeliness)
+        return
+
     ##WORKING WITH DATES
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
     date_run = start_date
 
-    arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', file_att)
+    arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', None)
     while date_run <= end_date:
         if args.verbose:
             print('*****************************')
@@ -395,6 +448,97 @@ def run_chla(arc_opt, start_date, end_date):
                 print(f'[INFO] Input file: {input_file}')
                 print(f'[INFO] Output file: {output_file}')
             arc_proc.compute_chla_image(input_file, output_file, timeliness)
+        date_run = date_run + timedelta(hours=24)
+
+
+def run_kd490(arc_opt, start_date, end_date):
+    section = 'KD490'
+    from datetime import timedelta
+    options = arc_opt.get_basic_options(section)
+    if options is None:
+        return
+    overwrite = arc_opt.get_value_param(section, 'overwrite', False, 'boolean')
+    file_base = arc_opt.get_value_param(section, 'file_base', None, 'file')
+    file_att = arc_opt.get_value_param(section, 'file_att', None, 'file')
+    if file_base is None:
+        print(f'[ERROR] file_base does not exist or is not available in the config file. Please review it')
+        return
+
+    timelinesses = ['NR', 'NT']
+    for t in timelinesses:
+        if file_base.split('/')[-1].find(t) > 0:
+            timeliness = t
+    if timeliness is None:
+        print(f'[ERROR] Timeliness is not defined in the file base. It should be NR or NT')
+        return
+
+    from arc_processing import ArcProcessing
+    if args.verbose:
+        print('[INFO] KD400 PROCESSING OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+        print(f'[INFO]  file_base:->{file_base}')
+        print(f'[INFO]  file_att:->{file_att}')
+        print(f'[INFO]  overwrite:->{overwrite}')
+        print(f'[INFO]  timeliness:->{timeliness}')
+
+    ##WORKING WITH SINGLE GRANULE
+    input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
+    if input_name is not None:
+        input_file = os.path.join(options['input_path'], input_name)
+        if os.path.exists(input_file):
+            if args.verbose:
+                print(f'[INFO] Working with the single file: {input_file}')
+        else:
+            print(f'[ERROR] File {input_file} does not exist')
+        output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
+        if output_name is None:
+            output_name = 'SingleOutputkd490.nc'
+        output_file = os.path.join(options['output_path'], output_name)
+        if args.verbose:
+            print(f'[INFO] Output file: {output_file}')
+        # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
+        arc_proc = ArcProcessing(arc_opt, args.verbose, 'KD490', file_att)
+        arc_proc.compute_kd490_image(input_file, output_file, timeliness)
+        return
+
+    ##WORKING WITH DATES
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
+    date_run = start_date
+
+    arc_proc = ArcProcessing(arc_opt, args.verbose, 'KD490', file_att)
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run}')
+        make_processing = True
+        input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
+        dateyj = date_run.strftime('%Y%j')
+        name_rrs = f'C{dateyj}_rrs-arc-4km.nc'
+        input_file = os.path.join(input_path, name_rrs)
+        if not os.path.exists(input_file):
+            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
+            make_processing = False
+
+        output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
+                                              True)
+        if output_path is None:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+            make_processing = False
+
+        output_name = f'C{dateyj}_kd490-arc-4km.nc'
+        output_file = os.path.join(output_path, output_name)
+        if os.path.exists(output_file) and not overwrite:
+            print(f'[INFO] Output file {output_file} already exists. Skipping...')
+            make_processing = False
+
+        if make_processing:
+            if args.verbose:
+                print(f'[INFO] Input file: {input_file}')
+                print(f'[INFO] Output file: {output_file}')
+            arc_proc.compute_kd490_image(input_file,output_file,timeliness)
         date_run = date_run + timedelta(hours=24)
 
 

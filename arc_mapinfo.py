@@ -307,7 +307,7 @@ class ArcMapInfo:
             print(f'[INFO] cmd: {cmd}')
         import subprocess
         import time
-        pro = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+        subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
         originalSize = os.path.getsize(self.ifile_base)
         historicalSize = -1
         while historicalSize != originalSize:

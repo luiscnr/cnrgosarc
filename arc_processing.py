@@ -2,6 +2,7 @@ import os.path
 
 from arc_mapinfo import ArcMapInfo
 from arc_gpr_model import ARC_GPR_MODEL
+from kd_algorithm import KD_ALGORITHMS
 from netCDF4 import Dataset
 from datetime import datetime as dt
 import numpy as np
@@ -34,13 +35,13 @@ class ArcProcessing:
             self.file_model = file_model_default
         else:
             ##GETTING GENERAL PARAMETERS
-            section = 'PROCESSING'
-            self.file_model = self.arc_opt.get_value_param(section, 'file_model', file_model_default, 'str')
-            self.file_grid = arc_opt.get_value_param(section, 'file_base', file_grid_default, 'str')
+            section = 'GENERAL'
+            self.file_model = self.arc_opt.get_value_param(section, 'chla_model', file_model_default, 'str')
+            self.file_grid = arc_opt.get_value_param(section, 'grid_base', file_grid_default, 'str')
             self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
             self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
 
-        if os.path.exists(self.file_model):
+        if os.path.exists(self.file_model) and output_type == 'CHLA':
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
     def create_source_list(self, list_files, file_out):
@@ -281,12 +282,143 @@ class ArcProcessing:
 
         datasetout.close()
 
+    def compute_kd490_image(self, filein, fileout, timeliness):
+        section = 'KD490'
+        file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
+        if file_base is None:
+            file_base = self.file_grid
+        if not os.path.exists(file_base):
+            print(f'[ERROR] File base {file_base} could not be found.')
+            return
+
+        ncsat = Dataset(filein)
+        rrs_bands = ['RRS490', 'RRS560']
+        if self.verbose:
+            print('[INFO] Checking RRS bands')
+        for band in rrs_bands:
+            if band not in ncsat.variables:
+                print(f'[ERROR] RRS variable {band} is not available. Exiting...')
+                return
+        var490 = ncsat.variables[rrs_bands[0]]
+        var560 = ncsat.variables[rrs_bands[1]]
+
+        datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
+        if datasetout is None:
+            print('[ERROR] Output dataset could not be started. Exiting.')
+            return
+
+        datasetout.references = "Zoffoli et al. (in preparation); Morel et al. (2007).  Examining the consistency of " \
+                                "products derived from various ocean color sensors in open ocean (Case 1) waters in " \
+                                "the perspective of a multi-sensor approach. Remote Sens. Environ., 111(1), 69-88 "
+
+        if self.verbose:
+            print('[INFO] Checking date...')
+        sat_date = None
+        if 'start_date' in ncsat.ncattrs():
+            try:
+                sat_date = dt.strptime(ncsat.start_date, '%Y-%m-%d')
+            except:
+                sat_date = None
+        else:
+            fname = filein.split('/')[-1]
+            if fname.startswith('O'):
+                try:
+                    sat_date = dt.strptime(fname[1:8], '%Y%j')
+                except:
+                    sat_date = None
+
+        if self.verbose:
+            print(f'[INFO] Setting times...')
+        if sat_date is not None:
+            datasetout.start_date = sat_date.strftime('%Y-%m-%d')
+            datasetout.stop_date = sat_date.strftime('%Y-%m-%d')
+        if timeliness is not None:
+            datasetout.timeliness = timeliness
+        cdate = dt.utcnow()
+        datasetout.creation_date = cdate.strftime('%Y-%m-%d')
+        datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
+
+        timeseconds = (sat_date - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
+        datasetout.variables['time'][0] = [np.int32(timeseconds)]
+
+        if 'SENSORMASK' in ncsat.variables:
+            if self.verbose:
+                print(f'[INFO] Getting sensor mask...')
+            sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
+            datasetout.variables['SENSORMASK'] = [sensor_mask_array]
+
+        if self.verbose:
+            print(f'[INFO] Getting kd-490 variable...')
+        var_kd = datasetout.variables['KD490']
+        min_value = var_kd.valid_min
+        max_value = var_kd.valid_max
+
+        kda = KD_ALGORITHMS('OK2-560')
+
+        if self.verbose:
+            print(f'[INFO] Checking kd490 pixels: YStep: {self.ystep} XStep: {self.xstep}')
+
+        iprogress = 0
+        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        if self.height < self.ystep and self.width < self.xstep:
+            iprogress_end = 1
+        for y in range(0, self.height, self.ystep):
+            for x in range(0, self.width, self.xstep):
+                iprogress = iprogress + 1
+                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+                nvalid = kda.check_kd490_ok2_560(array_490,array_560)
+                if self.verbose:
+                    if self.height < self.ystep and self.width < self.xstep:
+                        print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
+                    else:
+                        print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+                if nvalid > 500000:
+                    self.ystep = 500
+                    self.xstep = 500
+                    break
+
+        if self.verbose:
+            print(f'[INFO] Computing kd490: YStep: {self.ystep} XStep: {self.xstep}')
+        iprogress = 0
+        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        if self.height < self.ystep and self.width < self.xstep:
+            iprogress_end = 1
+        for y in range(0, self.height, self.ystep):
+            for x in range(0, self.width, self.xstep):
+                iprogress = iprogress + 1
+                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+
+                if self.height < self.ystep and self.width < self.xstep:
+                    print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
+                else:
+                    print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+                array_kd = kda.compute_kd490_ok2_560(array_490,array_560)
+                array_kd[array_kd < min_value] = -999.0
+                array_kd[array_kd > max_value] = -999.0
+                var_kd[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_kd[:, :]]
+
+        ncsat.close()
+
+
+        datasetout.close()
+        if self.verbose:
+            print('[INFO] KD490 computation completed. ')
+
     def compute_chla_image(self, filein, fileout, timeliness):
-        section = 'PROCESSING'
+
         if self.chla_model is None:
             print('[ERROR] Chla model could not be initiated. Please review file_model option in PROCESSING section.')
             return
+        section = 'PROCESSING'
         file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
+        if file_base is None:
+            section = 'CHLA'
+            file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
+
         if file_base is None:
             file_base = self.file_grid
         if not os.path.exists(file_base):
@@ -569,6 +701,25 @@ class ArcProcessing:
             if not 'DIFF' in datasetout.variables:
                 var = datasetout.createVariable('DIFF', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
                 var[:] = -999
+
+        if self.output_type == 'KD490':
+
+            if 'KD490' not in datasetout.variables:
+                if self.verbose:
+                    print('[INFO] Creating KD490 variable...')
+                var = datasetout.createVariable('KD490', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
+                var[:] = -999
+                var.grid_mapping = 'stereographic'
+                var.coordinates = 'time lon lat'
+                var.long_name = "Diffuse Attenuation Coefficient at 490nm"
+                var.standard_name = "volume_attenuation_coefficient_of_downwelling_radiative_flux_in_sea_water"
+                var.type = "surface"
+                var.units = "m^-1"
+                var.missing_value = -999.0
+                var.valid_min = 0.0
+                var.valid_max = 100.0
+                var.comment = "OK2-560 algorithm (Morel et al., 2007)"
 
         return datasetout
 
