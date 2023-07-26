@@ -38,7 +38,7 @@ def main():
     while date_here <= end_date:
         if args.verbose:
             print(f'[INFO] Date: {date_here}')
-        date_here = date_here + timedelta(hours=24)
+
         input_dirdate = get_folder_date(input_path, date_here, False)
         output_dirdate = get_folder_date(output_path, date_here, True)
         if input_dirdate is None:
@@ -56,7 +56,7 @@ def main():
         output_file = os.path.join(output_dirdate, f'O{yyyy}{jjj}_rrs-arc-fr.nc')
         correct_rrs_impl(input_file, output_file)
 
-
+        date_here = date_here + timedelta(hours=24)
 
 
 def correct_rrs_impl(input_file, output_file):
