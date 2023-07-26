@@ -54,9 +54,22 @@ def main():
             print(f'[ERROR] Input file: {input_file} does not exist. Skipping...')
             return
         output_file = os.path.join(output_dirdate, f'O{yyyy}{jjj}_rrs-arc-fr.nc')
-        correct_rrs_impl(input_file, output_file)
+        output_file_c = os.path.join(output_dirdate, f'O{yyyy}{jjj}_rrs-arc-fr_correcting.nc')
 
+        from netCDF4 import Dataset
+        dataset = Dataset(output_file)
+        dataset_c = Dataset(output_file_c)
+        array = np.array(dataset.variables['RRS400'])
+        array_c = np.array((dataset_c.variables['RRS400']))
+        dif = array - array_c
+        print(np.mean(array[array!=-999]))
+        print(np.mean(array_c[array!=-999]))
+        print(np.mean(dif[:]))
+
+
+        #correct_rrs_impl(input_file, output_file)
         date_here = date_here + timedelta(hours=24)
+
 
 
 def correct_rrs_impl(input_file, output_file):

@@ -109,12 +109,17 @@ class ARC_OPTIONS:
         if start_date is None or end_date is None:
             return None
 
+
+
         input_path_organization = self.get_path_organization(section, 'input_path_organization')
         output_path_organization = self.get_path_organization(section, 'output_path_organization')
         if input_path_organization == 'INVALID' or output_path_organization == 'INVALID':
             return None
 
         platform = self.get_platform(section)
+
+        alternative_path = self.get_path(section, 'alternative_path', False)
+        alternative_path_organization = self.get_path_organization(section, 'alternative_path_organization')
 
         options_out = {
             'input_path': input_path,
@@ -123,7 +128,9 @@ class ARC_OPTIONS:
             'output_path_organization': output_path_organization,
             'start_date': start_date,
             'end_date': end_date,
-            'platform': platform
+            'platform': platform,
+            'alternative_path': alternative_path,
+            'alternative_path_organization': alternative_path_organization
         }
         return options_out
 

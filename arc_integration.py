@@ -117,16 +117,16 @@ class ArcIntegration():
             if timeliness == 'NR':
                 at_dict['timeliness'] = 'NR'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
-                if sensor=='Ocean and Land Colour Instrument':
+                if sensor == 'Ocean and Land Colour Instrument':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D'
-                if sensor=='ESA Ocean Colour Climate Initiative v6':
+                if sensor == 'ESA Ocean Colour Climate Initiative v6':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_nrt_l3-multi-4km_P1D'
             if timeliness == 'NT':
                 at_dict['timeliness'] = 'NT'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_MY_009_123'
-                if sensor=='Ocean and Land Colour Instrument':
+                if sensor == 'Ocean and Land Colour Instrument':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_my_l3-olci-300m_P1D'
-                if sensor=='ESA Ocean Colour Climate Initiative v6':
+                if sensor == 'ESA Ocean Colour Climate Initiative v6':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-reflectance_my_l3-multi-4km_P1D'
 
         if self.output_type == 'TRANSP':
@@ -135,9 +135,9 @@ class ArcIntegration():
             if timeliness == 'NR':
                 at_dict['timeliness'] = 'NR'
                 at_dict['cmems_product_id'] = 'OCEANCOLOUR_ARC_BGC_L3_NRT_009_121'
-                if sensor=='Ocean and Land Colour Instrument':
+                if sensor == 'Ocean and Land Colour Instrument':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_nrt_l3-olci-300m_P1D'
-                if sensor=='ESA Ocean Colour Climate Initiative v6':
+                if sensor == 'ESA Ocean Colour Climate Initiative v6':
                     at_dict['title'] = 'cmems_obs-oc_arc_bgc-transp_nrt_l3-multi-4km_P1D'
             if timeliness == 'NT':
                 at_dict['timeliness'] = 'NT'
@@ -179,7 +179,6 @@ class ArcIntegration():
         if datasetout is None:
             return datasetout
 
-
         create_variables = True
         atribs = self.get_global_attributes(timeliness)
         if atribs is not None:  ##atrib is None, atribs ard defined in file base
@@ -188,7 +187,7 @@ class ArcIntegration():
                     datasetout.setncattr('Conventions', atribs[at])
                 else:
                     datasetout.setncattr(at, atribs[at])
-                if at == 'sensor' and atribs[at]=='ESA Ocean Colour Climate Initiative v6':
+                if at == 'sensor' and atribs[at] == 'ESA Ocean Colour Climate Initiative v6':
                     create_variables = False
 
         if not create_variables:
@@ -248,10 +247,8 @@ class ArcIntegration():
                                 'ADJAC, RWNEG_O2, RWNEG_O3, RWNEG_O4, RWNEG_O5, RWNEG_O6, RWNEG_O7, RWNEG_O8) '
             var.source = 'OLCI - Level2'
 
-        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE' or self.output_type=='NONE':
+        if self.output_type == 'RRS' or self.output_type == 'TRANSP' or self.output_type == 'OPERATIVE' or self.output_type == 'NONE':
             return datasetout
-
-
 
         if self.verbose:
             print(f'[INFO] Creating other bands...')
@@ -630,13 +627,11 @@ class ArcIntegration():
             print(f'[INFO] # Number of good pixels (flag-based mask) First check: {ngood}')
         dataset_mask.close()
 
-        if ngood==0:
+        if ngood == 0:
             print(f'[WARNING] No valid pixels were found. All the pixels are masked')
             return
 
-
-
-        #AVERAGE VARIABLES
+        # AVERAGE VARIABLES
         if self.apply_pool == 0:
             for var_avg_name in self.average_variables:
                 file_var = os.path.join(output_path, f'{var_avg_name}.nc')
@@ -647,8 +642,8 @@ class ArcIntegration():
             if self.apply_pool < 0:
                 poolhere = Pool()
             else:
-                #POOL THRESHOLD
-                if ngood>2000000:
+                # POOL THRESHOLD
+                if ngood > 2000000:
                     self.apply_pool = 7
                 poolhere = Pool(self.apply_pool)
 
@@ -679,7 +674,7 @@ class ArcIntegration():
                 var_avg_array = np.array(dataset_var.variables['average'])
                 var_mask_array[var_avg_array < 0] = 0
                 dataset_var.close()
-        #var_mask_array[var_mask_array==0] = -999
+        # var_mask_array[var_mask_array==0] = -999
         var_mask[:] = [var_mask_array[:]]
         ngood = np.count_nonzero(var_mask_array > 0)
         if self.verbose:
@@ -718,7 +713,7 @@ class ArcIntegration():
 
         return datasetout, wmask
 
-    def create_rrs_file(self, output_path, file_out, date_run, timeliness):
+    def create_rrs_file(self, output_path, file_out, date_run, timeliness, correctRrs):
         datasetout, wmask = self.start_rrs_or_transp_file(output_path, file_out, date_run, timeliness)
 
         # RRS BANDS
@@ -734,6 +729,8 @@ class ArcIntegration():
                     if self.verbose:
                         print(f'[INFO] Adapting mask for variable {avg_name}')
                     var_array[wmask <= 0] = -999.0
+                if correctRrs:
+                    var_array[var_array != -999] = var_array[var_array != -999] / np.pi
                 variable[0, :, :] = [var_array[:, :]]
                 dataset_var.close()
 
@@ -834,7 +831,7 @@ class ArcIntegration():
 
             dataset_granule.close()
 
-        #print('ystep: ', self.ystep, ' xstep: ', self.xstep)
+        # print('ystep: ', self.ystep, ' xstep: ', self.xstep)
         for y in range(0, self.height, self.ystep):
             if self.verbose:
                 print(f'[INFO] -> {y}')
@@ -1183,8 +1180,9 @@ class ArcIntegration():
 
         return info_agrup
 
-    def check_dataset_attrs(self,dataset):
-        at_list = ['relative_orbit','resampled_ymin','resampled_ymax','resampled_xmin','resampled_xmax','resampled_n_total','resampled_n_valid','granule_index','start_date']
+    def check_dataset_attrs(self, dataset):
+        at_list = ['relative_orbit', 'resampled_ymin', 'resampled_ymax', 'resampled_xmin', 'resampled_xmax',
+                   'resampled_n_total', 'resampled_n_valid', 'granule_index', 'start_date']
         at_list_dataset = dataset.ncattrs()
         for at in at_list:
             if at not in at_list_dataset:

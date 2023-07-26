@@ -1123,6 +1123,12 @@ def run_integration(arc_opt, start_date, end_date):
             print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
             make_integration = False
 
+        if output_type == 'CORRECT_RRS':
+            alternative_path = arc_opt.get_folder_date(options['alternative_path'], options['alternative_path_organization'], date_run,False)
+            if not os.path.exists(alternative_path):
+                print(f'[WARNING] Alternative path {alternative_path} for date {date_run} is not available. Skiping...')
+                make_integration = False
+
         if make_integration:
             datestr = date_run.strftime('%Y%j')
             pl = platform[-1]
@@ -1148,9 +1154,10 @@ def run_integration(arc_opt, start_date, end_date):
                 print(f'[INFO] Output file: {output_path}')
                 print(f'[INFO] Apply pool: {arc_integration.apply_pool}')
 
-            arc_integration.make_integration(output_path)
+            if output_type != 'CORRECT_RRS':
+                arc_integration.make_integration(output_path)
 
-            if output_type == 'RRS' or output_type == 'OPERATIVE':
+            if output_type == 'RRS' or output_type == 'OPERATIVE' or output_type == 'CORRECT_RRS':
                 file_base = os.path.join(dir_base, f'ArcGrid_65_90_300m_RRS_{timeliness}_Base.nc')
                 arc_integration.ami.ifile_base = file_base
                 name_out_end = f'O{pl}{datestr}_rrs-arc-fr.nc'
@@ -1158,7 +1165,26 @@ def run_integration(arc_opt, start_date, end_date):
                 if os.path.exists(file_out):
                     os.remove(file_out)
                 arc_integration.output_type = 'RRS'
-                arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness)
+                if output_type == 'CORRECT_RRS': ##COPY FILES FROM ALTERNATIVE PATH
+                    if os.path.exists(alternative_path):
+                        nfiles = len(os.listdir(alternative_path))
+                        if nfiles==3:
+                            for name in os.listdir(alternative_path):
+                                fname = os.path.join(alternative_path,name)
+                                fcopy = os.path.join(input_path,name)
+                                copy_file(fname,fcopy)
+                        elif nfiles==16:
+                            for name in os.listdir(alternative_path):
+                                if name.find('_rrs-arc-fr.nc')>0:
+                                    continue
+                                if name.find('_plankton-arc-fr.nc')>0:
+                                    continue
+                                fname = os.path.join(alternative_path,name)
+                                fcopy = os.path.join(input_path,name)
+                                copy_file(fname,fcopy)
+                            arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness,True)
+                else:
+                    arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness,False)
 
             if output_type == 'TRANSP' or output_type == 'OPERATIVE':
                 file_base = os.path.join(dir_base, f'ArcGrid_65_90_300m_TRANSP_{timeliness}_Base.nc')
@@ -1172,6 +1198,27 @@ def run_integration(arc_opt, start_date, end_date):
 
         date_run = date_run + timedelta(hours=24)
 
+def copy_file(ifile,ofile):
+    if args.verbose:
+        print(f'[INFO] Copying file : {ifile}...')
+
+    cmd = f'cp -a {ifile} {ofile}'
+    if args.verbose:
+        print(f'[INFO] cmd: {cmd}')
+    import subprocess
+    import time
+    subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+    originalSize = os.path.getsize(ifile)
+    historicalSize = -1
+    while historicalSize != originalSize:
+        if os.path.exists(ofile):
+            historicalSize = os.path.getsize(ofile)
+            if args.verbose:
+                porc = (historicalSize / originalSize) * 100
+                print(f'[INFO] Copying {porc:.2f} %')
+        time.sleep(1)
+    if args.verbose:
+        print('[INFO] Copy completed')
 
 def run_chla(arc_opt, start_date, end_date):
     options = arc_opt.get_processing_options()
