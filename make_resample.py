@@ -1123,6 +1123,7 @@ def run_integration(arc_opt, start_date, end_date):
             print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
             make_integration = False
 
+        output_type = arc_opt.get_value_param('INTEGRATE', 'output_type', 'OPERATIVE', 'str')
         if output_type == 'CORRECT_RRS':
             alternative_path = arc_opt.get_folder_date(options['alternative_path'], options['alternative_path_organization'], date_run,False)
             if not os.path.exists(alternative_path):
@@ -1135,7 +1136,6 @@ def run_integration(arc_opt, start_date, end_date):
             if pl == '3':
                 pl = ''
             from arc_integration import ArcIntegration
-            output_type = arc_opt.get_value_param('INTEGRATE', 'output_type', 'OPERATIVE', 'str')
             dir_base = arc_opt.get_value_param('INTEGRATE', 'file_base', None, 'str')
             if args.verbose:
                 print(f'[INFO] Output type: {output_type}')
