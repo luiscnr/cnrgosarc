@@ -1171,7 +1171,7 @@ def run_integration(arc_opt, start_date, end_date):
                         if nfiles==3:
                             for name in os.listdir(alternative_path):
                                 fname = os.path.join(alternative_path,name)
-                                fcopy = os.path.join(input_path,name)
+                                fcopy = os.path.join(output_path,name)
                                 copy_file(fname,fcopy)
                         elif nfiles==16:
                             for name in os.listdir(alternative_path):
@@ -1180,9 +1180,10 @@ def run_integration(arc_opt, start_date, end_date):
                                 if name.find('_plankton-arc-fr.nc')>0:
                                     continue
                                 fname = os.path.join(alternative_path,name)
-                                fcopy = os.path.join(input_path,name)
+                                fcopy = os.path.join(output_path,name)
                                 copy_file(fname,fcopy)
                             arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness,True)
+
                 else:
                     arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness,False)
 
