@@ -134,6 +134,7 @@ class OLCI_L2():
             if dif < self.max_dif_wl:
                 nc_sat = Dataset(self.reflectance_bands[band_name]['file_path'], 'r')
                 array_reflectance = np.ma.array(nc_sat.variables[band_name][:, :])
+                array_reflectance = array_reflectance / np.pi
                 array_reflectance = np.ma.filled(array_reflectance, fill_value=fvalue)
                 return array_reflectance
         return None

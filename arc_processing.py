@@ -292,14 +292,16 @@ class ArcProcessing:
             return
 
         ncsat = Dataset(filein)
-        rrs_bands = ['RRS490', 'RRS560']
+        rrs_bands = ['RRS443','RRS490','RRS510','RRS560']
         if self.verbose:
             print('[INFO] Checking RRS bands')
         for band in rrs_bands:
             if band not in ncsat.variables:
                 print(f'[ERROR] RRS variable {band} is not available. Exiting...')
                 return
-        var490 = ncsat.variables[rrs_bands[0]]
+        var443 = ncsat.variables[rrs_bands[0]]
+        var490 = ncsat.variables[rrs_bands[2]]
+        var510 = ncsat.variables[rrs_bands[3]]
         var560 = ncsat.variables[rrs_bands[1]]
 
         datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
@@ -389,14 +391,21 @@ class ArcProcessing:
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+                array_510 = np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+
+                array_chla = kda.compute_chla_ocme4(array_443,array_490,array_510,array_560,None)
+
+                array_chla = kda.compute_chla_ocme4(array_443, array_490, array_510, array_560, array_chla)
+
 
                 if self.height < self.ystep and self.width < self.xstep:
                     print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
                 else:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
-                array_kd = kda.compute_kd490_ok2_560(array_490,array_560)
+                array_kd = kda.compute_kd(array_490,array_560,array_chla)
                 array_kd[array_kd < min_value] = -999.0
                 array_kd[array_kd > max_value] = -999.0
                 var_kd[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_kd[:, :]]

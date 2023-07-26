@@ -32,63 +32,120 @@ def only_test():
     from kd_algorithm import KD_ALGORITHMS
     path_kd = os.path.join(path, 'trsp.nc')
     dataset_kd = Dataset(path_kd)
-    kd_array_olci = np.array(dataset_kd.variables['KD490_M07'][2100:2800, 4000:4700])
+    yini = 2100
+    yfin = 2800
+    xini = 4000
+    xfin = 4700
+    kd_array_olci = np.array(dataset_kd.variables['KD490_M07'][yini:yfin, xini:xfin])
+    scale_kd = dataset_kd.variables['KD490_M07'].scale_factor
+    offset_kd = dataset_kd.variables['KD490_M07'].add_offset
     dataset_kd.close()
+
+    path_443 = os.path.join(path, 'Oa03_reflectance.nc')
+    dataset_443 = Dataset(path_443)
+    array_443= np.array(dataset_443.variables['Oa03_reflectance'][yini:yfin, xini:xfin])
 
     path_490 = os.path.join(path, 'Oa04_reflectance.nc')
     dataset_490 = Dataset(path_490)
-    array_490 = np.array(dataset_490.variables['Oa04_reflectance'][2100:2800, 4000:4700])
+    array_490 = np.array(dataset_490.variables['Oa04_reflectance'][yini:yfin, xini:xfin])
+
+    path_510 = os.path.join(path, 'Oa05_reflectance.nc')
+    dataset_510 = Dataset(path_510)
+    array_510 = np.array(dataset_510.variables['Oa05_reflectance'][yini:yfin, xini:xfin])
 
     path_560 = os.path.join(path, 'Oa06_reflectance.nc')
     dataset_560 = Dataset(path_560)
-    array_560 = np.array(dataset_560.variables['Oa06_reflectance'][2100:2800, 4000:4700])
+    array_560 = np.array(dataset_560.variables['Oa06_reflectance'][yini:yfin, xini:xfin])
 
     path_chla = os.path.join(path, 'chl_oc4me.nc')
     dataset_chla = Dataset(path_chla)
-    array_chla = np.array(dataset_chla.variables['CHL_OC4ME'][2100:2800, 4000:4700])
-
+    scale_chl = dataset_chla.variables['CHL_OC4ME'].scale_factor
+    offset_chl = dataset_chla.variables['CHL_OC4ME'].add_offset
+    chla_array_olci = np.array(dataset_chla.variables['CHL_OC4ME'][yini:yfin, xini:xfin])
 
     kda = KD_ALGORITHMS('OK2-560')
-    kda.qratio = 0.97941
-    kd_array_new = kda.compute_kd490_ok2_560(array_490, array_560)
+    kd_array_new = kda.compute_kd490_ok2_560(array_490, array_560, chla_array_olci)
+    chl_array_new = kda.compute_chla_ocme4(array_443,array_490,array_510,array_560, chla_array_olci)
 
 
-    kd_array_olci[kd_array_olci != 255] = np.power(10, kd_array_olci[kd_array_olci != 255])
-    array_chla[array_chla != 255] = np.power(10,array_chla[array_chla != 255])
-
-
+    ##KD TRANSFORMATION FOR COMPARISON
+    # invert
+    kd_array_new[kd_array_olci != 255] = np.log10(kd_array_new[kd_array_olci != 255])
+    kd_array_new[kd_array_olci != 255] = (kd_array_new[kd_array_olci != 255] - offset_kd) / scale_kd
+    # round
+    kd_array_new[kd_array_olci != 255] = np.ceil(kd_array_new[kd_array_olci != 255])
+    # values shoud be between 0 and 254 (as 255 is used as invalid value)
+    kd_array_new[kd_array_new<0] = 0.0
+    kd_array_new[kd_array_new>254] = 254.0
+    kd_array_new[kd_array_olci == 255] = 255  ##invalid value, from kd_olci
+    kd_array_new = kd_array_new.astype(np.uint8).astype(np.float32)
+    ##reconvert
+    kd_array_new[kd_array_olci != 255] = (kd_array_new[kd_array_olci != 255] * scale_kd) + offset_kd
+    kd_array_new[kd_array_olci != 255] = np.power(10, kd_array_new[kd_array_olci != 255])
+    ##masks
     kd_array_new[kd_array_olci == 255] = -999.0
-    kd_array_new[kd_array_olci == 10.0] = -999.0
-    kd_array_new[array_chla == 255] = -999.0
+    kd_array_new[chla_array_olci == 255] = -999.0
 
-    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/kdcomparison.csv'
+    ##CHL TRANSFORMATION FOR COMPARISON
+    # invert
+    chl_array_new[chla_array_olci != 255] = np.log10(chl_array_new[chla_array_olci != 255])
+    chl_array_new[chla_array_olci != 255] = (chl_array_new[chla_array_olci != 255] - offset_chl) / scale_chl
+    # round
+    chl_array_new[chla_array_olci != 255] = np.ceil(chl_array_new[chla_array_olci != 255])
+    # values shoud be between 0 and 254 (as 255 is used as invalid value)
+    chl_array_new[chl_array_new < 0] = 0.0
+    chl_array_new[chl_array_new > 254] = 254.0
+    chl_array_new[chla_array_olci == 255] = 255  ##invalid value, from chl_olci
+    chl_array_new = chl_array_new.astype(np.uint8).astype(np.float32)
+    ##reconvert
+    chl_array_new[chla_array_olci != 255] = (chl_array_new[chla_array_olci != 255] * scale_chl) + offset_chl
+    chl_array_new[chla_array_olci != 255] = np.power(10, chl_array_new[chla_array_olci != 255])
+    ##masks
+    chl_array_new[chla_array_olci == 255] = -999.0
+
+
+
+    ##NON LOG10 TRANSFORMED VALUES FOR KD Y CHLA FROM OLCI
+    kd_array_olci[kd_array_olci != 255] = np.power(10, kd_array_olci[kd_array_olci != 255])
+    chla_array_olci[chla_array_olci != 255] = np.power(10, chla_array_olci[chla_array_olci != 255])
+
+
+
+
+
+    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/chlacomparison_1.csv'
     f1 = open(file_out,'w')
-    f1.write('Y;X;OLCI;COMPUTED;CHLA;RATIO')
+    f1.write('Y;X;KD_OLCI;KD_NEW;CHLA_OLCI;CHLA_NEW;RATIO_KD;RATIO_CHLA')
     for y in range(kd_array_olci.shape[0]):
         for x in range(kd_array_olci.shape[1]):
-            ypoint = y + 2100
-            xpoint = x + 4000
-            if kd_array_new[y,x]!=-999.0:
-                val_old = kd_array_olci[y, x]
-                val_new = kd_array_new[y, x]
-                val_chla = array_chla[y,x]
-                ron = kd_array_olci[y, x]/kd_array_new[y, x]
-                if y==691 and x==4:
-                    print(f'OLCI: {val_old:.4f};COMPUTED: {val_new:.4f}; CHLA: {val_chla:.4f}; RON: {ron:.4f}')
-                line = f'{ypoint};{xpoint};{val_old};{val_new};{val_chla};{ron}'
+            ypoint = y + yini
+            xpoint = x + xini
+            if kd_array_new[y, x] != -999.0:
+                val_kd_olci = kd_array_olci[y, x]
+                val_kd_new = kd_array_new[y, x]
+                val_chla_olci = chla_array_olci[y,x]
+                val_chla_new = chl_array_new[y,x]
+                ron_kd = kd_array_olci[y, x]/kd_array_new[y, x]
+                ron_chla = chla_array_olci[y,x]/chl_array_new[y,x]
+                # if y==691 and x==4:
+                #     print(f'OLCI: {val_old:.4f};COMPUTED: {val_new:.4f}; CHLA: {val_chla:.4f}; RON: {ron:.4f}')
+                line = f'{ypoint};{xpoint};{val_kd_olci};{val_kd_new};{val_chla_olci};{val_chla_new};{ron_kd};{ron_chla}'
                 f1.write('\n')
                 f1.write(line)
     f1.close()
 
+    dataset_443.close()
     dataset_490.close()
+    dataset_510.close()
     dataset_560.close()
+    dataset_chla.close()
 
     return True
 
 
 def main():
-    # if only_test():
-    #     return
+    if only_test():
+        return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
         check_py()
@@ -538,7 +595,7 @@ def run_kd490(arc_opt, start_date, end_date):
             if args.verbose:
                 print(f'[INFO] Input file: {input_file}')
                 print(f'[INFO] Output file: {output_file}')
-            arc_proc.compute_kd490_image(input_file,output_file,timeliness)
+            arc_proc.compute_kd490_image(input_file, output_file, timeliness)
         date_run = date_run + timedelta(hours=24)
 
 
