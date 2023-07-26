@@ -59,7 +59,7 @@ class ArcIntegration():
             'KD490': 'KD490_M07'
         }
 
-        if self.output_type == 'RRS':
+        if self.output_type == 'RRS' or self.output_type=='CORRECT_RRS':
             self.average_variables = list(self.rrs_variables_all.keys())
         elif self.output_type == 'TRANSP':
             self.average_variables = list(self.transp_variables_all)
