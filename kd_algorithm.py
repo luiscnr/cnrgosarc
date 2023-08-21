@@ -34,6 +34,19 @@ class KD_ALGORITHMS():
 
         return q0_ratio
 
+    def compute_kd_param(self,rrs443, rrs490, rrs510, rrs560):
+        array443 = np.array([rrs443])
+        array490 = np.array([rrs490])
+        array510 = np.array([rrs510])
+        array560 = np.array([rrs560])
+
+        chla = self.compute_chla_ocme4(array443,array490,array510,array560,None)
+        if chla is None:
+            return -999.0
+        chla = self.compute_chla_ocme4(array443, array490, array510, array560, chla)
+        kd = self.compute_kd490_ok2_560(array490,array560,chla)
+        return kd[0]
+
     def compute_kd(self, *args):
         if self.kdalgorithm == 'OK2-560':
             if len(args) == 2:
@@ -53,10 +66,20 @@ class KD_ALGORITHMS():
         return np.count_nonzero(valid)
 
     def compute_chla_ocme4(self, rrs443, rrs490, rrs510, rrs560, chla):
+        #print(rrs443.shape)
         rrs443[rrs443 < 0] = self.fillValue
         rrs490[rrs490 < 0] = self.fillValue
         rrs510[rrs510 < 0] = self.fillValue
         rrs560[rrs560 < 0] = self.fillValue
+        #print(rrs443.shape)
+        # if len(rrs443[rrs443==self.fillValue])==len(rrs443):
+        #     return None
+        # if len(rrs490[rrs490==self.fillValue])==len(rrs490):
+        #     return None
+        # if len(rrs510[rrs510==self.fillValue])==len(rrs510):
+        #     return None
+        # if len(rrs560[rrs560==self.fillValue])==len(rrs560):
+        #     return None
 
         sh = rrs490.shape
         # valid1 = np.logical_and(rrs443 != self.fillValue, rrs560 != self.fillValue)

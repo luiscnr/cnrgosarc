@@ -16,8 +16,46 @@ parser.add_argument('-ed', "--end_date", help="End date (yyyy-mm-dd")
 parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true")
 args = parser.parse_args()
 
+def do_test():
+    import pandas as pd
+    from arc_gpr_model import ARC_GPR_MODEL
+    from kd_algorithm import KD_ALGORITHMS
 
+    # file_model_default = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
+    # chla_model = ARC_GPR_MODEL(file_model_default)
+    kd_model = KD_ALGORITHMS('OK2-560')
+    file_input = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/rrs_points.csv'
+    #file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/chla_multi.csv'
+    file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/kd_multi.csv'
+    f1 = open(file_output, 'w')
+    #f1.write('ChlaMulti;ChlaOlci')
+    f1.write('kd_multi')
+    dfi = pd.read_csv(file_input, sep=';')
+    for idx, row in dfi.iterrows():
+        if (idx%1000)==0:
+            print('IDX: ',idx)
+        # jday = int(row['JDay'])
+        # longitude = float(row['Longitude'])
+        rrs443 = float(row['MultiVal_443'])
+        rrs490 = float(row['MultiVal_490'])
+        rrs560 = float(row['MultiVal_560'])
+        rrs665 = float(row['MultiVal_665'])
+        # cha_multi = chla_model.compute_chla_from_param(longitude,jday,rrs443,rrs490,rrs560,rrs665)
+        # rrs443 = float(row['OlciVal_443'])
+        # rrs490 = float(row['OlciVal_490'])
+        # rrs560 = float(row['OlciVal_560'])
+        # rrs665 = float(row['OlciVal_665'])
+        #cha_olci = chla_model.compute_chla_from_param(longitude, jday, rrs443, rrs490, rrs560, rrs665)
+        kd_multi = kd_model.compute_kd_param(rrs443,rrs490,rrs560,rrs665)
+        #line = f'{cha_multi};{cha_olci}'
+        line = f'{kd_multi}'
+        f1.write('\n')
+        f1.write(line)
+    f1.close()
+    return True
 def main():
+    if do_test():
+        return
     print('[INFO] Started correct reflectance')
     input_path = args.inputpath
     output_path = args.outputpath
@@ -54,16 +92,22 @@ def main():
             print(f'[ERROR] Input file: {input_file} does not exist. Skipping...')
             return
         output_file = os.path.join(output_dirdate, f'O{yyyy}{jjj}_rrs-arc-fr.nc')
-        output_file_c = os.path.join(output_dirdate, f'O{yyyy}{jjj}_rrs-arc-fr_correcting.nc')
+        output_file_c = os.path.join(output_dirdate, f'O{yyyy}{jjj}_rrs-arc-fr_correcting_prev.nc')
 
         from netCDF4 import Dataset
         dataset = Dataset(output_file)
+
+
         dataset_c = Dataset(output_file_c)
-        array = np.array(dataset.variables['RRS400'])
-        array_c = np.array((dataset_c.variables['RRS400']))
-        dif = array - array_c
-        print(np.mean(array[array!=-999]))
-        print(np.mean(array_c[array!=-999]))
+        array = np.array(dataset.variables['RRS708_75'])
+        array_c = np.array((dataset_c.variables['RRS708_75']))
+
+        print(len(array[array!=-999]))
+        print(len(array[array_c!=-999]))
+
+        dif = array[array != -999] / array_c [array  != -999]
+        print(np.mean(array[array != -999]))
+        print(np.mean(array_c[array != -999]))
         print(np.mean(dif[:]))
 
 

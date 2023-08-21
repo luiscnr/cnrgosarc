@@ -174,7 +174,7 @@ class ArcIntegration():
 
     def create_nc_file_out(self, ofname, timeliness):
         if self.verbose:
-            print(f'[INFO] Copying file base to start output file...')
+            print(f'[INFO] Copying file base {self.ami.ifile_base} to start output file...')
         datasetout = self.ami.copy_nc_base(ofname)
         if datasetout is None:
             return datasetout
