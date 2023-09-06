@@ -44,7 +44,7 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        do_check9()
+        do_check10()
         # from datetime import datetime as dt
         # correcting_time_variable_in_plankton_files(dt(2016, 6, 1), dt(2016, 9, 30))
         # correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
@@ -1168,7 +1168,7 @@ def run_integration(arc_opt, start_date, end_date):
                 if output_type == 'CORRECT_RRS': ##COPY FILES FROM ALTERNATIVE PATH
                     if os.path.exists(alternative_path):
                         nfiles = len(os.listdir(alternative_path))
-                        if nfiles==3:
+                        if nfiles==3 or nfiles==4:
                             for name in os.listdir(alternative_path):
                                 fname = os.path.join(alternative_path,name)
                                 fcopy = os.path.join(output_path,name)
@@ -1429,6 +1429,28 @@ def get_limits(y, x, ystep, xstep, ny, nx):
     limits = [yini, yfin, xini, xfin]
     return limits
 
+def do_check10():
+    print('STARTED DO CHECK 10')
+    from olci_l2 import OLCI_L2
+    from netCDF4 import Dataset
+    import numpy as np
+    from arc_mapinfo import ArcMapInfo
+    ami = ArcMapInfo(None, args.verbose)
+    y,x = ami.area_def.get_array_coordinates_from_lonlat(-10.58157,65.62573)
+    print(y,x)
+    path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/REPROCESSING/S3B_OL_2_WFR____20230821T121630_20230821T121930_20230821T142834_0180_083_109_1800_MAR_O_NR_003.SEN3'
+    oimage = OLCI_L2(path,True)
+
+    array = oimage.get_reflectance_band_array(412,-999)
+    print(array[1960,4290])
+    array_orig = array * np.pi
+    print(array_orig[1960,4290])
+
+    new_image = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/REPROCESSING/S3B_OL_2_WFR____20230821T121630_20230821T121930_20230821T142834_0180_083_109_1800_MAR_O_NR_003_resampled_bis.nc'
+    dataset = Dataset(new_image,'r')
+    array_d = dataset.variables['RRS412_5']
+    print(array_d[1804,14220])
+    dataset.close()
 
 def do_check9():
     print('STARTED DO CHECK 9')

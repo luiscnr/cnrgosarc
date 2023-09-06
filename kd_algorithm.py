@@ -40,12 +40,14 @@ class KD_ALGORITHMS():
         array510 = np.array([rrs510])
         array560 = np.array([rrs560])
 
+
+
         chla = self.compute_chla_ocme4(array443,array490,array510,array560,None)
         if chla is None:
-            return -999.0
-        chla = self.compute_chla_ocme4(array443, array490, array510, array560, chla)
-        kd = self.compute_kd490_ok2_560(array490,array560,chla)
-        return kd[0]
+            return -999.0, -999.0, -999.0
+        chla2 = self.compute_chla_ocme4(array443, array490, array510, array560, chla)
+        q0,kd = self.compute_kd490_ok2_560(array490,array560,chla2)
+        return q0[0],kd[0], chla[0], chla2[0]
 
     def compute_kd(self, *args):
         if self.kdalgorithm == 'OK2-560':
@@ -67,10 +69,11 @@ class KD_ALGORITHMS():
 
     def compute_chla_ocme4(self, rrs443, rrs490, rrs510, rrs560, chla):
         #print(rrs443.shape)
-        rrs443[rrs443 < 0] = self.fillValue
-        rrs490[rrs490 < 0] = self.fillValue
-        rrs510[rrs510 < 0] = self.fillValue
-        rrs560[rrs560 < 0] = self.fillValue
+
+        rrs443[rrs443 <= 0] = self.fillValue
+        rrs490[rrs490 <= 0] = self.fillValue
+        rrs510[rrs510 <= 0] = self.fillValue
+        rrs560[rrs560 <= 0] = self.fillValue
         #print(rrs443.shape)
         # if len(rrs443[rrs443==self.fillValue])==len(rrs443):
         #     return None
@@ -132,13 +135,15 @@ class KD_ALGORITHMS():
 
         return res
 
-    def compute_kd490_ok2_560(self, rrs490, rrs560, chla):
+    def compute_kd490_ok2_560(self,rrs490, rrs560, chla):
         ##Morel et al., 2017 Examining the consistency of products derived from various ocean color sensors in open ocean (Case 1) waters in the perspective of a multi-sensor approach
         ##Remote Sens. Environ 111(1), 69-88
 
-        rrs490[rrs490 < 0] = self.fillValue
-        rrs560[rrs560 < 0] = self.fillValue
+        rrs490[rrs490 <= 0] = self.fillValue
+        rrs560[rrs560 <= 0] = self.fillValue
         valid = np.logical_and(rrs490 != self.fillValue, rrs560 != self.fillValue)
+
+
         # if chla is not None:
         #     valid = np.logical_and(valid == True, chla >= self.chla_range[0])
 
@@ -150,16 +155,22 @@ class KD_ALGORITHMS():
         q0_ratio[:] = self.q0ratio_default
         if chla is not None:
             q0_ratio[valid] = self.get_q0_ratio(chla[valid], '490/560')
-        log_ratio[valid] = rrs490[valid] / rrs560[valid]
+        log_ratio[valid] = np.divide(rrs490,rrs560)
+        #print('---->', rrs490[valid],rrs560[valid],log_ratio[valid], q0_ratio[valid])
         log_ratio[valid] = log_ratio[valid] / q0_ratio[valid]
         log_ratio[valid] = np.log10(log_ratio[valid])
-        log_ratio[valid] = log_ratio[valid]
+        #log_ratio[valid] = log_ratio[valid]
 
         res = np.zeros(rrs490.shape)
         res[valid == False] = self.fillValue
         for x in range(len(coeffs)):
             res[valid] = res[valid] + (coeffs[x] * np.power(log_ratio[valid], x))
+            #print(x,log_ratio[valid],res[valid])
+
+        #print(res[valid])
 
         res[valid] = np.power(10, res[valid]) + 0.0166
 
-        return res
+
+
+        return q0_ratio,res

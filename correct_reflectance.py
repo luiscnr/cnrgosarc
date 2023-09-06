@@ -26,29 +26,37 @@ def do_test():
     kd_model = KD_ALGORITHMS('OK2-560')
     file_input = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/rrs_points.csv'
     #file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/chla_multi.csv'
-    file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/kd_multi.csv'
+    file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/kd_olci_computed.csv'
     f1 = open(file_output, 'w')
     #f1.write('ChlaMulti;ChlaOlci')
-    f1.write('kd_multi')
+    f1.write('chla1;chla2;q0;kd_multi')
     dfi = pd.read_csv(file_input, sep=';')
     for idx, row in dfi.iterrows():
         if (idx%1000)==0:
             print('IDX: ',idx)
         # jday = int(row['JDay'])
         # longitude = float(row['Longitude'])
-        rrs443 = float(row['MultiVal_443'])
-        rrs490 = float(row['MultiVal_490'])
-        rrs560 = float(row['MultiVal_560'])
-        rrs665 = float(row['MultiVal_665'])
+
+        # rrs443 = float(row['MultiVal_443'])
+        # rrs490 = float(row['MultiVal_490'])
+        # rrs510 = float(row['MultiVal_510'])
+        # rrs560 = float(row['MultiVal_560'])
+        # rrs665 = float(row['MultiVal_665'])
+
+
+
         # cha_multi = chla_model.compute_chla_from_param(longitude,jday,rrs443,rrs490,rrs560,rrs665)
-        # rrs443 = float(row['OlciVal_443'])
-        # rrs490 = float(row['OlciVal_490'])
-        # rrs560 = float(row['OlciVal_560'])
-        # rrs665 = float(row['OlciVal_665'])
+
+        rrs443 = float(row['OlciVal_443'])
+        rrs490 = float(row['OlciVal_490'])
+        rrs510 = float(row['OlciVal_510'])
+        rrs560 = float(row['OlciVal_560'])
+        rrs665 = float(row['OlciVal_665'])
+
         #cha_olci = chla_model.compute_chla_from_param(longitude, jday, rrs443, rrs490, rrs560, rrs665)
-        kd_multi = kd_model.compute_kd_param(rrs443,rrs490,rrs560,rrs665)
+        q0,kd_multi,chla1,chla2 = kd_model.compute_kd_param(rrs443,rrs490,rrs510,rrs560)
         #line = f'{cha_multi};{cha_olci}'
-        line = f'{kd_multi}'
+        line = f'{chla1};{chla2};{q0};{kd_multi}'
         f1.write('\n')
         f1.write(line)
     f1.close()
