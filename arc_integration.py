@@ -76,6 +76,7 @@ class ArcIntegration():
         self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
         self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
         self.platform = arc_opt.get_value_param(section, 'platform', 'S3', 'str')
+        self.timeliness = 'NT'
 
         if self.output_type == 'TEST':
             rrs_variables = arc_opt.get_value_param(section, 'rrs_bands', list(self.rrs_variables_all.keys()),
@@ -1196,6 +1197,8 @@ class ArcIntegration():
             if not name.endswith('.nc'):
                 continue
             if not name.startswith(self.platform):
+                continue
+            if name.find(self.timeliness)<0:
                 continue
 
             finput = os.path.join(self.dir_input, name)

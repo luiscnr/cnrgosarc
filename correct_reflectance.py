@@ -61,7 +61,15 @@ def do_test():
         f1.write(line)
     f1.close()
     return True
+def do_test_points():
+    from arc_mapinfo import ArcMapInfo
+    ami = ArcMapInfo(None,False)
+    lat,long = ami.area_def.get_lonlat_from_array_coordinates(14700,2000)
+    print(lat,long)
+    return True
 def main():
+    if do_test_points():
+        return
     if do_test():
         return
     print('[INFO] Started correct reflectance')

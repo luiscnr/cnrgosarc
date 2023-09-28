@@ -1148,6 +1148,7 @@ def run_integration(arc_opt, start_date, end_date):
                     if args.verbose:
                         print(f'[INFO] File base: {file_base}')
             arc_integration.apply_pool = arc_opt.get_value_param('INTEGRATE', 'apply_pool', 0, 'int')
+            arc_integration.timeliness = timeliness
             if args.verbose:
                 print(f'[INFO] Timeliness: {timeliness}')
                 print(f'[INFO] Input path: {input_path}')
