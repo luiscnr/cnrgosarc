@@ -155,7 +155,8 @@ class KD_ALGORITHMS():
         q0_ratio[:] = self.q0ratio_default
         if chla is not None:
             q0_ratio[valid] = self.get_q0_ratio(chla[valid], '490/560')
-        log_ratio[valid] = np.divide(rrs490,rrs560)
+        #print('We are here: ',log_ratio.shape,valid.shape,)
+        log_ratio[valid] = np.divide(rrs490[valid],rrs560[valid])
         #print('---->', rrs490[valid],rrs560[valid],log_ratio[valid], q0_ratio[valid])
         log_ratio[valid] = log_ratio[valid] / q0_ratio[valid]
         log_ratio[valid] = np.log10(log_ratio[valid])
