@@ -407,6 +407,9 @@ class ArcProcessing:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 #print(array_490.shape,array_560.shape,array_chla.shape)
                 array_kd = kda.compute_kd(array_490,array_560,array_chla)
+                print('we are here, ',array_kd.shape,type(array_kd))
+                print('min value ', min_value, type(min_value))
+                print('max value ', max_value, type(max_value))
                 array_kd[array_kd < min_value] = -999.0
                 array_kd[array_kd > max_value] = -999.0
                 var_kd[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_kd[:, :]]
