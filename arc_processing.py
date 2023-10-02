@@ -406,7 +406,7 @@ class ArcProcessing:
                 else:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 #print(array_490.shape,array_560.shape,array_chla.shape)
-                array_kd = kda.compute_kd(array_490,array_560,array_chla)
+                q0ratio, array_kd = kda.compute_kd(array_490,array_560,array_chla)
                 print('we are here, ',array_kd.shape,type(array_kd))
                 print('min value ', min_value, type(min_value))
                 print('max value ', max_value, type(max_value))
