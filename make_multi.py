@@ -144,8 +144,8 @@ def only_test():
 
 
 def main():
-    if only_test():
-        return
+    # if only_test():
+    #     return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
         check_py()
