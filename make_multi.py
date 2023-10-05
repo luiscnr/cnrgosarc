@@ -142,8 +142,35 @@ def only_test():
 
     return True
 
+def do_test():
+    file_check = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/C2016122_rrs-arc-4km.nc'
+    from netCDF4 import Dataset
+    from kd_algorithm import KD_ALGORITHMS
+    dcheck = Dataset(file_check)
+    var_names = ['RRS443','RRS490','RRS510','RRS560','RRS665']
+
+
+    val443 = dcheck.variables['RRS443'][0,357,1136]
+    val490 = dcheck.variables['RRS490'][0, 357, 1136]
+    val510 = dcheck.variables['RRS510'][0, 357, 1136]
+    val560 = dcheck.variables['RRS560'][0, 357, 1136]
+    #val665 = dcheck.variables['RRS560'][0, 357, 1136]
+
+    dcheck.close()
+    kda = KD_ALGORITHMS('OK2-560')
+    res = kda.compute_kd_param(val443,val490,val510,val560)
+    print(res[1])
+    file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/output.nc'
+    dout = Dataset(file_output)
+    print(dout.variables['KD490'][0,357,1136])
+    dout.close()
+
+
+    return True
 
 def main():
+    # if do_test():
+    #     return
     # if only_test():
     #     return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
@@ -540,7 +567,7 @@ def run_kd490(arc_opt, start_date, end_date):
         print(f'[INFO]  timeliness:->{timeliness}')
 
     ##WORKING WITH SINGLE GRANULE
-    input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
+    input_name = arc_opt.get_value_param('KD490', 'name_input', None, 'str')
     if input_name is not None:
         input_file = os.path.join(options['input_path'], input_name)
         if os.path.exists(input_file):
@@ -548,7 +575,7 @@ def run_kd490(arc_opt, start_date, end_date):
                 print(f'[INFO] Working with the single file: {input_file}')
         else:
             print(f'[ERROR] File {input_file} does not exist')
-        output_name = arc_opt.get_value_param('PROCESSING', 'name_output', None, 'str')
+        output_name = arc_opt.get_value_param('KD490', 'name_output', None, 'str')
         if output_name is None:
             output_name = 'SingleOutputkd490.nc'
         output_file = os.path.join(options['output_path'], output_name)

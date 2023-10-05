@@ -300,9 +300,9 @@ class ArcProcessing:
                 print(f'[ERROR] RRS variable {band} is not available. Exiting...')
                 return
         var443 = ncsat.variables[rrs_bands[0]]
-        var490 = ncsat.variables[rrs_bands[2]]
-        var510 = ncsat.variables[rrs_bands[3]]
-        var560 = ncsat.variables[rrs_bands[1]]
+        var490 = ncsat.variables[rrs_bands[1]]
+        var510 = ncsat.variables[rrs_bands[2]]
+        var560 = ncsat.variables[rrs_bands[3]]
 
         datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
         if datasetout is None:
@@ -407,9 +407,9 @@ class ArcProcessing:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 #print(array_490.shape,array_560.shape,array_chla.shape)
                 q0ratio, array_kd = kda.compute_kd(array_490,array_560,array_chla)
-                print('we are here, ',array_kd.shape,type(array_kd))
-                print('min value ', min_value, type(min_value))
-                print('max value ', max_value, type(max_value))
+                # print('we are here, ',array_kd.shape,type(array_kd))
+                # print('min value ', min_value, type(min_value))
+                # print('max value ', max_value, type(max_value))
                 array_kd[array_kd < min_value] = -999.0
                 array_kd[array_kd > max_value] = -999.0
                 var_kd[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_kd[:, :]]
