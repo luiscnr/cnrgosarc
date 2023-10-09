@@ -172,6 +172,7 @@ def main():
                 else:
                     options_clim[option] = False
             else:
+                print(option)
                 options_clim[option] = int(options[ref][option].strip())
 
     ## getting date
