@@ -20,7 +20,92 @@ parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true"
 args = parser.parse_args()
 
 
+def do_test():
+    file_nc = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_MULTI_CLIMATOLOGY/TEMP_07_19/TempResults_800_1000_800_1000.nc'
+    from netCDF4 import Dataset
+    dataset = Dataset(file_nc)
+    dc = np.array(dataset.variables['DATA_COMPUTATION'])
+    dw = np.array(dataset.variables['DATA_WEIGHT'])
+
+    avg_var = np.array(dataset.variables['W_AVG'])
+    avg_var_t = np.zeros(dc.shape)
+    avg_var_t[:, :, :] = avg_var[:, :]
+    ndata = np.array(dataset.variables['NOFOBS'])
+    num_wstd = np.power((dc - avg_var_t), 2)
+    num_wstd = np.multiply(dw, num_wstd)
+    el = num_wstd[:, 14, 173]
+    for e in el:
+        print('---> el cuadrado', e)
+    lasuma = np.nansum(num_wstd, axis=0)
+    print('la suma: ', lasuma[14, 173])
+    # num_wstd = np.multiply(num_wstd, dw)
+    factor = (ndata - 1) / ndata
+    print('Ndata ', ndata[14, 173], 'factor: ', factor[14, 173])
+    weighted_std = np.nansum(num_wstd, axis=0) / (factor * np.nansum(dw, axis=0))
+    weighted_std = np.sqrt(weighted_std)
+
+    data = dc[:, 14, 173]
+    weights = dw[:, 14, 173]
+    sum_data = 0
+    sum_weights = 0
+    for d, w in zip(data, weights):
+        # print(d,w)
+        if not np.isnan(d):
+            sum_data = sum_data + (d * w)
+            sum_weights = sum_weights + w
+    avg_w = sum_data / sum_weights
+
+    n_obs = 0
+    num = 0
+    denom = 0
+    for d, w in zip(data, weights):
+        # print(d,w)
+        if not np.isnan(d):
+            num = num + (w * ((d - avg_w) * (d - avg_w)))
+            denom = denom + w
+            n_obs = n_obs + 1
+    print('la suma tal: ', num)
+    factor = (n_obs - 1) / n_obs
+    print('nobs: ', n_obs, 'factor: ', factor)
+    denom = ((n_obs - 1) / n_obs) * denom
+    w_std = np.sqrt(num / denom)
+    # avg = np.nanmean(dc,axis=0)
+    # print('-----------------------')
+    # print(np.nanmean(tal))
+    # print(avg[14,173])
+    print('------------')
+    # avg_var = np.array(dataset.variables['W_AVG'])
+    # print(avg_var[14,173])
+    # print(avg_w)
+    # std_nor = np.array(dataset.variables['N_STD'])
+    std_var = np.array(dataset.variables['W_STD'])
+    # print(std_nor[14,173])
+    # print('NDATA',ndata[14,173],n_obs)
+    print(weighted_std[14, 173])
+    print(w_std)
+    print(std_var[14, 173])
+
+    dataset.close()
+
+    return True
+
+
+def do_test2():
+    file_nc = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_MULTI_CLIMATOLOGY/TEMP_07_19/Temp_200_400_400_600_2022.nc'
+    from netCDF4 import Dataset
+    dataset = Dataset(file_nc)
+    w = np.array(dataset.variables['WEIGHTS'])
+    w[w == -999] = np.nan
+    sw = np.nansum(w, axis=0)
+    print(np.min(sw), np.max(sw))
+    dataset.close()
+
+    return True
+
+
 def main():
+    # if do_test2():
+    #     return
     print('[INFO] STARTED CLIMATOLOGY')
     if not os.path.exists(args.config_file):
         print(f'[ERROR] Config file {args.config_file} does not exist. Exiting...')
@@ -59,8 +144,8 @@ def main():
     options_clim = {
         'temporal_window': 11,
         'spatial_window': 3,
-        'nywindow': 100,
-        'nxwindow': 100,
+        'nywindow': 200,
+        'nxwindow': 200,
         'use_weights': True,
         'variable': 'CHL',
         'ny': -1,
@@ -70,13 +155,18 @@ def main():
         'year_end': 2022,
         'yref': -1,
         'xref': -1,
+        'name_out': '$DATE$_chl_arc_multi_clima.nc',
+        'applyPool': 0,
+        'input_name': 'C$DATE$_chl-arc-4km.nc',
+        'log_scale': False
     }
 
+    # setting options
     for option in options_clim:
         if options.has_option(ref, option):
-            if option == 'file_ref' or option == 'variable':
+            if option == 'file_ref' or option == 'variable' or option == 'name_out' or option == 'input_name':
                 options_clim[option] = options[ref][option].strip()
-            elif option == 'use_weights':
+            elif option == 'use_weights' or options == 'log_scale':
                 if options[ref][option].strip().lower() == 'true' or options[ref][option].strip() == '1':
                     options_clim[option] = True
                 else:
@@ -84,6 +174,7 @@ def main():
             else:
                 options_clim[option] = int(options[ref][option].strip())
 
+    ## getting date
     date_here_str = args.date
     try:
         date_here = dt.strptime(date_here_str, '%Y-%m-%d')
@@ -92,184 +183,63 @@ def main():
         return
 
     if args.mode == 'MULTI':
-        if options_clim['yref'] == -1 and options_clim['xref'] == -1 and options_clim['ny'] >= 0 and options_clim[
-            'nx'] >= 0:
-            ny = options_clim['ny']
-            nx = options_clim['nx']
-            nywindow = options_clim['nywindow']
-            nxwindow = options_clim['nxwindow']
-            temporal_window = options_clim['temporal_window']
-            year_ini = options_clim['year_ini']
-            year_end = options_clim['year_end']
-            ##version 1
-            for year in range(year_ini, year_end + 1):
-                date_here = date_here.replace(year=year)
-                options_clim_here = options_clim.copy()
-                options_clim_here['year_ini'] = year
-                options_clim_here['year_end'] = year
-                warnings.simplefilter('ignore', UserWarning)
-                warnings.simplefilter('ignore', RuntimeWarning)
-                # make_clim_multi_day_extracts(input_path, output_path, date_here, options_clim_here)
-            make_clime_multi_day_computation(output_path, date_here, None)
-            ##version 2
-            # date_list = get_input_file_list_day(date_here, temporal_window, input_path, year_ini, year_end)
-            # for y in range(0, ny, nywindow):
-            #     for x in range(0, nx, nxwindow):
-            #         limits = get_limits(y, x, nywindow, nxwindow, ny, nx)
-            #         nywindow_here = limits[1] - limits[0]
-            #         nxwindow_here = limits[3] - limits[2]
-            #         options_clim_here = options_clim.copy()
-            #         options_clim_here['nywindow'] = nywindow_here
-            #         options_clim_here['nxwindow'] = nxwindow_here
-            #         options_clim_here['yref'] = limits[0]
-            #         options_clim_here['xref'] = limits[2]
-            #
-            #         make_clim_multi_day_v2(input_path, output_path, date_here, options_clim_here, date_list, ny, nx)
+        year_ini = options_clim['year_ini']
+        year_end = options_clim['year_end']
+        apply_pool = options_clim['applyPool']
+        if apply_pool != 0:
+            params_list = []
+            from multiprocessing import Pool
+            if args.verbose:
+                print('[INFO] Starting parallel processing')
+        else:
+            if args.verbose:
+                print('[INFO] Starting sequential processing')
 
-    # date_here_str = options[ref]['date']
-    # date_here = dt.strptime(date_here_str, '%Y-%m-%d')
-
-    # if args.mode == 'MULTI':
-    #     make_clim_multi_day(input_path, output_path, date_here, options)
+        for year in range(year_ini, year_end + 1):
+            date_here = date_here.replace(year=year)
+            options_clim_here = options_clim.copy()
+            options_clim_here['year_ini'] = year
+            options_clim_here['year_end'] = year
+            warnings.simplefilter('ignore', UserWarning)
+            warnings.simplefilter('ignore', RuntimeWarning)
+            if apply_pool == 0:  ##sequential
+                make_clim_multi_day_extracts(input_path, output_path, date_here, options_clim_here)
+            else:
+                params_here = [input_path, output_path, date_here, options_clim_here]
+                params_list.append(params_here)
+                if len(params_list) == options_clim['applyPool']:
+                    if args.verbose:
+                        print(f'[INFO] Running parallel processes: {apply_pool}')
+                    poolhere = Pool(apply_pool)
+                    poolhere.map(make_clim_multi_day_extracts_parallel, params_list)
+                    params_list = []
+        if apply_pool != 0 and len(params_list) > 0:
+            if args.verbose:
+                print(f'[INFO] Running parallel processes: {apply_pool} -> {len(params_list)}')
+            poolhere.map(make_clim_multi_day_extracts_parallel, params_list)
+        make_clime_multi_day_computation(output_path, date_here, options_clim)
+        make_clim_together(output_path, date_here, options_clim)
 
 
-def make_clim_multi_day_v2(input_path, output_path, date_here, options, date_list, ny, nx):
-    if options is None:
-        temporal_window = 11
-        spatial_window = 3
-        xref = 0
-        yref = 0
-        nywindow = 100
-        nxwindow = 100
-        use_weights = True
-        variable = 'CHL'
-        ny = -1
-        nx = -1
-        file_ref = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
-        year_ini = 1998
-        year_end = 2022
-    else:
-        temporal_window = options['temporal_window']  # 11
-        spatial_window = options['spatial_window']  # 3
-        nywindow = options['nywindow']
-        nxwindow = options['nxwindow']
-        use_weights = options['use_weights']
-        variable = options['variable']
-        ny = options['ny']
-        nx = options['nx']
-        file_ref = options['file_ref']
-        year_ini = options['year_ini']  # 1998
-        year_end = options['year_end']  # 2022
-        yref = options['yref']
-        xref = options['xref']
 
-    if args.verbose:
-        print(f'[INFO]**********************************************************')
-        print(f'[INFO] YRef: {yref} XRef: {xref}  NYWindow: {nywindow} NXWindow: {nxwindow}')
-        print(f'[INFO] Temporal window: {temporal_window} Spatial window: {spatial_window}')
-    if date_list is None:
-        date_list = get_input_file_list_day(date_here, temporal_window, input_path, year_ini, year_end)
-    if ny == -1 and nx == -1:
-        for date_str in date_list:
-            input_file = date_list[date_str]['input_file']
-            if input_file is not None:
-                ny, nx = get_ny_nx(input_file, variable)
-    nyears = (year_end - year_ini) + 1
-    ndata = nyears * temporal_window * spatial_window * spatial_window
-
-    data_computation = np.zeros((ndata, nywindow, nxwindow))
-    data_weights = np.ones((ndata, nywindow, nxwindow))
-    if use_weights:
-        if args.verbose:
-            print('[INFO] Retrieving weights...')
-        spatial_weights = get_spatial_weight_filter_3x3(None, 1, 1)
-        temporal_weights = get_temporal_weight_filter(None, temporal_window, 1, 1)
-        index = 0
-        for iyear in range(nyears):
-            for itemporal in range(len(temporal_weights)):
-                for ispatial in range(len(spatial_weights)):
-                    data_weights[index, :, :] = spatial_weights[ispatial] * temporal_weights[itemporal]
-                    index = index + 1
-
-    if args.verbose:
-        print('[INFO] Getting data...')
-    data_computation[:] = -999.0
-    itime = 0
-    idate = 0
-    year_ref = -1
-    for date_str in date_list:
-        date_h = dt.strptime(date_str, '%Y-%m-%d')
-        year = date_h.year
-        iyear = year - year_ini
-        input_file = date_list[date_str]['input_file']
-        input_data = None
-        # input_data = date_list[date_str]['input_array']
-        # if input_data is None:
-        #     dataset = Dataset(input_file)
-        #     input_data = np.array(dataset.variables[variable])
-        #     dataset.close()
-        if args.verbose and year != year_ref:
-            year_ref = year
-            print(
-                f'[INFO] Date: {date_str} Index all: {itime}  Index date: {idate}  Index year: {iyear} Input file: {input_file}')
-        if input_file is None:
-            itime = itime + (spatial_window * spatial_window)
-            idate = idate + 1
-            continue
-
-        # print(itime,yref,nywindow,xref,nxwindow,ny,nx)
-        indices = [itime, yref, nywindow, xref, nxwindow, ny, nx]
-        data_computation, weighted_avg = set_data_window_3x3(data_computation, input_file, variable, indices, None,
-                                                             input_data)
-        itime = itime + (spatial_window * spatial_window)
-        idate = idate + 1
-
-    # data_computation[data_computation == -999.0] = np.nan
-    # data_weights[data_computation == -999.0] = np.nan
-    #
-    #
-    # # r, c = np.unravel_index(np.nanargmax(std), std.shape)
-    # # print(std[r, c])
-    # # print(data_computation[:, r, c])
-    #
-    # # avg = np.nanmean(data_computation[:, :, :], axis=0)
-    # std = np.std(data_computation[:, :, :], axis=0)
-    # median = np.median(data_computation[:, :, :], axis=0)
-    #
-    # prod = data_computation * data_weights
-    # weighted_avg = np.sum(prod) / np.sum(data_weights)
-    # nofobs = np.count_nonzero(~np.isnan(data_computation), axis=0)
-    #
-    # # min_array = np.nanmin(data_computation[:, :, :], axis=0)
-    # # max_array = np.nanmax(data_computation[:, :, :], axis=0)
-
-    if args.verbose:
-        print('[INFO] COMPLETED')
+def make_clim_multi_day_extracts_parallel(params):
+    make_clim_multi_day_extracts(params[0], params[1], params[2], params[3])
 
 
 def make_clim_multi_day_extracts(input_path, output_path, date_here, options):
-    if options is None:
-        temporal_window = 11
-        spatial_window = 3
-        nywindow = 1375
-        nxwindow = 1375
-        use_weights = True
-        variable = 'CHL'
-        ny = -1
-        nx = -1
-        file_ref = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
-    else:
-        temporal_window = options['temporal_window']  # 11
-        spatial_window = options['spatial_window']  # 3
-        nywindow = options['nywindow']
-        nxwindow = options['nxwindow']
-        use_weights = options['use_weights']
-        variable = options['variable']
-        ny = options['ny']
-        nx = options['nx']
-        file_ref = options['file_ref']
+    temporal_window = options['temporal_window']  # 11
+    spatial_window = options['spatial_window']  # 3
+    nywindow = options['nywindow']
+    nxwindow = options['nxwindow']
+    use_weights = options['use_weights']
+    variable = options['variable']
+    ny = options['ny']
+    nx = options['nx']
+    input_name = options['input_name']
+    log_scale = options['log_scale']
 
-    date_list = get_input_file_list_day(date_here, temporal_window, input_path, date_here.year, date_here.year)
+    date_list = get_input_file_list_day(date_here, temporal_window, input_path, date_here.year, date_here.year,
+                                        input_name)
     if ny == -1 and nx == -1:
         for date_str in date_list:
             input_file = date_list[date_str]['input_file']
@@ -327,85 +297,39 @@ def make_clim_multi_day_extracts(input_path, output_path, date_here, options):
     output_temp = os.path.join(output_path, f'TEMP_{mstr}_{dstr}')
     if not os.path.isdir(output_temp):
         os.mkdir(output_temp)
-    for y in range(0, ny, 200):
-        for x in range(0, nx, 200):
-            limits = get_limits(y, x, 200, 200, ny, nx)
+    for y in range(0, ny, nywindow):
+        for x in range(0, nx, nxwindow):
+            limits = get_limits(y, x, nywindow, nxwindow, ny, nx)
             nywindow_here = limits[1] - limits[0]
             nxwindow_here = limits[3] - limits[2]
             output_file = os.path.join(output_temp,
                                        f'Temp_{limits[0]}_{limits[1]}_{limits[2]}_{limits[3]}_{date_here.year}.nc')
             dout = start_data_temporal_file(output_file, nywindow_here, nxwindow_here, ndata)
-            dout.variables['DATA'][:, :, :] = data_computation[:, limits[0]:limits[1], limits[2]:limits[3]]
+            array = data_computation[:, limits[0]:limits[1], limits[2]:limits[3]]
+            if log_scale:
+                array = np.log10(array)
+            dout.variables['DATA'][:, :, :] = array
             dout.variables['WEIGHTS'][:, :, :] = data_weights[:, limits[0]:limits[1], limits[2]:limits[3]]
             dout.close()
-
-    ###DEPRECATED
-    # if args.verbose:
-    #     print(f'[INFO] Computing temporal average for date: {date_here}')
-    # temporal_weights[np.isnan(data_computation_w)] = np.nan
-    # temporal_weighted_data = np.multiply(data_computation_w, temporal_weights)
-    # temporal_weighted_data_sum = np.nansum(temporal_weighted_data, axis=0)
-    # temporal_weights_sum = np.nansum(temporal_weights, axis=0)
-    # temporal_weights_count = np.count_nonzero(~np.isnan(temporal_weights), axis=0)
-    # temporal_weighted_avg = temporal_weighted_data_sum / temporal_weights_sum
-    # temporal_weighted_avg[temporal_weights_sum == 0] = -999
-    #
-    # avg = np.nanmean(data_computation[:, :, :], axis=0)
-    # std = np.nanstd(data_computation[:, :, :], axis=0)
-    # # r, c = np.unravel_index(np.nanargmax(std), std.shape)
-    # # print(std[r, c])
-    # # print(data_computation[:, r, c])
-    #
-    # median = np.nanmedian(data_computation[:, :, :], axis=0)
-    # min_array = np.nanmin(data_computation[:, :, :], axis=0)
-    # max_array = np.nanmax(data_computation[:, :, :], axis=0)
-    #
-    # date_here_str = date_here.strftime('%Y%m%d')
-    # output_file = os.path.join(output_path, f'Avg_{date_here_str}.nc')
-    #
-    # # print(output_file, os.path.exists(file_ref))
-    # dout = start_climatology_temporal_file(output_file, file_ref)
-    # dout.variables['W_AVG'][0, :, :] = temporal_weighted_avg[:, :]
-    # dout.variables['N_AVG'][0, :, :] = avg[:, :]
-    # dout.variables['STD'][0, :, :] = std[:, :]
-    # dout.variables['MEDIAN'][0, :, :] = median[:, :]
-    # dout.variables['MIN'][0, :, :] = min_array[:, :]
-    # dout.variables['MAX'][0, :, :] = max_array[:, :]
-    # dout.variables['DIFF_N_W'][0, :, :] = temporal_weighted_avg[:, :] / avg[:, :]
-    # dout.variables['N_DAYS'][0, :, :] = temporal_weights_count[:, :]
-    # dout.variables['SUM_W'][0, :, :] = temporal_weights_sum[:, :]
-    #
-    # dout.close()
 
     print('[INFO] Completed')
 
 
 def make_clime_multi_day_computation(output_path, date_here, options):
-    if options is None:
-        temporal_window = 11
-        spatial_window = 3
-        nywindow = 200
-        nxwindow = 200
-        use_weights = True
-        variable = 'CHL'
-        ny = 1375
-        nx = 1375
-        year_ini = 1998
-        year_end = 2022
-        file_ref = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
-    else:
-        temporal_window = options['temporal_window']  # 11
-        spatial_window = options['spatial_window']  # 3
-        nywindow = options['nywindow']
-        nxwindow = options['nxwindow']
-        use_weights = options['use_weights']
-        variable = options['variable']
-        ny = options['ny']
-        nx = options['nx']
-        file_ref = options['file_ref']
-        year_ini = options['year_ini']  # 1998
-        year_end = options['year_end']  # 2022
-        file_ref = options['file_ref']
+    temporal_window = options['temporal_window']  # 11
+    spatial_window = options['spatial_window']  # 3
+    nywindow = options['nywindow']
+    nxwindow = options['nxwindow']
+    ny = options['ny']
+    nx = options['nx']
+    year_ini = options['year_ini']  # 1998
+    year_end = options['year_end']  # 2022
+    apply_pool = options['applyPool']
+    if apply_pool != 0:
+        params_list = []
+        from multiprocessing import Pool
+        if args.verbose:
+            print('[INFO] Starting parallel processing')
 
     mstr = date_here.strftime('%m')
     dstr = date_here.strftime('%d')
@@ -417,54 +341,124 @@ def make_clime_multi_day_computation(output_path, date_here, options):
 
     for y in range(0, ny, nywindow):
         for x in range(0, nx, nxwindow):
-            limits = get_limits(y, x, 200, 200, ny, nx)
-            nywindow_here = limits[1] - limits[0]
-            nxwindow_here = limits[3] - limits[2]
-            data_computation = np.zeros((ndata, nywindow_here, nxwindow_here))
-            data_weights = np.ones((ndata, nywindow_here, nxwindow_here))
-            output_file = os.path.join(output_temp, f'TempResults_{limits[0]}_{limits[1]}_{limits[2]}_{limits[3]}.nc')
-
-            idata = 0
-            for year in range(year_ini, year_end + 1):
-                input_file = os.path.join(output_temp,
-                                          f'Temp_{limits[0]}_{limits[1]}_{limits[2]}_{limits[3]}_{date_here.year}.nc')
-                dset = Dataset(input_file)
-                data_computation[idata:idata + nbyyear, :, :] = np.array(dset.variables['DATA'][:, :, :])
-                data_weights[idata:idata + nbyyear, :, :] = np.array(dset.variables['WEIGHTS'][:, :, :])
-                dset.close()
-
-            data_weights[data_computation == -999] = np.nan
-            data_computation[data_computation == -999] = np.nan
-
-            print(f'[INFO] Computing for {y} - {x} ')
-            avg = np.nanmean(data_computation, axis=0)
-            median = np.nanmedian(data_computation, axis=0)
-            std = np.nanstd(data_computation, axis=0)
-            min_array = np.nanmin(data_computation, axis=0)
-            max_array = np.nanmax(data_computation, axis=0)
-            nofobs = np.count_nonzero(~np.isnan(data_computation), axis=0)
-            weigthed_prod = np.multiply(data_computation, data_weights)
-            weighted_avg = np.nansum(weigthed_prod, axis=0) / np.nansum(data_weights, axis=0)
-            num_wstd = (data_computation - weighted_avg) * (data_computation - weighted_avg)
-            num_wstd = np.multiply(num_wstd, data_weights)
-            factor = ndata - 1 / ndata
-            weighted_std = np.nansum(num_wstd, axis=0) / (factor * np.nansum(data_weights))
-            weighted_std = np.sqrt(weighted_std)
-
-            dout = start_results_temporal_file(output_file, nywindow_here, nxwindow_here)
-            dout.variables['W_AVG'][:, :] = weighted_avg[:, :]
-            dout.variables['N_AVG'][:, :] = avg[:, :]
-            dout.variables['W_STD'][:, :] = weighted_std[:, :]
-            dout.variables['N_STD'][:, :] = std[:, :]
-            dout.variables['MEDIAN'][:, :] = median[:, :]
-            dout.variables['MIN'][:, :] = min_array[:, :]
-            dout.variables['MAX'][:, :] = max_array[:, :]
-            dout.variables['NOFOBS'][:, :] = nofobs[:, :]
-
-            dout.close()
+            limits = get_limits(y, x, nywindow, nxwindow, ny, nx)
+            if apply_pool == 0:
+                make_clime_multi_day_computation_impl(ndata, nbyyear, nyears, limits, year_ini, year_end, output_temp)
+            else:
+                params_here = [ndata, nbyyear, nyears, limits, year_ini, year_end, output_temp]
+                params_list.append(params_here)
+                if len(params_list) == apply_pool:
+                    if args.verbose:
+                        print(f'[INFO] Running parallel processes: {apply_pool}')
+                    poolhere = Pool(apply_pool)
+                    poolhere.map(make_clime_multi_day_computation_impl_parallel, params_list)
+                    params_list = []
+    if apply_pool != 0 and len(params_list) > 0:
+        if args.verbose:
+            print(f'[INFO] Running parallel processes: {apply_pool} -> {len(params_list)}')
+        poolhere = Pool(apply_pool)
+        poolhere.map(make_clime_multi_day_computation_impl_parallel, params_list)
 
 
-def get_input_file_list_day(date_here, temporal_window, input_path, year_ini, year_end):
+def make_clime_multi_day_computation_impl_parallel(params):
+    make_clime_multi_day_computation_impl(params[0], params[1], params[2], params[3], params[4], params[5], params[6])
+
+
+def make_clime_multi_day_computation_impl(ndata, nbyyear, nyears, limits, year_ini, year_end, output_temp):
+    nywindow_here = limits[1] - limits[0]
+    nxwindow_here = limits[3] - limits[2]
+    data_computation = np.zeros((ndata, nywindow_here, nxwindow_here))
+    data_weights = np.ones((ndata, nywindow_here, nxwindow_here))
+    output_file = os.path.join(output_temp, f'TempResults_{limits[0]}_{limits[1]}_{limits[2]}_{limits[3]}.nc')
+    idata = 0
+    for year in range(year_ini, year_end + 1):
+        input_file = os.path.join(output_temp, f'Temp_{limits[0]}_{limits[1]}_{limits[2]}_{limits[3]}_{year}.nc')
+        dset = Dataset(input_file)
+        data_computation[idata:idata + nbyyear, :, :] = np.array(dset.variables['DATA'][:, :, :])
+        data_weights[idata:idata + nbyyear, :, :] = np.array(dset.variables['WEIGHTS'][:, :, :])
+
+        dset.close()
+        idata = idata + nbyyear
+
+    data_weights[data_computation == -999] = np.nan
+    data_computation[data_computation == -999] = np.nan
+
+    print(f'[INFO] Computing for {limits[0]} - {limits[1]} {limits[2]} - {limits[3]}')
+
+    avg = np.nanmean(data_computation, axis=0)
+    median = np.nanmedian(data_computation, axis=0)
+    std = np.nanstd(data_computation, axis=0)
+    min_array = np.nanmin(data_computation, axis=0)
+    max_array = np.nanmax(data_computation, axis=0)
+    nofobs = np.count_nonzero(~np.isnan(data_weights), axis=0)
+    weigthed_prod = np.multiply(data_computation, data_weights)
+    sum_weights = np.nansum(data_weights, axis=0)
+    weighted_avg = np.nansum(weigthed_prod, axis=0) / sum_weights
+    diff_n_w = np.abs(avg - weighted_avg)
+
+    # weighted str
+    weighted_avg_t = np.zeros(data_computation.shape)
+    weighted_avg_t[:, :, :] = weighted_avg[:, :]
+    num_wstd = np.power((data_computation - weighted_avg_t), 2)
+    num_wstd = np.multiply(num_wstd, data_weights)
+    factor = (nofobs - 1) / nofobs
+    weighted_std = np.nansum(num_wstd, axis=0) / (factor * sum_weights)
+    weighted_std = np.sqrt(weighted_std)
+
+    pw = (sum_weights / (24 * nyears)) * 100
+
+    # ntimes = data_weights.shape[0]
+    dout = start_results_temporal_file(output_file, nywindow_here, nxwindow_here)
+    dout.variables['W_AVG'][:, :] = weighted_avg[:, :]
+    dout.variables['N_AVG'][:, :] = avg[:, :]
+    dout.variables['W_STD'][:, :] = weighted_std[:, :]
+    dout.variables['N_STD'][:, :] = std[:, :]
+    dout.variables['MEDIAN'][:, :] = median[:, :]
+    dout.variables['MIN'][:, :] = min_array[:, :]
+    dout.variables['MAX'][:, :] = max_array[:, :]
+    dout.variables['NOFOBS'][:, :] = nofobs[:, :]
+    dout.variables['SUM_W'][:, :] = sum_weights[:, :]
+    dout.variables['PORC_W'][:, :] = pw[:, :]
+    dout.variables['DIFF_N_W'][:, :] = diff_n_w[:, :]
+
+    # dout.variables['DATA_WEIGHT'][:, :, :] = data_weights[:, :, :]
+    # dout.variables['DATA_COMPUTATION'][:, :, :] = data_computation[:, :, :]
+
+    dout.close()
+
+
+def make_clim_together(output_path, date_here, options):
+    nywindow = options['nywindow']
+    nxwindow = options['nxwindow']
+    ny = options['ny']
+    nx = options['nx']
+    year_ini = options['year_ini']  # 1998
+    year_end = options['year_end']  # 2022
+    name_out = options['name_out']
+
+    mstr = date_here.strftime('%m')
+    dstr = date_here.strftime('%d')
+    output_temp = os.path.join(output_path, f'TEMP_{mstr}_{dstr}')
+    date_here_str = f'{year_ini}{mstr}{dstr}_{year_end}{mstr}{dstr}'
+    name_out = name_out.replace('$DATE$', date_here_str)
+    file_out = os.path.join(output_path, name_out)
+    dout = start_results_temporal_file(file_out, ny, nx)
+
+    for y in range(0, ny, nywindow):
+        for x in range(0, nx, nxwindow):
+            limits = get_limits(y, x, nywindow, nxwindow, ny, nx)
+            # nywindow_here = limits[1] - limits[0]
+            # nxwindow_here = limits[3] - limits[2]
+            file_results = os.path.join(output_temp, f'TempResults_{limits[0]}_{limits[1]}_{limits[2]}_{limits[3]}.nc')
+            din = Dataset(file_results)
+            for var in din.variables:
+                dout.variables[var][limits[0]:limits[1], limits[2]:limits[3]] = din.variables[var][:, :]
+            din.close()
+
+    dout.close()
+
+
+def get_input_file_list_day(date_here, temporal_window, input_path, year_ini, year_end, input_name):
     if args.verbose:
         print(f'[INFO] Getting file list...')
     ndaysw = int(np.floor(temporal_window / 2))
@@ -480,7 +474,10 @@ def get_input_file_list_day(date_here, temporal_window, input_path, year_ini, ye
             date_here_str = date_here_ref.strftime('%Y-%m-%d')
             year_str = date_here_ref.strftime('%Y')
             jjj_str = date_here_ref.strftime('%j')
-            input_file = os.path.join(input_path, year_str, jjj_str, f'C{year_str}{jjj_str}_chl-arc-4km.nc')
+            date_str = f'{year_str}{jjj_str}'
+            name_in = input_name.replace('$DATE$', date_str)
+            # input_file = os.path.join(input_path, year_str, jjj_str, f'C{year_str}{jjj_str}_chl-arc-4km.nc')
+            input_file = os.path.join(input_path, year_str, jjj_str, name_in)
             if os.path.exists(input_file):
                 date_list[date_here_str] = {'input_file': input_file, 'input_array': None}
             else:
@@ -517,6 +514,7 @@ def start_results_temporal_file(output_file, ny, nx):
 
     print(f'Starting file:{output_file}')
 
+    # dout.createDimension('time', ntimes)
     dout.createDimension('y', ny)  # ny
     dout.createDimension('x', nx)  # nx
     dout.createVariable('W_AVG', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
@@ -529,9 +527,11 @@ def start_results_temporal_file(output_file, ny, nx):
     dout.createVariable('MEDIAN', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
     dout.createVariable('MIN', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
     dout.createVariable('MAX', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
-    dout.createVariable('NYEARS', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
-    dout.createVariable('NDAYS', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
     dout.createVariable('NOFOBS', 'f4', ('y', 'x'), fill_value=-999, zlib=True, complevel=6)
+
+    # dout.createVariable('DATA_WEIGHT', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True, complevel=6)
+    # dout.createVariable('DATA_COMPUTATION', 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True, complevel=6)
+
     return dout
 
 
@@ -930,6 +930,140 @@ def get_spatial_weight_filter_3x3(options, ny, nx):
     if ny == 1 and nx == 1:
         spatial_weights = spatial_weights.flatten()
     return spatial_weights
+
+
+def mainV2():
+    # ##version 2 DEPRECATED
+    # date_list = get_input_file_list_day(date_here, temporal_window, input_path, year_ini, year_end)
+    # for y in range(0, ny, nywindow):
+    #     for x in range(0, nx, nxwindow):
+    #         limits = get_limits(y, x, nywindow, nxwindow, ny, nx)
+    #         nywindow_here = limits[1] - limits[0]
+    #         nxwindow_here = limits[3] - limits[2]
+    #         options_clim_here = options_clim.copy()
+    #         options_clim_here['nywindow'] = nywindow_here
+    #         options_clim_here['nxwindow'] = nxwindow_here
+    #         options_clim_here['yref'] = limits[0]
+    #         options_clim_here['xref'] = limits[2]
+    #
+    #         make_clim_multi_day_v2(input_path, output_path, date_here, options_clim_here, date_list, ny, nx)
+    #
+    # date_here_str = options[ref]['date']
+    # date_here = dt.strptime(date_here_str, '%Y-%m-%d')
+    return
+def make_clim_multi_day_v2(input_path, output_path, date_here, options, date_list, ny, nx):
+    if options is None:
+        temporal_window = 11
+        spatial_window = 3
+        xref = 0
+        yref = 0
+        nywindow = 100
+        nxwindow = 100
+        use_weights = True
+        variable = 'CHL'
+        ny = -1
+        nx = -1
+        file_ref = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
+        year_ini = 1998
+        year_end = 2022
+    else:
+        temporal_window = options['temporal_window']  # 11
+        spatial_window = options['spatial_window']  # 3
+        nywindow = options['nywindow']
+        nxwindow = options['nxwindow']
+        use_weights = options['use_weights']
+        variable = options['variable']
+        ny = options['ny']
+        nx = options['nx']
+        file_ref = options['file_ref']
+        year_ini = options['year_ini']  # 1998
+        year_end = options['year_end']  # 2022
+        yref = options['yref']
+        xref = options['xref']
+    input_name = options['input_name']
+    if args.verbose:
+        print(f'[INFO]**********************************************************')
+        print(f'[INFO] YRef: {yref} XRef: {xref}  NYWindow: {nywindow} NXWindow: {nxwindow}')
+        print(f'[INFO] Temporal window: {temporal_window} Spatial window: {spatial_window}')
+    if date_list is None:
+        date_list = get_input_file_list_day(date_here, temporal_window, input_path, year_ini, year_end, input_name)
+    if ny == -1 and nx == -1:
+        for date_str in date_list:
+            input_file = date_list[date_str]['input_file']
+            if input_file is not None:
+                ny, nx = get_ny_nx(input_file, variable)
+    nyears = (year_end - year_ini) + 1
+    ndata = nyears * temporal_window * spatial_window * spatial_window
+
+    data_computation = np.zeros((ndata, nywindow, nxwindow))
+    data_weights = np.ones((ndata, nywindow, nxwindow))
+    if use_weights:
+        if args.verbose:
+            print('[INFO] Retrieving weights...')
+        spatial_weights = get_spatial_weight_filter_3x3(None, 1, 1)
+        temporal_weights = get_temporal_weight_filter(None, temporal_window, 1, 1)
+        index = 0
+        for iyear in range(nyears):
+            for itemporal in range(len(temporal_weights)):
+                for ispatial in range(len(spatial_weights)):
+                    data_weights[index, :, :] = spatial_weights[ispatial] * temporal_weights[itemporal]
+                    index = index + 1
+
+    if args.verbose:
+        print('[INFO] Getting data...')
+    data_computation[:] = -999.0
+    itime = 0
+    idate = 0
+    year_ref = -1
+    for date_str in date_list:
+        date_h = dt.strptime(date_str, '%Y-%m-%d')
+        year = date_h.year
+        iyear = year - year_ini
+        input_file = date_list[date_str]['input_file']
+        input_data = None
+        # input_data = date_list[date_str]['input_array']
+        # if input_data is None:
+        #     dataset = Dataset(input_file)
+        #     input_data = np.array(dataset.variables[variable])
+        #     dataset.close()
+        if args.verbose and year != year_ref:
+            year_ref = year
+            print(
+                f'[INFO] Date: {date_str} Index all: {itime}  Index date: {idate}  Index year: {iyear} Input file: {input_file}')
+        if input_file is None:
+            itime = itime + (spatial_window * spatial_window)
+            idate = idate + 1
+            continue
+
+        # print(itime,yref,nywindow,xref,nxwindow,ny,nx)
+        indices = [itime, yref, nywindow, xref, nxwindow, ny, nx]
+        data_computation, weighted_avg = set_data_window_3x3(data_computation, input_file, variable, indices, None,
+                                                             input_data)
+        itime = itime + (spatial_window * spatial_window)
+        idate = idate + 1
+
+    # data_computation[data_computation == -999.0] = np.nan
+    # data_weights[data_computation == -999.0] = np.nan
+    #
+    #
+    # # r, c = np.unravel_index(np.nanargmax(std), std.shape)
+    # # print(std[r, c])
+    # # print(data_computation[:, r, c])
+    #
+    # # avg = np.nanmean(data_computation[:, :, :], axis=0)
+    # std = np.std(data_computation[:, :, :], axis=0)
+    # median = np.median(data_computation[:, :, :], axis=0)
+    #
+    # prod = data_computation * data_weights
+    # weighted_avg = np.sum(prod) / np.sum(data_weights)
+    # nofobs = np.count_nonzero(~np.isnan(data_computation), axis=0)
+    #
+    # # min_array = np.nanmin(data_computation[:, :, :], axis=0)
+    # # max_array = np.nanmax(data_computation[:, :, :], axis=0)
+
+    if args.verbose:
+        print('[INFO] COMPLETED')
+
 
 
 if __name__ == '__main__':

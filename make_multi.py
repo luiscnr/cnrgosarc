@@ -160,7 +160,7 @@ def do_test():
     kda = KD_ALGORITHMS('OK2-560')
     res = kda.compute_kd_param(val443,val490,val510,val560)
     print(res[1])
-    file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/output.nc'
+    file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/C2016122_kd490-arc-4km.nc'
     dout = Dataset(file_output)
     print(dout.variables['KD490'][0,357,1136])
     dout.close()
@@ -169,8 +169,8 @@ def do_test():
     return True
 
 def main():
-    # if do_test():
-    #     return
+    if do_test():
+        return
     # if only_test():
     #     return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
