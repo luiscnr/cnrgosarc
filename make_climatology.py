@@ -166,13 +166,12 @@ def main():
         if options.has_option(ref, option):
             if option == 'file_ref' or option == 'variable' or option == 'name_out' or option == 'input_name':
                 options_clim[option] = options[ref][option].strip()
-            elif option == 'use_weights' or options == 'log_scale':
+            elif option == 'use_weights' or option == 'log_scale':
                 if options[ref][option].strip().lower() == 'true' or options[ref][option].strip() == '1':
                     options_clim[option] = True
                 else:
                     options_clim[option] = False
             else:
-                print(option)
                 options_clim[option] = int(options[ref][option].strip())
 
     ## getting date
