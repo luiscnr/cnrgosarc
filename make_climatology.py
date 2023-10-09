@@ -321,7 +321,7 @@ def make_clim_multi_day_extracts(input_path, output_path, date_here, options):
             dout = start_data_temporal_file(output_file, nywindow_here, nxwindow_here, ndata)
             array = data_computation[:, limits[0]:limits[1], limits[2]:limits[3]]
             if log_scale:
-                array = np.log10(array)
+                array[array!=-999] = np.log10(array[array!=-999])
             dout.variables['DATA'][:, :, :] = array
             dout.variables['WEIGHTS'][:, :, :] = data_weights[:, limits[0]:limits[1], limits[2]:limits[3]]
             dout.close()
