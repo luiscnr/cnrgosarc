@@ -14,7 +14,8 @@ parser = argparse.ArgumentParser(description="Arctic climatology")
 parser.add_argument("-m", "--mode", help="Mode", choices=["MULTI"], required=True)
 parser.add_argument("-c", "--config_file", help="Config file", required=True)
 # parser.add_argument('-i', "--inputpath", help="Input directory")
-parser.add_argument('-d', "--date", help="Date (yyyy-mm-dd)", required=True)
+parser.add_argument('-sd', "--start_date", help="Start date (yyyy-mm-dd)", required=True)
+parser.add_argument('-ed', "--end_date", help="End Date (yyyy-mm-dd)", required=True)
 # parser.add_argument('-o', "--output", help="Output directory")
 parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true")
 args = parser.parse_args()
@@ -175,50 +176,63 @@ def main():
                 options_clim[option] = int(options[ref][option].strip())
 
     ## getting date
-    date_here_str = args.date
+    date_here_str = args.start_date
     try:
         date_here = dt.strptime(date_here_str, '%Y-%m-%d')
     except:
-        print(f'[ERROR] Date for climatology is not in the correct format YYYY-mm-dd')
+        print(f'[ERROR] Start Date for climatology is not in the correct format YYYY-mm-dd')
         return
 
-    if args.mode == 'MULTI':
-        year_ini = options_clim['year_ini']
-        year_end = options_clim['year_end']
-        apply_pool = options_clim['applyPool']
-        if apply_pool != 0:
-            params_list = []
-            from multiprocessing import Pool
-            if args.verbose:
-                print('[INFO] Starting parallel processing')
-        else:
-            if args.verbose:
-                print('[INFO] Starting sequential processing')
+    if args.end_date:
+        date_here_end_str = args.end_date
+        try:
+            date_here_end = dt.strptime(date_here_end_str, '%Y-%m-%d')
+        except:
+            print(f'[WARNING] Start Date for climatology is not in the correct format YYYY-mm-dd.')
+            return
+    else:
+        date_here_end = date_here
 
-        for year in range(year_ini, year_end + 1):
-            date_here = date_here.replace(year=year)
-            options_clim_here = options_clim.copy()
-            options_clim_here['year_ini'] = year
-            options_clim_here['year_end'] = year
-            warnings.simplefilter('ignore', UserWarning)
-            warnings.simplefilter('ignore', RuntimeWarning)
-            if apply_pool == 0:  ##sequential
-                make_clim_multi_day_extracts(input_path, output_path, date_here, options_clim_here)
+    while date_here<=date_here_end:
+        if args.mode == 'MULTI':
+            year_ini = options_clim['year_ini']
+            year_end = options_clim['year_end']
+            apply_pool = options_clim['applyPool']
+            if apply_pool != 0:
+                params_list = []
+                from multiprocessing import Pool
+                if args.verbose:
+                    print('[INFO] Starting parallel processing')
             else:
-                params_here = [input_path, output_path, date_here, options_clim_here]
-                params_list.append(params_here)
-                if len(params_list) == options_clim['applyPool']:
-                    if args.verbose:
-                        print(f'[INFO] Running parallel processes: {apply_pool}')
-                    poolhere = Pool(apply_pool)
-                    poolhere.map(make_clim_multi_day_extracts_parallel, params_list)
-                    params_list = []
-        if apply_pool != 0 and len(params_list) > 0:
-            if args.verbose:
-                print(f'[INFO] Running parallel processes: {apply_pool} -> {len(params_list)}')
-            poolhere.map(make_clim_multi_day_extracts_parallel, params_list)
-        make_clime_multi_day_computation(output_path, date_here, options_clim)
-        make_clim_together(output_path, date_here, options_clim)
+                if args.verbose:
+                    print('[INFO] Starting sequential processing')
+
+            for year in range(year_ini, year_end + 1):
+                date_here_y = date_here.replace(year=year)
+                options_clim_here = options_clim.copy()
+                options_clim_here['year_ini'] = year
+                options_clim_here['year_end'] = year
+                warnings.simplefilter('ignore', UserWarning)
+                warnings.simplefilter('ignore', RuntimeWarning)
+                if apply_pool == 0:  ##sequential
+                    make_clim_multi_day_extracts(input_path, output_path, date_here_y, options_clim_here)
+                else:
+                    params_here = [input_path, output_path, date_here_y, options_clim_here]
+                    params_list.append(params_here)
+                    if len(params_list) == options_clim['applyPool']:
+                        if args.verbose:
+                            print(f'[INFO] Running parallel processes: {apply_pool}')
+                        poolhere = Pool(apply_pool)
+                        poolhere.map(make_clim_multi_day_extracts_parallel, params_list)
+                        params_list = []
+            if apply_pool != 0 and len(params_list) > 0:
+                if args.verbose:
+                    print(f'[INFO] Running parallel processes: {apply_pool} -> {len(params_list)}')
+                poolhere.map(make_clim_multi_day_extracts_parallel, params_list)
+            make_clime_multi_day_computation(output_path, date_here, options_clim)
+            make_clim_together(output_path, date_here, options_clim)
+
+        date_here = date_here + timedelta(hours=24)
 
 
 
