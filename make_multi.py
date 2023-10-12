@@ -642,6 +642,9 @@ def run_month(arc_opt, mode, start_date, end_date):
         output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
     else:
         output_type = mode
+
+    
+
     from arc_processing import ArcProcessing
     from calendar import monthrange
 
@@ -714,14 +717,14 @@ def run_month(arc_opt, mode, start_date, end_date):
         edate = date_run.replace(day=nfiles_month).strftime('%j')
 
 
-        name_out_end = f'O{sdate}{edate}-{param_name}_monthly-arc-4km.nc'
+        name_out_end = f'C{sdate}{edate}-{param_name}_monthly-arc-4km.nc'
         file_out = os.path.join(output_path, name_out_end)
         if args.verbose:
             print(f'[INFO] Output file: {file_out}')
 
-        name_source = f'O{sdate}{edate}-{param_name}_monthly-arc-4km.sources'
+        name_source = f'C{sdate}{edate}-{param_name}_monthly-arc-4km.sources'
         file_source = os.path.join(output_path, name_source)
-        name_source_timeliness = f'O{sdate}{edate}-{param_name}_monthly-arc-4km_{timeliness}.sources'
+        name_source_timeliness = f'C{sdate}{edate}-{param_name}_monthly-arc-4km_{timeliness}.sources'
         file_source_timeliness = os.path.join(output_path, name_source_timeliness)
 
         compute_month = True
