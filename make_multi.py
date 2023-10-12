@@ -357,6 +357,15 @@ def main():
         run_kd490(arc_opt, start_date, end_date)
         return
 
+    if args.mode == 'MONTHLY_CHLA':
+        # operative_mode = arc_opt.get_value_param('PROCESSING', 'operative_mode', False, 'boolean')
+        # if operative_mode:
+        #     date = check_monthly_operative_mode(arc_opt)
+        #     if date is not None:
+        #         run_month(arc_opt,'CHLA',date,date)
+        # else:
+        run_month(arc_opt, 'CHLA', start_date, end_date)
+        return
 
 def run_resample(arc_opt, start_date, end_date):
     options = arc_opt.get_resample_options()
@@ -625,6 +634,128 @@ def run_kd490(arc_opt, start_date, end_date):
             arc_proc.compute_kd490_image(input_file, output_file, timeliness)
         date_run = date_run + timedelta(hours=24)
 
+
+# mode: CHLA or TRANSP
+def run_month(arc_opt, mode, start_date, end_date):
+    options = arc_opt.get_processing_options()
+    if mode is None:
+        output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
+    else:
+        output_type = mode
+    from arc_processing import ArcProcessing
+    from calendar import monthrange
+
+    if args.verbose:
+        print('[INFO] PROCESSING OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+    file_base, timeliness = get_monthly_timeliness(arc_opt)
+
+    if args.verbose:
+        print(f'[INFO] File base: {file_base}')
+        print(f'[INFO] Timeliness: {timeliness}')
+    arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
+    start_date = start_date.replace(day=15)
+    end_date = end_date.replace(day=15)
+    date_run = start_date
+
+    # from datetime import datetime as dt
+    # date_run = dt(2022,10,11)
+    # date_run.replace(day=15)
+
+    if output_type == 'CHLA':
+        file_date = 'CDATE_plankton-arc-4k.nc'
+        param_name = 'plankton'
+    if output_type == 'TRANSP':
+        file_date = 'CDATE_kd490-arc-4km.nc'
+        param_name = 'transp'
+
+    file_date_format = '%Y%j'
+
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run.month}/{date_run.year}')
+
+        output_path = arc_opt.get_folder_year(options['output_path'], date_run, True)
+        if output_path is None:
+            print(f'[WARNING] Output path {output_path} for date {date_run} is not available. Skiping...')
+            date_run = date_run + timedelta(days=30)
+            date_run = date_run.replace(day=15)
+            continue
+
+        nfiles_month = monthrange(date_run.year, date_run.month)[1]
+
+        input_files, input_files_timeliness = arc_opt.get_list_files_month(options['input_path'],
+                                                                           options['input_path_organization'],
+                                                                           date_run.year,
+                                                                           date_run.month, file_date, file_date_format,
+                                                                           timeliness)
+
+        nfiles_available = len(input_files)
+        ntimeliness = len(input_files_timeliness)
+        if nfiles_available == 0:
+            print(
+                f'[ERROR] No files avaiable for computing the {output_type} average for {date_run.year}/{date_run.month}. Skipping...')
+            date_run = date_run + timedelta(days=30)
+            date_run = date_run.replace(day=15)
+            continue
+        if nfiles_available < nfiles_month:
+            print(f'[WARNING] Only {nfiles_available} of {nfiles_month} are available for computing the average')
+        if ntimeliness < nfiles_available:
+            print(f'[WARNING] Only {ntimeliness} of {nfiles_available} are in the correct timeliness {timeliness}')
+
+        sdate = date_run.replace(day=1).strftime('%Y%j')
+        edate = date_run.replace(day=nfiles_month).strftime('%j')
+
+
+        name_out_end = f'O{sdate}{edate}-{param_name}_monthly-arc-4km.nc'
+        file_out = os.path.join(output_path, name_out_end)
+        if args.verbose:
+            print(f'[INFO] Output file: {file_out}')
+
+        name_source = f'O{sdate}{edate}-{param_name}_monthly-arc-4km.sources'
+        file_source = os.path.join(output_path, name_source)
+        name_source_timeliness = f'O{sdate}{edate}-{param_name}_monthly-arc-4km_{timeliness}.sources'
+        file_source_timeliness = os.path.join(output_path, name_source_timeliness)
+
+        compute_month = True
+        # CHECK IF FILE MUST BE RUN AGAIN
+        if os.path.exists(file_out) and os.path.exists(file_source_timeliness):
+            nsources_prev = 0
+            f1 = open(file_source_timeliness, 'r')
+            for line in f1:
+                if len(line.strip()) > 0:
+                    nsources_prev = nsources_prev + 1
+            f1.close()
+            if nsources_prev == ntimeliness:
+                compute_month = False
+                print(f'[INFO] Month file has already been computed. Skipping...')
+
+        if compute_month:
+            arc_proc.create_source_list(input_files, file_source)
+            arc_proc.create_source_list(input_files_timeliness, file_source_timeliness)
+            arc_proc.compute_month(date_run.year, date_run.month, timeliness, input_files, file_out)
+
+        date_run = date_run + timedelta(days=30)
+        date_run = date_run.replace(day=15)
+
+def get_monthly_timeliness(arc_opt):
+    file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
+    timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
+    if file_base is not None:
+        if os.path.exists(file_base):
+            if timeliness is None:
+                if file_base.find('_NR_') > 0:
+                    timeliness = 'NR'
+                if file_base.find('_NT_') > 0:
+                    timeliness = 'NT'
+    return file_base, timeliness
 
 def check_py():
     print('[INFO] Checking py imports...')

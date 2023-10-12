@@ -251,7 +251,7 @@ def main():
         if operative_mode:
             date = check_monthly_operative_mode(arc_opt)
             if date is not None:
-                run_month(arc_opt,'CHLA',date,date)
+                run_month(arc_opt, 'CHLA', date, date)
         else:
             run_month(arc_opt, 'CHLA', start_date, end_date)
         return
@@ -266,19 +266,19 @@ def main():
             run_month(arc_opt, 'TRANSP', start_date, end_date)
         return
 
-
     if args.mode == 'QL':
-        #print('to be done')
+        # print('to be done')
         run_ql(arc_opt, start_date, end_date)
+
 
 def check_monthly_operative_mode(arc_opt):
     from datetime import datetime as dt
     file_base, timeliness = get_monthly_timeliness(arc_opt)
     day_today = dt.utcnow().day
-    if timeliness=='NR' and day_today>=8:
+    if timeliness == 'NR' and day_today >= 8:
         print('[WARNING] Month operative NR files are only processed between days 1 and 8 of the month')
         return None
-    if timeliness=='NR' and day_today>=8:
+    if timeliness == 'NR' and day_today >= 8:
         print('[WARNING] Month operative NT files are only processed after day 8 of the month')
         return None
     month_today = dt.utcnow().month
@@ -291,6 +291,8 @@ def check_monthly_operative_mode(arc_opt):
         year_processing = year_today
     date = dt(year_processing, month_processing, 15)
     return date
+
+
 def get_monthly_timeliness(arc_opt):
     file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
     timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
@@ -301,7 +303,8 @@ def get_monthly_timeliness(arc_opt):
                     timeliness = 'NR'
                 if file_base.find('_NT_') > 0:
                     timeliness = 'NT'
-    return file_base,timeliness
+    return file_base, timeliness
+
 
 # mode: CHLA or TRANSP
 def run_month(arc_opt, mode, start_date, end_date):
@@ -318,7 +321,7 @@ def run_month(arc_opt, mode, start_date, end_date):
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
 
-    file_base,timeliness = get_monthly_timeliness(arc_opt)
+    file_base, timeliness = get_monthly_timeliness(arc_opt)
 
     if args.verbose:
         print(f'[INFO] File base: {file_base}')
@@ -405,8 +408,8 @@ def run_month(arc_opt, mode, start_date, end_date):
                 print(f'[INFO] Month file has already been computed. Skipping...')
 
         if compute_month:
-            arc_proc.create_source_list(input_files,file_source)
-            arc_proc.create_source_list(input_files_timeliness,file_source_timeliness)
+            arc_proc.create_source_list(input_files, file_source)
+            arc_proc.create_source_list(input_files_timeliness, file_source_timeliness)
             arc_proc.compute_month(date_run.year, date_run.month, timeliness, input_files, file_out)
 
         date_run = date_run + timedelta(days=30)
@@ -1125,7 +1128,8 @@ def run_integration(arc_opt, start_date, end_date):
 
         output_type = arc_opt.get_value_param('INTEGRATE', 'output_type', 'OPERATIVE', 'str')
         if output_type == 'CORRECT_RRS':
-            alternative_path = arc_opt.get_folder_date(options['alternative_path'], options['alternative_path_organization'], date_run,False)
+            alternative_path = arc_opt.get_folder_date(options['alternative_path'],
+                                                       options['alternative_path_organization'], date_run, False)
             if not os.path.exists(alternative_path):
                 print(f'[WARNING] Alternative path {alternative_path} for date {date_run} is not available. Skiping...')
                 make_integration = False
@@ -1166,27 +1170,27 @@ def run_integration(arc_opt, start_date, end_date):
                 if os.path.exists(file_out):
                     os.remove(file_out)
                 arc_integration.output_type = 'RRS'
-                if output_type == 'CORRECT_RRS': ##COPY FILES FROM ALTERNATIVE PATH
+                if output_type == 'CORRECT_RRS':  ##COPY FILES FROM ALTERNATIVE PATH
                     if os.path.exists(alternative_path):
                         nfiles = len(os.listdir(alternative_path))
-                        if nfiles==3 or nfiles==4:
+                        if nfiles == 3 or nfiles == 4:
                             for name in os.listdir(alternative_path):
-                                fname = os.path.join(alternative_path,name)
-                                fcopy = os.path.join(output_path,name)
-                                copy_file(fname,fcopy)
-                        elif nfiles==16:
+                                fname = os.path.join(alternative_path, name)
+                                fcopy = os.path.join(output_path, name)
+                                copy_file(fname, fcopy)
+                        elif nfiles == 16:
                             for name in os.listdir(alternative_path):
-                                if name.find('_rrs-arc-fr.nc')>0:
+                                if name.find('_rrs-arc-fr.nc') > 0:
                                     continue
-                                if name.find('_plankton-arc-fr.nc')>0:
+                                if name.find('_plankton-arc-fr.nc') > 0:
                                     continue
-                                fname = os.path.join(alternative_path,name)
-                                fcopy = os.path.join(output_path,name)
-                                copy_file(fname,fcopy)
-                            arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness,True)
+                                fname = os.path.join(alternative_path, name)
+                                fcopy = os.path.join(output_path, name)
+                                copy_file(fname, fcopy)
+                            arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness, True)
 
                 else:
-                    arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness,False)
+                    arc_integration.create_rrs_file(output_path, file_out, date_run, timeliness, False)
 
             if output_type == 'TRANSP' or output_type == 'OPERATIVE':
                 file_base = os.path.join(dir_base, f'ArcGrid_65_90_300m_TRANSP_{timeliness}_Base.nc')
@@ -1200,7 +1204,8 @@ def run_integration(arc_opt, start_date, end_date):
 
         date_run = date_run + timedelta(hours=24)
 
-def copy_file(ifile,ofile):
+
+def copy_file(ifile, ofile):
     if args.verbose:
         print(f'[INFO] Copying file : {ifile}...')
 
@@ -1221,6 +1226,7 @@ def copy_file(ifile,ofile):
         time.sleep(1)
     if args.verbose:
         print('[INFO] Copy completed')
+
 
 def run_chla(arc_opt, start_date, end_date):
     options = arc_opt.get_processing_options()
@@ -1430,6 +1436,7 @@ def get_limits(y, x, ystep, xstep, ny, nx):
     limits = [yini, yfin, xini, xfin]
     return limits
 
+
 def do_check10():
     print('STARTED DO CHECK 10')
     from olci_l2 import OLCI_L2
@@ -1437,21 +1444,22 @@ def do_check10():
     import numpy as np
     from arc_mapinfo import ArcMapInfo
     ami = ArcMapInfo(None, args.verbose)
-    y,x = ami.area_def.get_array_coordinates_from_lonlat(-10.58157,65.62573)
-    print(y,x)
+    y, x = ami.area_def.get_array_coordinates_from_lonlat(-10.58157, 65.62573)
+    print(y, x)
     path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/REPROCESSING/S3B_OL_2_WFR____20230821T121630_20230821T121930_20230821T142834_0180_083_109_1800_MAR_O_NR_003.SEN3'
-    oimage = OLCI_L2(path,True)
+    oimage = OLCI_L2(path, True)
 
-    array = oimage.get_reflectance_band_array(412,-999)
-    print(array[1960,4290])
+    array = oimage.get_reflectance_band_array(412, -999)
+    print(array[1960, 4290])
     array_orig = array * np.pi
-    print(array_orig[1960,4290])
+    print(array_orig[1960, 4290])
 
     new_image = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/REPROCESSING/S3B_OL_2_WFR____20230821T121630_20230821T121930_20230821T142834_0180_083_109_1800_MAR_O_NR_003_resampled_bis.nc'
-    dataset = Dataset(new_image,'r')
+    dataset = Dataset(new_image, 'r')
     array_d = dataset.variables['RRS412_5']
-    print(array_d[1804,14220])
+    print(array_d[1804, 14220])
     dataset.close()
+
 
 def do_check9():
     print('STARTED DO CHECK 9')
@@ -1952,7 +1960,7 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                         poolhere.map(make_resample_dir_parallel, params_list)
                         params_list = []
 
-        #if resample is done, we must delete unzipped file
+        # if resample is done, we must delete unzipped file
         if not dokml and doresample and resample_done:
             if zp.is_zipfile(prod_path):
                 for fn in os.listdir(path_prod_u):
@@ -1972,8 +1980,6 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             if zp.is_zipfile(prod_path):
                 for fn in os.listdir(path_prod_u):
                     os.remove(os.path.join(path_prod_u, fn))
-
-
 
     if doresample and apply_pool != 0 and len(params_list) > 0:
 
