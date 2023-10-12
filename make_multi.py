@@ -169,8 +169,8 @@ def do_test():
     return True
 
 def main():
-    if do_test():
-        return
+    # if do_test():
+    #     return
     # if only_test():
     #     return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
