@@ -669,7 +669,7 @@ def run_month(arc_opt, mode, start_date, end_date):
     # date_run.replace(day=15)
 
     if output_type == 'CHLA':
-        file_date = 'CDATE_plankton-arc-4km.nc'
+        file_date = 'CDATE_chl-arc-4km.nc'
         param_name = 'plankton'
     if output_type == 'TRANSP':
         file_date = 'CDATE_kd490-arc-4km.nc'
