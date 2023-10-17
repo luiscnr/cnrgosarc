@@ -126,7 +126,7 @@ def make_script(options,output_path):
             line = f'job1=$(sbatch /store/COP2-OC-TAC/arc/code/scripts_climatology/{name_slurm} {date_here_str})'
             f1.write(line)
             f1.write('\n')
-            line = f'job1id =$(echo "$job1" | awk ' + f"'" + '{print $NF}' + f"'" + ')'
+            line = f'job1id=$(echo "$job1" | awk ' + f"'" + '{print $NF}' + f"'" + ')'
             f1.write(line)
             f1.write('\n')
             f1.write('\n')
@@ -135,7 +135,7 @@ def make_script(options,output_path):
             line = f'job{index}=$(sbatch --dependency=afterany:$job{index_prev}id /store/COP2-OC-TAC/arc/code/scripts_climatology/{name_slurm} {date_here_str})'
             f1.write(line)
             f1.write('\n')
-            line = f'job{index}id =$(echo "$job{index}" | awk ' + f"'" + '{print $NF}' + f"'" + ')'
+            line = f'job{index}id=$(echo "$job{index}" | awk ' + f"'" + '{print $NF}' + f"'" + ')'
             f1.write(line)
             f1.write('\n')
             f1.write('\n')
