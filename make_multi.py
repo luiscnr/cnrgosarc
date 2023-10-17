@@ -643,7 +643,7 @@ def run_month(arc_opt, mode, start_date, end_date):
     else:
         output_type = mode
 
-    
+
 
     from arc_processing import ArcProcessing
     from calendar import monthrange

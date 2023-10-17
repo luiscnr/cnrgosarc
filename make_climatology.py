@@ -11,7 +11,7 @@ warnings.simplefilter('ignore', UserWarning)
 warnings.simplefilter('ignore', RuntimeWarning)
 
 parser = argparse.ArgumentParser(description="Arctic climatology")
-parser.add_argument("-m", "--mode", help="Mode", choices=["MULTI"], required=True)
+parser.add_argument("-m", "--mode", help="Mode", choices=["MULTI","SCRIPT"], required=True)
 parser.add_argument("-c", "--config_file", help="Config file", required=True)
 # parser.add_argument('-i', "--inputpath", help="Input directory")
 parser.add_argument('-sd', "--start_date", help="Start date (yyyy-mm-dd)", required=True)
@@ -103,6 +103,67 @@ def do_test2():
 
     return True
 
+def make_script(options,output_path):
+    print(f'[INFO] Making script')
+    ref = 'CLIMATOLOGY'
+    if not options.has_option(ref,'variable'):
+        print(f'[ERROR] Variable option in file config is required')
+        return
+    variable = options[ref]['variable']
+    date_here, date_here_end = get_dates()
+
+    sdate = date_here.strftime('%Y%m%d')
+    edate = date_here_end.strftime('%Y%m%d')
+
+    name_output = f'Script_{variable}_{sdate}_{edate}.sh'
+    file_output = os.path.join(output_path,name_output)
+    name_slurm = f'run_climatology_multi_{variable}_date.slurm'
+    index = 1
+    f1= open(file_output,'w')
+    while date_here <= date_here_end:
+        date_here_str = date_here.strftime('%Y-%m-%d')
+        if index==1:
+            line = f'job1=$(sbatch /store/COP2-OC-TAC/arc/code/scripts_climatology/{name_slurm} {date_here_str})'
+            f1.write(line)
+            f1.write('\n')
+            line = f'job1id =$(echo "$job1" | awk ' + f"'" + '{print $NF}' + f"'" + ')'
+            f1.write(line)
+            f1.write('\n')
+            f1.write('\n')
+        else:
+            index_prev = index-1
+            line = f'job{index}=$(sbatch --dependency=afterany:$job{index_prev}id /store/COP2-OC-TAC/arc/code/scripts_climatology/{name_slurm} {date_here_str})'
+            f1.write(line)
+            f1.write('\n')
+            line = f'job{index}id =$(echo "$job{index}" | awk ' + f"'" + '{print $NF}' + f"'" + ')'
+            f1.write(line)
+            f1.write('\n')
+            f1.write('\n')
+        index = index + 1
+        date_here = date_here + timedelta(hours=24)
+    f1.close()
+    print(f'[INFO] File created: {file_output}')
+
+def get_dates():
+    ## getting dates
+    date_here_str = args.start_date
+    try:
+        date_here = dt.strptime(date_here_str, '%Y-%m-%d')
+    except:
+        print(f'[ERROR] Start Date for climatology is not in the correct format YYYY-mm-dd')
+        return
+
+    if args.end_date:
+        date_here_end_str = args.end_date
+        try:
+            date_here_end = dt.strptime(date_here_end_str, '%Y-%m-%d')
+        except:
+            print(f'[WARNING] Start Date for climatology is not in the correct format YYYY-mm-dd.')
+            return
+    else:
+        date_here_end = date_here
+
+    return date_here, date_here_end
 
 def main():
     # if do_test2():
@@ -123,6 +184,7 @@ def main():
         print(f'[ERROR] Config file {args.config_file} must containt a section named CLIMATOLOGY')
         return
 
+
     if not options.has_option(ref, 'input_path'):
         print(f'[ERROR] input_path option is required in config file {args.config_file}')
         return
@@ -141,6 +203,11 @@ def main():
         except:
             print(f'[ERROR] Output path {output_path} does not exist and could not be created')
             return
+
+    if args.mode == 'SCRIPT':
+        make_script(options,output_path)
+        return
+
     # defaults
     options_clim = {
         'temporal_window': 11,
@@ -175,23 +242,7 @@ def main():
             else:
                 options_clim[option] = int(options[ref][option].strip())
 
-    ## getting date
-    date_here_str = args.start_date
-    try:
-        date_here = dt.strptime(date_here_str, '%Y-%m-%d')
-    except:
-        print(f'[ERROR] Start Date for climatology is not in the correct format YYYY-mm-dd')
-        return
-
-    if args.end_date:
-        date_here_end_str = args.end_date
-        try:
-            date_here_end = dt.strptime(date_here_end_str, '%Y-%m-%d')
-        except:
-            print(f'[WARNING] Start Date for climatology is not in the correct format YYYY-mm-dd.')
-            return
-    else:
-        date_here_end = date_here
+    date_here, date_here_end = get_dates()
 
     while date_here<=date_here_end:
         if args.mode == 'MULTI':
