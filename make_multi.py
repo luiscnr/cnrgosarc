@@ -1,6 +1,9 @@
 import argparse
 import os
 from datetime import timedelta
+
+import numpy as np
+
 from arc_multi_sources import ARC_MULTI_SOURCES
 import warnings
 
@@ -9,7 +12,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
                     choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
-                             "MONTHLY_CHLA", "MONTHLY_KD490"],
+                             "MONTHLY_CHLA", "MONTHLY_KD490","MONTHLY_RRS_TEST"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -168,10 +171,71 @@ def do_test():
 
     return True
 
+def do_global_grid_monthly():
+    input_file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/SOURCES/2019/07/20190701_c3s_obs-oc_glo_bgc-reflectance_my_l3-multi-4km_P1D.nc'
+    output_file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/GlobalGrid_Base.nc'
+
+    from netCDF4 import Dataset
+    input_dataset = Dataset(input_file)
+    ncout = Dataset(output_file,'w')
+
+    # copy dimensions
+    for name, dimension in input_dataset.dimensions.items():
+        ncout.createDimension(
+            name, (len(dimension) if not dimension.isunlimited() else None))
+
+    variable = input_dataset.variables['latitude']
+    ncout.createVariable('lat', variable.datatype, variable.dimensions, zlib=True,shuffle=True, complevel=6)
+    ncout['lat'][:] = input_dataset['latitude'][:]
+    variable = input_dataset.variables['longitude']
+    ncout.createVariable('lon', variable.datatype, variable.dimensions, zlib=True, shuffle=True, complevel=6)
+    ncout['lon'][:] = input_dataset['longitude'][:]
+    variable = input_dataset.variables['time']
+    ncout.createVariable('time', variable.datatype, variable.dimensions, zlib=True, shuffle=True, complevel=6)
+    ncout['time'][:] = input_dataset['time'][:]
+
+    variable = input_dataset.variables['RRS510']
+    ncout.createVariable('RRS510', variable.datatype, variable.dimensions, fill_value=-999.0,zlib=True, shuffle=True, complevel=6)
+    ncout.createVariable('RRS510_count', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True, shuffle=True,
+                         complevel=6)
+    ncout.createVariable('RRS510_error', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True, shuffle=True,
+                         complevel=6)
+
+    input_dataset.close()
+    ncout.close()
+
+    return True
+
+def check_point():
+    from datetime import datetime as dt
+    from netCDF4 import Dataset
+    dir_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/OUTPUT/2019'
+    dir_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/SOURCES/2019/07'
+    for day in range(1,32):
+        date_here = dt(2019,7,day)
+        yyyy = '2019'
+        dd = date_here.strftime('%d')
+        mm = date_here.strftime('%m')
+        jjj = date_here.strftime('%j')
+        fout = os.path.join(dir_out,jjj,f'C{yyyy}{jjj}_rrs-arc-4km.nc')
+        fout = os.path.join(dir_out, f'{yyyy}{mm}{dd}_c3s_obs-oc_glo_bgc-reflectance_my_l3-multi-4km_P1D.nc')
+        dataset = Dataset(fout)
+        array = np.array(dataset.variables['RRS510'])
+        #print(day,'-->',array[0,1070,826])
+        print(day,'-->',array[0,359,7080])
+        dataset.close()
+
+
+    return True
+
 def main():
+    # if do_global_grid_monthly():
+    #     return
     # if do_test():
     #     return
     # if only_test():
+    #     return
+    # if check_point():
     #     return
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
@@ -365,6 +429,10 @@ def main():
         #         run_month(arc_opt,'CHLA',date,date)
         # else:
         run_month(arc_opt, 'CHLA', start_date, end_date)
+        return
+
+    if args.mode == 'MONTHLY_RRS_TEST':
+        run_month(arc_opt, 'RRS510', start_date, end_date)
         return
 
 def run_resample(arc_opt, start_date, end_date):
@@ -679,6 +747,11 @@ def run_month(arc_opt, mode, start_date, end_date):
         param_name = 'transp'
 
     file_date_format = '%Y%j'
+
+    if output_type == 'RRS510':
+        file_date = 'DATE_c3s_obs-oc_glo_bgc-reflectance_my_l3-multi-4km_P1D.nc'
+        param_name = 'rrs510'
+        file_date_format = '%Y%m%d'
 
     while date_run <= end_date:
         if args.verbose:

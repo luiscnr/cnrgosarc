@@ -39,7 +39,7 @@ class ArcMapInfo:
 
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
 
-    #option config_file for adding globat attributes
+    # option config_file for adding globat attributes
     def create_nc_filegrid(self, ofname, createMask, createLatLong):
 
         try:
@@ -160,7 +160,6 @@ class ArcMapInfo:
                     # mask[np.where((lats >= 70) & (lats <= 75))] = 10
                     # mask[np.where((lons >= 10) & (lons <= 20))] = mask[np.where((lons >= 10) & (lons <= 20))] + 10
                     satellite_mask[0, yini:yend, xini:xend] = [mask[:, :]]
-
 
         OFILE.close()
 
@@ -658,6 +657,27 @@ class ArcMapInfo:
         }
         return areas[area_id]
 
+    def get_subarea_def_from_array_coordinates(self, ymin, ymax, xmin, xmax):
+        width = (xmax - xmin)
+        height = (ymax - ymin)
+        projection = self.get_projection_info(self.area_def.proj_id)
+        xvalues = [xmin, xmax, xmax, xmin]
+        yvalues = [ymin, ymin, ymax, ymax]
+        xcoords, ycoords = self.area_def.get_projection_coordinates_from_array_coordinates(xvalues, yvalues)
+        extent = (np.min(xcoords), np.max(ycoords), np.max(xcoords), np.min(ycoords))
+
+        area_def = AreaDefinition('SubArea', 'SubArea', self.area_def.proj_id, projection,
+                                  width, height, extent)
+
+        lons, lats = self.area_def.get_lonlat_from_array_coordinates(xvalues, yvalues)
+        min_lon = np.min(lons[:])
+        max_lon = np.max(lons[:])
+        min_lat = np.min(lats[:])
+        max_lat = np.max(lats[:])
+        geo_limits = [min_lat, max_lat, min_lon, max_lon]
+
+        return geo_limits, area_def
+
     def get_subarea_def(self, lats, lons):
 
         xcoords, ycoords = self.area_def.get_array_coordinates_from_lonlat(lons, lats)
@@ -674,10 +694,7 @@ class ArcMapInfo:
         ymax = np.ceil(np.max(ycoords)) + 1
         if ymax > self.area_def.height:
             ymax = self.area_def.height
-        # print(xmin)
-        # print(xmax)
-        # print(ymin)
-        # print(ymax)
+
         width = (xmax - xmin)
         height = (ymax - ymin)
         # print(width, height)
@@ -686,15 +703,22 @@ class ArcMapInfo:
 
         xvalues = [xmin, xmax, xmax, xmin]
         yvalues = [ymin, ymin, ymax, ymax]
+        # xvalues = [xmin_new, xmax_new, xmax_new, xmin_new]
+        # yvalues = [ymin_new, ymin_new, ymax_new, ymax_new]
         xcoords, ycoords = self.area_def.get_projection_coordinates_from_array_coordinates(xvalues, yvalues)
         # lontal,lattal = self.area_def.get_lonlat_from_array_coordinates(xvalues,yvalues)
-        # print(yvalues)
-        # print(xvalues)
-        # print(lontal)
-        # print(lattal)
+        # print('******************')
+        # print('yvalues:',yvalues)
+        # print('xvalues:',xvalues)
+        # print('lontal:',lontal)
+        # print('lattal:',lattal)
 
         extent = (np.min(xcoords), np.max(ycoords), np.max(xcoords), np.min(ycoords))
+
+
         # print(extent)
+        # print('*********************')
+
 
         area_def = AreaDefinition('SubArea', 'SubArea', self.area_def.proj_id, projection,
                                   width, height, extent)
@@ -703,6 +727,10 @@ class ArcMapInfo:
         # print(area_def.width, area_def.height)
 
         limits = [xmin, xmax, ymin, ymax]
+
+        #dif = xmax-xmin
+
+
         return limits, area_def
 
     def check_make_resample_impl(self, olimage, arc_opt):
@@ -881,8 +909,7 @@ class ArcMapInfo:
 
         return line_output
 
-    def make_resample_from_file_orig_multi(self, input_file, output_file, date_here):
-
+    def make_resample_from_file_orig_multi_dep(self, input_file, output_file, date_here):
         if not os.path.exists(self.ifile_base):
             print(f'[ERROR] File grid base: {self.ifile_base} does not exist')
             return
@@ -899,24 +926,25 @@ class ArcMapInfo:
             print(f'[INFO] Adding variables from file orig: {input_file}')
 
         ncdataset = Dataset(input_file, 'r')
-        vartime = False
+        # vartime = False
         for name in ncdataset.variables:
             if name.lower().startswith('lat'):
                 variable_lat = name
             if name.lower().startswith('lon'):
                 variable_lon = name
-            if name.lower().startswith('time'):
-                vartime = True
+            # if name.lower().startswith('time'):
+            #     vartime = True
 
         lat_array = ncdataset.variables[variable_lat][0:600]
         lon_array = ncdataset.variables[variable_lon][:]
-        nlon = len(lon_array)
-        xstep = 600
+        # nlon = len(lon_array)
+        # xstep = 600
+        step = 600
 
         for name, variable in ncdataset.variables.items():
             if name.lower().startswith('lat') or name.lower().startswith('lon') or name.lower().startswith('time'):
                 continue
-            if name.startswith('ZSD') or name.startswith('SPM') or name=='flags' or name.endswith('uncertainty'):
+            if name.startswith('ZSD') or name.startswith('SPM') or name == 'flags' or name.endswith('uncertainty'):
                 continue
 
             if self.verbose:
@@ -957,31 +985,128 @@ class ArcMapInfo:
                 var_output.long_name = f'Remote Sensing Reflectance at {name.lower()}'
                 var_output.units = 'sr^-1'
 
-            if name=='KD490':
+            if name == 'KD490':
                 var_output.long_name = 'Diffuse Attenuation Coefficient at 490nm'
                 var_output.units = 'm^-1'
 
+            for y in range(0, self.area_def.width, step):
+                for x in range(0, self.area_def.height, step):
+                    ymax = y + step
+                    xmax = x + step
+                    if ymax > self.area_def.height:
+                        ymax = self.area_def.height
+                    if xmax > self.area_def.width:
+                        xmax = self.area_def.width
+                    geo_limits, area_def = self.get_subarea_def_from_array_coordinates(y, ymax, x, xmax)
 
+                    lon_diff = geo_limits[3] - geo_limits[2]
+                    print(y, ymax, x, xmax, geo_limits, lon_diff)
+
+    def make_resample_from_file_orig_multi(self, input_file, output_file, date_here):
+
+        if not os.path.exists(self.ifile_base):
+            print(f'[ERROR] File grid base: {self.ifile_base} does not exist')
+            return
+        if self.verbose:
+            print('[INFO] Starting resample...')
+            print(f'[INFO] Output file: {output_file}')
+
+        datasetout = self.copy_nc_base(output_file)
+
+        if datasetout is None:
+            return datasetout
+
+        # lat_big = np.array(datasetout.variables['lat'])
+        # lon_big = np.array(datasetout.variables['lon'])
+
+
+        if self.verbose:
+            print(f'[INFO] Adding variables from file orig: {input_file}')
+
+        ncdataset = Dataset(input_file, 'r')
+        # vartime = False
+        for name in ncdataset.variables:
+            if name.lower().startswith('lat'):
+                variable_lat = name
+            if name.lower().startswith('lon'):
+                variable_lon = name
+            # if name.lower().startswith('time'):
+            #     vartime = True
+
+        lat_array = ncdataset.variables[variable_lat][0:600]
+        lon_array = ncdataset.variables[variable_lon][:]
+        nlon = len(lon_array)
+        xstep = 2160
+
+        for name, variable in ncdataset.variables.items():
+            if name.lower().startswith('lat') or name.lower().startswith('lon') or name.lower().startswith('time'):
+                continue
+            if name.startswith('ZSD') or name.startswith('SPM') or name == 'flags' or name.endswith('uncertainty'):
+                continue
+
+            if self.verbose:
+                print(f'[INFO]  Adding variable: {name}')
+
+            var_output = datasetout.createVariable(name, 'f4', ('time', 'y', 'x'), fill_value=-999.0, zlib=True,
+                                                   complevel=4,
+                                                   shuffle=True)
+
+            var_output.stardard_name = ncdataset[name].standard_name
+            var_output.type = ncdataset[name].type
+            var_output.coordinates = 'time lon lat'
+            var_output.grid_mapping = 'stereographic'
+
+            valid_min_at = None
+            valid_max_at = None
+            missing_value_at = -999.0
+            if 'valid_min' in ncdataset[name].ncattrs():
+                valid_min_at = ncdataset[name].valid_min
+            elif 'min_val' in ncdataset[name].ncattrs():
+                valid_min_at = ncdataset[name].min_val
+
+            if 'valid_max' in ncdataset[name].ncattrs():
+                valid_max_at = ncdataset[name].valid_min
+            elif 'max_val' in ncdataset[name].ncattrs():
+                valid_max_at = ncdataset[name].max_val
+
+            if 'missing_value' in ncdataset[name].ncattrs():
+                missing_value_at = ncdataset[name].missing_value
+            elif '_FillValue' in ncdataset[name].ncattrs():
+                missing_value_at = ncdataset[name]._FillValue
+
+            var_output.valid_min = valid_min_at
+            var_output.valid_max = valid_max_at
+            var_output.missing_value = missing_value_at
+
+            if name.startswith('RRS'):
+                var_output.long_name = f'Remote Sensing Reflectance at {name.lower()}'
+                var_output.units = 'sr^-1'
+
+            if name == 'KD490':
+                var_output.long_name = 'Diffuse Attenuation Coefficient at 490nm'
+                var_output.units = 'm^-1'
 
             for x in range(0, nlon, xstep):
+                print(f'[INFO] -> {x}')
                 yini = 0
                 yfin = 600
                 xini = x
                 xfin = x + xstep
                 if xfin > nlon:
                     xfin = nlon
-                # height = (yfin - yini)
-                # width = (xfin - xini)
-                # shape = (height, width)
+
                 lon_here = lon_array[xini:xfin]
                 lat_here = lat_array[yini:yfin]
+
                 lat2D, lon2D = self.get_2D_lat_lon_arrays(lat_here, lon_here)
                 limits, sub_area_def = self.get_subarea_def(lat2D, lon2D)
+
                 swath_def = SwathDefinition(lons=lon2D, lats=lat2D)
                 valid_input_index, valid_output_index, index_array, distance_array = get_neighbour_info(swath_def,
                                                                                                         sub_area_def,
                                                                                                         6800,
                                                                                                         neighbours=1)
+
                 rrsarray = np.array(variable[0, yini:yfin, xini:xfin])
                 result = get_sample_from_neighbour_info('nn', sub_area_def.shape, rrsarray, valid_input_index,
                                                         valid_output_index, index_array,
@@ -991,12 +1116,13 @@ class ArcMapInfo:
                 ymax = int(limits[3])
                 xmin = int(limits[0])
                 xmax = int(limits[1])
+
                 var_output_array = np.array(var_output[0, ymin:ymax, xmin:xmax])
                 var_output_array[result != -999] = result[result != -999]
                 var_output[0, ymin:ymax, xmin:xmax] = var_output_array[:, :]
         from datetime import datetime as dt
         if date_here is not None:
-            nsec = (date_here-dt(1970,1,1)).total_seconds()
+            nsec = (date_here - dt(1970, 1, 1)).total_seconds()
             datasetout.variables['time'][0] = [np.int(nsec)]
             datasetout.start_date = date_here.strftime('%Y-%m-%d')
             datasetout.stop_date = date_here.strftime('%Y-%m-%d')

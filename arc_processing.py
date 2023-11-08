@@ -96,11 +96,20 @@ class ArcProcessing:
             var_avg_name = 'KD490'
             var_avg_count_name = 'KD490_count'
             var_avg_error_name = 'KD490_error'
+        if self.output_type.startswith('RRS'):
+            var_avg_name = self.output_type
+            var_avg_count_name = f'{self.output_type}_count'
+            var_avg_error_name = f'{self.output_type}_error'
+            self.height = 4320
+            self.width = 8640
 
         var_avg = datasetout.variables[var_avg_name]
         var_avg_count = datasetout.variables[var_avg_count_name]
         var_avg_error = datasetout.variables[var_avg_error_name]
-        var_smask = datasetgrid.variables['SENSORMASK']
+        if self.output_type.startswith('RRS'):
+            var_smask = None
+        else:
+            var_smask = datasetgrid.variables['SENSORMASK']
 
         self.ystep = self.arc_opt.get_value_param(section, 'ystep', 6500, 'int')
         self.xstep = self.arc_opt.get_value_param(section, 'xstep', 6500, 'int')
@@ -120,7 +129,10 @@ class ArcProcessing:
                 error_array = np.array(var_avg_error[0, limits[0]:limits[1], limits[2]:limits[3]])
                 # print(array.shape)
 
-                mask_array = np.array(var_smask[0, limits[0]:limits[1], limits[2]:limits[3]])
+                if var_smask is not None:
+                    mask_array = np.array(var_smask[0, limits[0]:limits[1], limits[2]:limits[3]])
+                else:
+                    mask_array = None
                 # print(var_smask.shape)
                 # print(mask_array.shape)
 
@@ -150,10 +162,10 @@ class ArcProcessing:
                 coef_array[indices_good] = 1 / (count_array[indices_good] - 1)
                 error_array[indices_good] = coef_array[indices_good] * (x2array[indices_good] - xarray[indices_good])
 
-
-                array[mask_array == -999.0] = -999.0
-                count_array[mask_array == -999.0] = -999.0
-                error_array[mask_array == -999.0] = -999.0
+                if mask_array is not None:
+                    array[mask_array == -999.0] = -999.0
+                    count_array[mask_array == -999.0] = -999.0
+                    error_array[mask_array == -999.0] = -999.0
 
                 var_avg[0, limits[0]:limits[1], limits[2]:limits[3]] = [array[:, :]]
                 var_avg_count[0, limits[0]:limits[1], limits[2]:limits[3]] = [count_array[:, :]]
