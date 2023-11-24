@@ -79,6 +79,8 @@ class ARC_OPTIONS:
             print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
         options['unzip_path'] = unzip_path
 
+
+
         return options
 
     def get_integrate_options(self):
@@ -109,6 +111,8 @@ class ARC_OPTIONS:
         if start_date is None or end_date is None:
             return None
 
+        climatology_path = self.get_path(section,'climatology_path',False)
+
 
 
         input_path_organization = self.get_path_organization(section, 'input_path_organization')
@@ -130,7 +134,8 @@ class ARC_OPTIONS:
             'end_date': end_date,
             'platform': platform,
             'alternative_path': alternative_path,
-            'alternative_path_organization': alternative_path_organization
+            'alternative_path_organization': alternative_path_organization,
+            'climatology_path': climatology_path
         }
         return options_out
 

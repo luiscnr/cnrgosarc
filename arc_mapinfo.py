@@ -38,6 +38,7 @@ class ArcMapInfo:
             print('---------------------------------------------------------------------------------------------')
 
         self.olci_l2_bands = [400, 412.5, 442.5, 490, 510, 560, 620, 665, 673.75, 681.25, 708.75, 753.75, 778.75]
+        self.climatology_path = None
 
     # option config_file for adding globat attributes
     def create_nc_filegrid(self, ofname, createMask, createLatLong):
@@ -715,10 +716,8 @@ class ArcMapInfo:
 
         extent = (np.min(xcoords), np.max(ycoords), np.max(xcoords), np.min(ycoords))
 
-
         # print(extent)
         # print('*********************')
-
 
         area_def = AreaDefinition('SubArea', 'SubArea', self.area_def.proj_id, projection,
                                   width, height, extent)
@@ -728,8 +727,7 @@ class ArcMapInfo:
 
         limits = [xmin, xmax, ymin, ymax]
 
-        #dif = xmax-xmin
-
+        # dif = xmax-xmin
 
         return limits, area_def
 
@@ -1018,7 +1016,9 @@ class ArcMapInfo:
 
         # lat_big = np.array(datasetout.variables['lat'])
         # lon_big = np.array(datasetout.variables['lon'])
-
+        addrrsqibands = False
+        if self.climatology_path is not None and os.path.exists(self.climatology_path):
+            addrrsqibands = True
 
         if self.verbose:
             print(f'[INFO] Adding variables from file orig: {input_file}')
@@ -1120,6 +1120,28 @@ class ArcMapInfo:
                 var_output_array = np.array(var_output[0, ymin:ymax, xmin:xmax])
                 var_output_array[result != -999] = result[result != -999]
                 var_output[0, ymin:ymax, xmin:xmax] = var_output_array[:, :]
+
+            if name.startswith('RRS') and addrrsqibands:
+                nameqi = f'QI_{name}'
+                var_output_qi = datasetout.createVariable(nameqi, 'f4', ('time', 'y', 'x'), fill_value=-999.0,
+                                                          zlib=True,
+                                                          complevel=4,
+                                                          shuffle=True)
+                rrs = name[-3:]
+                var_output_qi.long_name = f'Quality Index for  remote sensing reflectance at {rrs} nm'
+                var_output_qi.comment = 'QI=(DailyData-ClimatologyMedian)/ClimatologyStandardDeviation'
+                var_output_qi.type = 'surface'
+                var_output_qi.units = '1'
+                var_output_qi.missing_value = -999.0
+                var_output_qi.valid_min = -5.0
+                var_output_qi.valid_max = 5.0
+                file_clima = self.get_file_climatology(name, date_here)
+                if file_clima is not None:
+                    if self.verbose:
+                        print(f'[INFO] Computing  climatology uisng file: {file_clima}')
+                    output_array = self.compute_climatology(file_clima, var_output)
+                    var_output_qi[0, :, :] = output_array[:, :]
+
         from datetime import datetime as dt
         if date_here is not None:
             nsec = (date_here - dt(1970, 1, 1)).total_seconds()
@@ -1132,6 +1154,35 @@ class ArcMapInfo:
 
         ncdataset.close()
         datasetout.close()
+
+    def get_file_climatology(self, variable, date_work):
+        path = os.path.join(self.climatology_path, variable.lower())
+        if not os.path.exists(path):
+            return None
+        if date_work.month == 2 and date_work.day == 29:
+            date_work = date_work.replace(day=28)
+        ddmm = date_work.strftime('%m%d')
+        if variable.lower() == 'kd490':
+            variable = 'transp'
+        fname = f'1998{ddmm}_2022{ddmm}_{variable.lower()}_arc_multi_clima.nc'
+        file_clima = os.path.join(path, fname)
+        if os.path.isfile(file_clima):
+            return file_clima
+        else:
+            return None
+
+    def compute_climatology(self, file_clima, input_variable):
+        dclima = Dataset(file_clima)
+        central = np.array(dclima.variables['MEDIAN'])
+        dispersion = np.array(dclima.variables['N_STD'])
+        dclima.close()
+        input_array = np.array(input_variable)
+        output_array = np.zeros((input_array.shape[1], input_array.shape[2]))
+        output_array[:, :] = input_array[0, :, :]
+        output_array[output_array != -999] = (output_array[output_array != -999] - central[output_array != -999]) / \
+                                             dispersion[output_array != -999]
+
+        return output_array
 
     def make_resample_pml(self, fpml, fileout):
         if self.verbose:

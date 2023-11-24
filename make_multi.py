@@ -12,7 +12,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
                     choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
-                             "MONTHLY_CHLA", "MONTHLY_KD490","MONTHLY_RRS_TEST"],
+                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -46,7 +46,7 @@ def only_test():
 
     path_443 = os.path.join(path, 'Oa03_reflectance.nc')
     dataset_443 = Dataset(path_443)
-    array_443= np.array(dataset_443.variables['Oa03_reflectance'][yini:yfin, xini:xfin])
+    array_443 = np.array(dataset_443.variables['Oa03_reflectance'][yini:yfin, xini:xfin])
 
     path_490 = os.path.join(path, 'Oa04_reflectance.nc')
     dataset_490 = Dataset(path_490)
@@ -68,8 +68,7 @@ def only_test():
 
     kda = KD_ALGORITHMS('OK2-560')
     kd_array_new = kda.compute_kd490_ok2_560(array_490, array_560, chla_array_olci)
-    chl_array_new = kda.compute_chla_ocme4(array_443,array_490,array_510,array_560, chla_array_olci)
-
+    chl_array_new = kda.compute_chla_ocme4(array_443, array_490, array_510, array_560, chla_array_olci)
 
     ##KD TRANSFORMATION FOR COMPARISON
     # invert
@@ -78,8 +77,8 @@ def only_test():
     # round
     kd_array_new[kd_array_olci != 255] = np.ceil(kd_array_new[kd_array_olci != 255])
     # values shoud be between 0 and 254 (as 255 is used as invalid value)
-    kd_array_new[kd_array_new<0] = 0.0
-    kd_array_new[kd_array_new>254] = 254.0
+    kd_array_new[kd_array_new < 0] = 0.0
+    kd_array_new[kd_array_new > 254] = 254.0
     kd_array_new[kd_array_olci == 255] = 255  ##invalid value, from kd_olci
     kd_array_new = kd_array_new.astype(np.uint8).astype(np.float32)
     ##reconvert
@@ -106,18 +105,12 @@ def only_test():
     ##masks
     chl_array_new[chla_array_olci == 255] = -999.0
 
-
-
     ##NON LOG10 TRANSFORMED VALUES FOR KD Y CHLA FROM OLCI
     kd_array_olci[kd_array_olci != 255] = np.power(10, kd_array_olci[kd_array_olci != 255])
     chla_array_olci[chla_array_olci != 255] = np.power(10, chla_array_olci[chla_array_olci != 255])
 
-
-
-
-
     file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/chlacomparison_1.csv'
-    f1 = open(file_out,'w')
+    f1 = open(file_out, 'w')
     f1.write('Y;X;KD_OLCI;KD_NEW;CHLA_OLCI;CHLA_NEW;RATIO_KD;RATIO_CHLA')
     for y in range(kd_array_olci.shape[0]):
         for x in range(kd_array_olci.shape[1]):
@@ -126,10 +119,10 @@ def only_test():
             if kd_array_new[y, x] != -999.0:
                 val_kd_olci = kd_array_olci[y, x]
                 val_kd_new = kd_array_new[y, x]
-                val_chla_olci = chla_array_olci[y,x]
-                val_chla_new = chl_array_new[y,x]
-                ron_kd = kd_array_olci[y, x]/kd_array_new[y, x]
-                ron_chla = chla_array_olci[y,x]/chl_array_new[y,x]
+                val_chla_olci = chla_array_olci[y, x]
+                val_chla_new = chl_array_new[y, x]
+                ron_kd = kd_array_olci[y, x] / kd_array_new[y, x]
+                ron_chla = chla_array_olci[y, x] / chl_array_new[y, x]
                 # if y==691 and x==4:
                 #     print(f'OLCI: {val_old:.4f};COMPUTED: {val_new:.4f}; CHLA: {val_chla:.4f}; RON: {ron:.4f}')
                 line = f'{ypoint};{xpoint};{val_kd_olci};{val_kd_new};{val_chla_olci};{val_chla_new};{ron_kd};{ron_chla}'
@@ -145,31 +138,31 @@ def only_test():
 
     return True
 
+
 def do_test():
     file_check = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/C2016122_rrs-arc-4km.nc'
     from netCDF4 import Dataset
     from kd_algorithm import KD_ALGORITHMS
     dcheck = Dataset(file_check)
-    var_names = ['RRS443','RRS490','RRS510','RRS560','RRS665']
+    var_names = ['RRS443', 'RRS490', 'RRS510', 'RRS560', 'RRS665']
 
-
-    val443 = dcheck.variables['RRS443'][0,357,1136]
+    val443 = dcheck.variables['RRS443'][0, 357, 1136]
     val490 = dcheck.variables['RRS490'][0, 357, 1136]
     val510 = dcheck.variables['RRS510'][0, 357, 1136]
     val560 = dcheck.variables['RRS560'][0, 357, 1136]
-    #val665 = dcheck.variables['RRS560'][0, 357, 1136]
+    # val665 = dcheck.variables['RRS560'][0, 357, 1136]
 
     dcheck.close()
     kda = KD_ALGORITHMS('OK2-560')
-    res = kda.compute_kd_param(val443,val490,val510,val560)
+    res = kda.compute_kd_param(val443, val490, val510, val560)
     print(res[1])
     file_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_COMPARISON_OLCI_MULTI/ALGORITHMS/C2016122_kd490-arc-4km.nc'
     dout = Dataset(file_output)
-    print(dout.variables['KD490'][0,357,1136])
+    print(dout.variables['KD490'][0, 357, 1136])
     dout.close()
 
-
     return True
+
 
 def do_global_grid_monthly():
     input_file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/SOURCES/2019/07/20190701_c3s_obs-oc_glo_bgc-reflectance_my_l3-multi-4km_P1D.nc'
@@ -177,7 +170,7 @@ def do_global_grid_monthly():
 
     from netCDF4 import Dataset
     input_dataset = Dataset(input_file)
-    ncout = Dataset(output_file,'w')
+    ncout = Dataset(output_file, 'w')
 
     # copy dimensions
     for name, dimension in input_dataset.dimensions.items():
@@ -185,7 +178,7 @@ def do_global_grid_monthly():
             name, (len(dimension) if not dimension.isunlimited() else None))
 
     variable = input_dataset.variables['latitude']
-    ncout.createVariable('lat', variable.datatype, variable.dimensions, zlib=True,shuffle=True, complevel=6)
+    ncout.createVariable('lat', variable.datatype, variable.dimensions, zlib=True, shuffle=True, complevel=6)
     ncout['lat'][:] = input_dataset['latitude'][:]
     variable = input_dataset.variables['longitude']
     ncout.createVariable('lon', variable.datatype, variable.dimensions, zlib=True, shuffle=True, complevel=6)
@@ -195,10 +188,13 @@ def do_global_grid_monthly():
     ncout['time'][:] = input_dataset['time'][:]
 
     variable = input_dataset.variables['RRS510']
-    ncout.createVariable('RRS510', variable.datatype, variable.dimensions, fill_value=-999.0,zlib=True, shuffle=True, complevel=6)
-    ncout.createVariable('RRS510_count', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True, shuffle=True,
+    ncout.createVariable('RRS510', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True, shuffle=True,
                          complevel=6)
-    ncout.createVariable('RRS510_error', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True, shuffle=True,
+    ncout.createVariable('RRS510_count', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True,
+                         shuffle=True,
+                         complevel=6)
+    ncout.createVariable('RRS510_error', variable.datatype, variable.dimensions, fill_value=-999.0, zlib=True,
+                         shuffle=True,
                          complevel=6)
 
     input_dataset.close()
@@ -206,27 +202,28 @@ def do_global_grid_monthly():
 
     return True
 
+
 def check_point():
     from datetime import datetime as dt
     from netCDF4 import Dataset
     dir_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/OUTPUT/2019'
     dir_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/SOURCES/2019/07'
-    for day in range(1,32):
-        date_here = dt(2019,7,day)
+    for day in range(1, 32):
+        date_here = dt(2019, 7, day)
         yyyy = '2019'
         dd = date_here.strftime('%d')
         mm = date_here.strftime('%m')
         jjj = date_here.strftime('%j')
-        fout = os.path.join(dir_out,jjj,f'C{yyyy}{jjj}_rrs-arc-4km.nc')
+        fout = os.path.join(dir_out, jjj, f'C{yyyy}{jjj}_rrs-arc-4km.nc')
         fout = os.path.join(dir_out, f'{yyyy}{mm}{dd}_c3s_obs-oc_glo_bgc-reflectance_my_l3-multi-4km_P1D.nc')
         dataset = Dataset(fout)
         array = np.array(dataset.variables['RRS510'])
-        #print(day,'-->',array[0,1070,826])
-        print(day,'-->',array[0,359,7080])
+        # print(day,'-->',array[0,1070,826])
+        print(day, '-->', array[0, 359, 7080])
         dataset.close()
 
-
     return True
+
 
 def main():
     # if do_global_grid_monthly():
@@ -435,6 +432,7 @@ def main():
         run_month(arc_opt, 'RRS510', start_date, end_date)
         return
 
+
 def run_resample(arc_opt, start_date, end_date):
     options = arc_opt.get_resample_options()
     if options is None:
@@ -459,12 +457,15 @@ def run_resample(arc_opt, start_date, end_date):
         return
     from netCDF4 import Dataset
     base_file = options['file_base']
+    climatology_path = options['climatology_path']
     # dbase = Dataset(base_file)
     # dname = dbase.title
     # dbase.close()
 
     ams = ARC_MULTI_SOURCES(options['input_path'], options['input_path_organization'], options['moi_user'],
                             options['moi_pass'], args.verbose)
+
+
     while date_ref <= date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')
 
@@ -510,6 +511,8 @@ def run_resample(arc_opt, start_date, end_date):
         from arc_mapinfo import ArcMapInfo
         ami = ArcMapInfo(None, args.verbose)
         ami.set_area_definition('polar_stereographic_4km')
+        if climatology_path is not None and os.path.exists(climatology_path):
+            ami.climatology_path = climatology_path
         ami.ifile_base = base_file
         if args.verbose:
             print(f'[INFO] Make resample from file {file_date} to file: {file_output}')
@@ -711,8 +714,6 @@ def run_month(arc_opt, mode, start_date, end_date):
     else:
         output_type = mode
 
-
-
     from arc_processing import ArcProcessing
     from calendar import monthrange
 
@@ -789,7 +790,6 @@ def run_month(arc_opt, mode, start_date, end_date):
         sdate = date_run.replace(day=1).strftime('%Y%j')
         edate = date_run.replace(day=nfiles_month).strftime('%j')
 
-
         name_out_end = f'C{sdate}{edate}-{param_name}_monthly-arc-4km.nc'
         file_out = os.path.join(output_path, name_out_end)
         if args.verbose:
@@ -821,6 +821,7 @@ def run_month(arc_opt, mode, start_date, end_date):
         date_run = date_run + timedelta(days=30)
         date_run = date_run.replace(day=15)
 
+
 def get_monthly_timeliness(arc_opt):
     file_base = arc_opt.get_value_param('PROCESSING', 'file_base', None, 'str')
     timeliness = arc_opt.get_value_param('PROCESSING', 'timeliness', None, 'str')
@@ -832,6 +833,7 @@ def get_monthly_timeliness(arc_opt):
                 if file_base.find('_NT_') > 0:
                     timeliness = 'NT'
     return file_base, timeliness
+
 
 def check_py():
     print('[INFO] Checking py imports...')
