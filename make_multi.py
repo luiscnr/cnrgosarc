@@ -552,6 +552,8 @@ def run_chla(arc_opt, start_date, end_date):
         print(f'[INFO]  overwrite:->{overwrite}')
         print(f'[INFO]  timeliness:->{timeliness}')
 
+    climatology_path = options['climatology_path']
+
     ##WORKING WITH SINGLE GRANULE, ONLY CHLA
     input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
     if input_name is not None:
@@ -569,6 +571,7 @@ def run_chla(arc_opt, start_date, end_date):
             print(f'[INFO] Output file: {output_file}')
         # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
         arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', file_att)
+        arc_proc.climatology_path = climatology_path
 
         arc_proc.compute_chla_image(input_file, output_file, timeliness)
         return
@@ -580,6 +583,7 @@ def run_chla(arc_opt, start_date, end_date):
     date_run = start_date
 
     arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', None)
+    arc_proc.climatology_path = climatology_path
     while date_run <= end_date:
         if args.verbose:
             print('*****************************')
@@ -646,6 +650,8 @@ def run_kd490(arc_opt, start_date, end_date):
         print(f'[INFO]  overwrite:->{overwrite}')
         print(f'[INFO]  timeliness:->{timeliness}')
 
+    climatology_path = options['climatology_path']
+
     ##WORKING WITH SINGLE GRANULE
     input_name = arc_opt.get_value_param('KD490', 'name_input', None, 'str')
     if input_name is not None:
@@ -663,6 +669,7 @@ def run_kd490(arc_opt, start_date, end_date):
             print(f'[INFO] Output file: {output_file}')
         # defining arc_proc, last parameters (file_at) is none because it's defined a file base with attributes
         arc_proc = ArcProcessing(arc_opt, args.verbose, 'KD490', file_att)
+        arc_proc.climatology_path = climatology_path
         arc_proc.compute_kd490_image(input_file, output_file, timeliness)
         return
 
@@ -673,6 +680,7 @@ def run_kd490(arc_opt, start_date, end_date):
     date_run = start_date
 
     arc_proc = ArcProcessing(arc_opt, args.verbose, 'KD490', file_att)
+    arc_proc.climatology_path = climatology_path
     while date_run <= end_date:
         if args.verbose:
             print('*****************************')

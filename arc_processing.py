@@ -44,6 +44,8 @@ class ArcProcessing:
         if os.path.exists(self.file_model) and output_type == 'CHLA':
             self.chla_model = ARC_GPR_MODEL(self.file_model)
 
+        self.climatology_path = None
+
     def create_source_list(self, list_files, file_out):
         if os.path.exists(file_out):
             os.remove(file_out)
@@ -428,6 +430,29 @@ class ArcProcessing:
                 array_kd[array_kd > max_value] = -999.0
                 var_kd[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_kd[:, :]]
 
+        if self.climatology_path is not None and os.path.exists(self.climatology_path):
+            nameqi = f'QI_KD490'
+            var_output_qi = datasetout.createVariable(nameqi, 'f4', ('time', 'y', 'x'), fill_value=-999.0,
+                                                      zlib=True,
+                                                      complevel=4,
+                                                      shuffle=True)
+            var_output_qi.long_name = f'Quality Index for diffuse attenuation coefficient at 490nm'
+            var_output_qi.comment = 'QI=(DailyData-ClimatologyMedian)/ClimatologyStandardDeviation'
+            var_output_qi.type = 'surface'
+            var_output_qi.units = '1'
+            var_output_qi.missing_value = -999.0
+            var_output_qi.valid_min = -5.0
+            var_output_qi.valid_max = 5.0
+            file_clima = self.get_file_climatology('kd490', sat_date)
+            if file_clima is not None:
+                if self.verbose:
+                    print(f'[INFO] Computing  climatology uisng file: {file_clima}')
+                output_array = self.compute_climatology(file_clima, var_kd,True)
+                var_output_qi[0, :, :] = output_array[:, :]
+
+
+
+
         ncsat.close()
 
 
@@ -604,6 +629,27 @@ class ArcProcessing:
                         array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
                         array_diff = array_chla_prev / array_chla
                         var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+
+        if self.climatology_path is not None and os.path.exists(self.climatology_path):
+            nameqi = f'QI_CHL'
+            var_output_qi = datasetout.createVariable(nameqi, 'f4', ('time', 'y', 'x'), fill_value=-999.0,
+                                                      zlib=True,
+                                                      complevel=4,
+                                                      shuffle=True)
+            var_output_qi.long_name = f'Quality Index for chlrophyll a concentration'
+            var_output_qi.comment = 'QI=(DailyData-ClimatologyMedian)/ClimatologyStandardDeviation'
+            var_output_qi.type = 'surface'
+            var_output_qi.units = '1'
+            var_output_qi.missing_value = -999.0
+            var_output_qi.valid_min = -5.0
+            var_output_qi.valid_max = 5.0
+            file_clima = self.get_file_climatology('chl', sat_date)
+            if file_clima is not None:
+                if self.verbose:
+                    print(f'[INFO] Computing  climatology uisng file: {file_clima}')
+                output_array = self.compute_climatology(file_clima, var_chla,True)
+                var_output_qi[0, :, :] = output_array[:, :]
+
         ncsat.close()
         if ncgrid is not None:
             ncgrid.close()
@@ -620,6 +666,38 @@ class ArcProcessing:
         datasetout.close()
         if self.verbose:
             print('[INFO] Chla computation completed. ')
+
+
+    def compute_climatology(self, file_clima,input_variable,log_transformed):
+        dclima = Dataset(file_clima)
+        central = np.array(dclima.variables['MEDIAN'])
+        dispersion = np.array(dclima.variables['N_STD'])
+        dclima.close()
+        input_array = np.array(input_variable)
+        if log_transformed:
+            input_array[input_array != -999] = np.log10(input_array[input_array != -999])
+        output_array = np.zeros((input_array.shape[1], input_array.shape[2]))
+        output_array[:, :] = input_array[0, :, :]
+        output_array[output_array != -999] = (output_array[output_array != -999] - central[output_array != -999]) / \
+                                             dispersion[output_array != -999]
+
+        return output_array
+
+    def get_file_climatology(self, variable, date_work):
+        path = os.path.join(self.climatology_path, variable.lower())
+        if not os.path.exists(path):
+            return None
+        if date_work.month == 2 and date_work.day == 29:
+            date_work = date_work.replace(day=28)
+        ddmm = date_work.strftime('%m%d')
+        if variable.lower() == 'kd490':
+            variable = 'transp'
+        fname = f'1998{ddmm}_2022{ddmm}_{variable.lower()}_arc_multi_clima.nc'
+        file_clima = os.path.join(path, fname)
+        if os.path.isfile(file_clima):
+            return file_clima
+        else:
+            return None
 
     def get_limits(self, y, x, ystep, xstep, ny, nx):
         yini = y
