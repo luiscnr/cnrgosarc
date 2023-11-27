@@ -3,7 +3,7 @@ from ftplib import FTP
 from datetime import datetime as dt
 
 class ARC_MULTI_SOURCES:
-    def __init__(self, input_dir, input_dir_org,moi_user,moi_pass, verbose):
+    def __init__(self, input_dir, input_dir_org,moi_user,moi_pass,use_myint_sources, verbose):
         self.verbose = verbose
         self.input_dir = input_dir
         if input_dir_org is None:
@@ -11,6 +11,7 @@ class ARC_MULTI_SOURCES:
         self.input_dir_org = input_dir_org
         self.name_product = 'OCEANCOLOUR_GLO_BGC_L3_MY_009_107'
         self.name_dataset = 'c3s_obs-oc_glo_bgc-reflectance_my_l3-multi-4km_P1D'
+        self.use_myint_sources = use_myint_sources
         self.server = 'my.cmems-du.eu'
         self.variable_check = ['latitude','longitude','time','RRS412','RRS443','RRS490','RRS510','RRS560','RRS665']
 
@@ -27,6 +28,8 @@ class ARC_MULTI_SOURCES:
             return None
         date_here_str = date_here.strftime('%Y%m%d')
         name = f'{date_here_str}_{self.name_dataset}.nc'
+        if self.use_myint_sources:
+            name = name.replace('my','myint')
         fdate = os.path.join(dirdate, name)
         if not os.path.exists(fdate) and make_download:
             self.download_file(date_here, dirdate, name)

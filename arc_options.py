@@ -112,6 +112,7 @@ class ARC_OPTIONS:
             return None
 
         climatology_path = self.get_path(section,'climatology_path',False)
+        use_myint_sources = self.get_value_param(section, 'use_myint_sources', False, 'boolean')
 
 
 
@@ -135,7 +136,8 @@ class ARC_OPTIONS:
             'platform': platform,
             'alternative_path': alternative_path,
             'alternative_path_organization': alternative_path_organization,
-            'climatology_path': climatology_path
+            'climatology_path': climatology_path,
+            'use_myint_sources': use_myint_sources
         }
         return options_out
 

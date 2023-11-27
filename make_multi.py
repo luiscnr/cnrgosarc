@@ -462,8 +462,9 @@ def run_resample(arc_opt, start_date, end_date):
     # dname = dbase.title
     # dbase.close()
 
+    use_myint_sources = options['use_myint_sources']
     ams = ARC_MULTI_SOURCES(options['input_path'], options['input_path_organization'], options['moi_user'],
-                            options['moi_pass'], args.verbose)
+                            options['moi_pass'], use_myint_sources,args.verbose)
 
 
     while date_ref <= date_fin:
