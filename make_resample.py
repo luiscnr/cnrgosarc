@@ -1907,26 +1907,49 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                 zprod.extractall(path=unzip_path)
 
         olimage = OLCI_L2(path_prod_u, args.verbose)
-        olimage.get_geo_and_params()
-        granule_index = granule_index + 1
 
-        # A new orbit_index is assigned to each platform + relative pass
-        rel_pass = str(olimage.get_rel_pass())
-        platform = olimage.get_platform()
-        rel_pass = f'{platform}_{rel_pass}'
-        if rel_pass not in rel_pass_dict.keys():
-            idref = idref + 1
-            rel_pass_dict[rel_pass] = math.pow(2, idref)
-            if dokml:
-                import simplekml
-                if foutkml is not None and kml is not None:
-                    kml.save(foutkml)
-                    idcolor = idcolor + 1
-                    if idcolor >= len(red):
-                        idcolor = 0
-                foutkml = os.path.join(dirdest, f'Passes_RelativeOrbit_{rel_pass}.kml')
-                kml = simplekml.Kml()
-        orbit_index = rel_pass_dict[rel_pass]
+        if olimage.check_granule():
+            olimage.get_geo_and_params()
+            granule_index = granule_index + 1
+            # A new orbit_index is assigned to each platform + relative pass
+            rel_pass = str(olimage.get_rel_pass())
+            platform = olimage.get_platform()
+            rel_pass = f'{platform}_{rel_pass}'
+            if rel_pass not in rel_pass_dict.keys():
+                idref = idref + 1
+                rel_pass_dict[rel_pass] = math.pow(2, idref)
+                if dokml:
+                    import simplekml
+                    if foutkml is not None and kml is not None:
+                        kml.save(foutkml)
+                        idcolor = idcolor + 1
+                        if idcolor >= len(red):
+                            idcolor = 0
+                    foutkml = os.path.join(dirdest, f'Passes_RelativeOrbit_{rel_pass}.kml')
+                    kml = simplekml.Kml()
+            orbit_index = rel_pass_dict[rel_pass]
+        else:
+            print(f'[WARNING] Granule {output_name} is corrupted. Skipping granule...')
+            dokml = False
+            doresample = False
+            ##Granule must be cancelled
+            if zp.is_zipfile(prod_path):
+                for fn in os.listdir(path_prod_u):
+                    os.remove(os.path.join(path_prod_u, fn))
+                os.remove(prod_path)
+            else:
+                for fn in os.listdir(prod_path):
+                    os.remove(os.path.join(prod_path,fn))
+                os.rename(prod_path,os.path.join(unzip_path,f'{output_name}.SEN3'))
+            ##Granule name is save to a file of corrupted files
+            f_corrupted_list = os.path.join(dirorig,'CorruptedFiles.txt')
+            already_existed = os.path.exists(f_corrupted_list)
+            fout = open(f_corrupted_list,'a')
+            if already_existed:
+                fout.write('\n')
+            fout.write(output_name)
+            fout.close()
+
 
         if doresample and not resample_done:
             if apply_pool == 0:

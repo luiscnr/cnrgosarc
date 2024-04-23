@@ -1,3 +1,4 @@
+import calendar
 import os
 from ftplib import FTP
 from datetime import datetime as dt
@@ -53,6 +54,19 @@ class ARC_MULTI_SOURCES:
             return 'NOFILE'
 
 
+    def check_file_ftp(self,date_here):
+
+        date_here_str = date_here.strftime('%Y%m%d')
+        name = f'{date_here_str}_{self.name_dataset}.nc'
+        fwork = FTPWork(self.server, self.moi_user, self.moi_pass)
+        fwork.path_dataset = f'/Core/{self.name_product}/{self.name_dataset}'
+        return fwork.check_daily_file(date_here,name)
+
+    def check_month_files_ftp(self,year,month):
+        fwork = FTPWork(self.server, self.moi_user, self.moi_pass)
+        fwork.path_dataset = f'/Core/{self.name_product}/{self.name_dataset}'
+        missing_dates = fwork.check_daily_files_month(year,month,self.name_dataset)
+        return missing_dates
 
     def download_file(self, date_here, dirdate, name):
         if self.verbose:
@@ -149,6 +163,29 @@ class FTPWork():
             return True
         else:
             return False
+
+    def check_daily_files_month(self,year,month,name_ref):
+
+        res = calendar.monthrange(year,month)
+        last_day_month = res[1]
+        b = self.go_month_subdir(None, year, month)
+        if not b:
+            missing_dates = []
+            for day in range(1, last_day_month + 1):
+                date_here = dt(year, month, day)
+                missing_dates.append(date_here)
+            return missing_dates
+        list = self.ftpdu.nlst()
+        missing_dates = []
+        for day in range(1,last_day_month+1):
+            date_here = dt(year,month,day)
+            date_here_str = date_here.strftime('%Y%m%d')
+            name_file = f'{date_here_str}_{name_ref}.nc'
+            if name_file not in list:
+                missing_dates.append(date_here)
+
+        return missing_dates
+
 
     def donwload_daily_file(self,date_here,dir_out,name_file):
         b = self.check_daily_file(date_here,name_file)

@@ -12,7 +12,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
                     choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
-                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST"],
+                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -225,6 +225,67 @@ def check_point():
     return True
 
 
+def check_sources():
+    from datetime import datetime as dt
+    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/missing_sources.csv'
+    fout = open(file_out,'w')
+    input_path = '/mnt/c/DATA_LUIS'
+    moi_user = 'lgonzalezvilas'
+    moi_pass = 'MegaRoma17!'
+    ams = ARC_MULTI_SOURCES(input_path, None, moi_user, moi_pass, False, True)
+
+    for year in range(1997,2022):
+        for month in range(1,13):
+            if year==1997 and month<9:
+                continue
+            print('-->',year,month)
+            missing_dates = ams.check_month_files_ftp(year,month)
+            for date in missing_dates:
+                fout.write(date.strftime('%Y-%m-%d'))
+                fout.write('\n')
+    # date_ref = dt(1997, 9, 4)
+    # date_end = dt(2022, 12, 31)
+    # while date_ref <= date_end:
+    #     if date_ref.day == 1:
+    #         print('-->', date_ref)
+    #     b = ams.check_file_ftp(date_ref)
+    #     if not b:
+    #         print('NOT AVAILABLE')
+    #         fout.write('\n')
+    #         fout.write(date_ref.strftime('%Y-%m-%d'))
+    #     date_ref = date_ref + timedelta(hours=24)
+
+    fout.close()
+
+    return True
+
+def check_coverage():
+    file_grid = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
+    from netCDF4 import Dataset
+    import numpy as np
+    dataset = Dataset(file_grid)
+
+    lat_array = np.array(dataset.variables['lat'])
+    lon_array = np.array(dataset.variables['lon'])
+    from global_land_mask import globe
+
+    ncoverage = 0
+    for y in range(0,1375):
+        print(y, 'de 1375')
+        for x in range(0,1375):
+            lat_here = lat_array[y,x]
+            lon_here = lon_array[y,x]
+            if lat_here<65.0:
+                continue
+            if globe.is_land(lat_here,lon_here):
+                continue
+            ncoverage = ncoverage + 1
+
+
+    print(ncoverage)
+
+    return True
+
 def main():
     # if do_global_grid_monthly():
     #     return
@@ -234,6 +295,12 @@ def main():
     #     return
     # if check_point():
     #     return
+    # if check_sources():
+    #     return
+
+    # if check_coverage():
+    #     return
+
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
         check_py()
@@ -464,8 +531,7 @@ def run_resample(arc_opt, start_date, end_date):
 
     use_myint_sources = options['use_myint_sources']
     ams = ARC_MULTI_SOURCES(options['input_path'], options['input_path_organization'], options['moi_user'],
-                            options['moi_pass'], use_myint_sources,args.verbose)
-
+                            options['moi_pass'], use_myint_sources, args.verbose)
 
     while date_ref <= date_fin:
         print(f'[INFO]******************************************************************************->{date_ref}')

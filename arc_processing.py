@@ -315,6 +315,7 @@ class ArcProcessing:
             if band not in ncsat.variables:
                 print(f'[ERROR] RRS variable {band} is not available. Exiting...')
                 return
+
         var443 = ncsat.variables[rrs_bands[0]]
         var490 = ncsat.variables[rrs_bands[1]]
         var510 = ncsat.variables[rrs_bands[2]]
@@ -364,6 +365,8 @@ class ArcProcessing:
                 print(f'[INFO] Getting sensor mask...')
             sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
             datasetout.variables['SENSORMASK'] = [sensor_mask_array]
+
+        ncsat.close()
 
         if self.verbose:
             print(f'[INFO] Getting kd-490 variable...')
@@ -453,7 +456,7 @@ class ArcProcessing:
 
 
 
-        ncsat.close()
+        #ncsat.close()
 
 
         datasetout.close()

@@ -22,6 +22,23 @@ class OLCI_L2():
         self.params = {}
         self.coords_image = None
 
+    def check_granule(self):
+        nfiles = 0
+        valid = True
+        for name in os.listdir(self.path_source):
+            if name!='iop_lsd.nc':
+                nfiles = nfiles + 1
+            if name.endswith('.nc'):
+                try:
+                    dataset = Dataset(os.path.join(self.path_source,name))
+                    dataset.close()
+                except:
+                    valid = False
+                    break
+        if nfiles<32:
+            valid = False
+        return valid
+
     def get_geo_and_params(self):
         self.get_dimensions()
         cgeo = CHECK_GEO()
