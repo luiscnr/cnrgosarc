@@ -12,7 +12,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
                     choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
-                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI"],
+                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -449,6 +449,22 @@ def main():
 
         return
 
+    if args.mode == 'CORRECT_TIMESTAMP' and args.start_date and args.inputpath and args.outputpath:
+        start_date, end_date = get_dates_from_arg()
+        if start_date is None or end_date is None:
+             return
+        if not os.path.isdir(args.inputpath):
+            print(f'[ERROR] {args.inputpath} is not a valid directory')
+            return
+        if not os.path.isdir(args.outputpath):
+            try:
+                os.mkdir(args.outputpath)
+            except:
+                print(f'[ERROR] {args.outputpath} is not a valid directory')
+                return
+        run_correct_time_stamp(start_date,end_date,args.inputpath,args.outputpath)
+        return
+
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL. DATES COULD BE ALSO PASSED AS ARGS
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
@@ -465,6 +481,7 @@ def main():
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
+
     # check if dates from args should be used
     start_date = None
     end_date = None
@@ -499,6 +516,63 @@ def main():
         run_month(arc_opt, 'RRS510', start_date, end_date)
         return
 
+
+
+def run_correct_time_stamp(start_date,end_date,input_path,output_path):
+    if start_date is None or end_date is None:
+        return
+    date_ref = start_date
+    while date_ref <= end_date:
+        print(f'[INFO]******************************************************************************->{date_ref}')
+        input_path_date = os.path.join(input_path,date_ref.strftime('%Y'),date_ref.strftime('%j'))
+        dateyj = date_ref.strftime('%Y%j')
+        name = f'C{dateyj}_rrs-arc-4km.nc'
+        file_input = os.path.join(input_path_date,name)
+        if os.path.exists(file_input):
+            output_path_year = os.path.join(output_path,date_ref.strftime('%Y'))
+            if not os.path.exists(output_path_year): os.mkdir(output_path_year)
+            output_path_date = os.path.join(output_path_year,date_ref.strftime('%j'))
+            if not os.path.exists(output_path_date): os.mkdir(output_path_date)
+            file_output = os.path.join(output_path_date, name)
+            create_copy_correcting_time_stamp(file_input,file_output,date_ref)
+
+        date_ref = date_ref + timedelta(hours=24)
+
+def create_copy_correcting_time_stamp(file_input,file_output,date_here):
+    from datetime import datetime as dt
+    from netCDF4 import Dataset
+    time_ref = dt(1981,1,1,0,0,0)
+    new_ts = (date_here.replace(hour=0,minute=0,second=0,microsecond=0)-time_ref).total_seconds()
+    new_ts = np.int32(new_ts)
+    input_dataset = Dataset(file_input)
+    ncout = Dataset(file_output, 'w', format='NETCDF4')
+
+    ##global attributes
+    ncout.setncatts(input_dataset.__dict__)
+
+    # copy dimensions
+    for name, dimension in input_dataset.dimensions.items():
+        ncout.createDimension(
+            name, (len(dimension) if not dimension.isunlimited() else None))
+
+    for name, variable in input_dataset.variables.items():
+        fill_value = None
+        if '_FillValue' in list(variable.ncattrs()):
+            fill_value = variable._FillValue
+
+        ncout.createVariable(name, variable.datatype, variable.dimensions, fill_value=fill_value, zlib=True, complevel=6)
+
+        # copy variable attributes all at once via dictionary
+        ncout[name].setncatts(input_dataset[name].__dict__)
+
+        # copy data
+        if name == 'time':
+            ncout[name][0] = new_ts
+        else:
+            ncout[name][:] = input_dataset[name][:]
+
+    ncout.close()
+    input_dataset.close()
 
 def run_resample(arc_opt, start_date, end_date):
     options = arc_opt.get_resample_options()
