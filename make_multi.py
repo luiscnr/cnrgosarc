@@ -543,8 +543,8 @@ def run_correct_time_stamp(start_date,end_date,input_path,output_path):
                 from netCDF4 import Dataset
                 from datetime import datetime as dt
                 dataset = Dataset(file_input)
-                ts = dataset.variables['time'][0]
-                date_file = dt(1981,1,1,0,0,0)+timedelta(seconds=ts)
+                ts = float(dataset.variables['time'][0])
+                date_file = dt(1981,1,1)+timedelta(seconds=ts)
                 btime = date_file.strftime('%Y-%m-%d')==date_ref.strftime('%Y-%m-%d')
                 print(f'[INFO] {date_ref.strftime("%Y-%m-%d")}->{date_file.strftime("%Y-%m-%d")}->{btime}')
                 dataset.close()
