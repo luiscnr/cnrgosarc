@@ -473,7 +473,7 @@ def main():
             print(f'[ERROR] {args.inputpath} is not a valid directory')
             return
         run_correct_time_stamp(start_date,end_date,args.inputpath,None)
-
+        return
 
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL. DATES COULD BE ALSO PASSED AS ARGS
     if not args.config_file:
