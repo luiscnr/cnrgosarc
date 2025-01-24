@@ -1144,7 +1144,7 @@ class ArcMapInfo:
 
         from datetime import datetime as dt
         if date_here is not None:
-            nsec = (date_here - dt(1970, 1, 1)).total_seconds()
+            nsec = (date_here - dt(1981, 1, 1)).total_seconds()
             datasetout.variables['time'][0] = [np.int(nsec)]
             datasetout.start_date = date_here.strftime('%Y-%m-%d')
             datasetout.stop_date = date_here.strftime('%Y-%m-%d')

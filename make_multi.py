@@ -12,7 +12,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
                     choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
-                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP"],
+                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP","CHECK_TIMESTAMP"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -465,6 +465,16 @@ def main():
         run_correct_time_stamp(start_date,end_date,args.inputpath,args.outputpath)
         return
 
+    if args.mode == 'CHECK_TIMESTAMP' and  args.inputpath:
+        start_date, end_date = get_dates_from_arg()
+        if start_date is None or end_date is None:
+            return
+        if not os.path.isdir(args.inputpath):
+            print(f'[ERROR] {args.inputpath} is not a valid directory')
+            return
+        run_correct_time_stamp(start_date,end_date,args.inputpath,None)
+
+
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL. DATES COULD BE ALSO PASSED AS ARGS
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
@@ -529,12 +539,22 @@ def run_correct_time_stamp(start_date,end_date,input_path,output_path):
         name = f'C{dateyj}_rrs-arc-4km.nc'
         file_input = os.path.join(input_path_date,name)
         if os.path.exists(file_input):
-            output_path_year = os.path.join(output_path,date_ref.strftime('%Y'))
-            if not os.path.exists(output_path_year): os.mkdir(output_path_year)
-            output_path_date = os.path.join(output_path_year,date_ref.strftime('%j'))
-            if not os.path.exists(output_path_date): os.mkdir(output_path_date)
-            file_output = os.path.join(output_path_date, name)
-            create_copy_correcting_time_stamp(file_input,file_output,date_ref)
+            if output_path is None: ##only info
+                from netCDF4 import Dataset
+                from datetime import datetime as dt
+                dataset = Dataset(file_input)
+                ts = dataset.variables['time'][0]
+                date_file = dt(1981,1,1,0,0,0)+timedelta(seconds=ts)
+                btime = date_file.strftime('%Y-%m-%d')==date_ref.strftime('%Y-%m-%d')
+                print(f'[INFO] {date_ref.strftime("%Y-%m-%d")}->{date_file.strftime("%Y-%m-%d")}->{btime}')
+                dataset.close()
+            else:
+                output_path_year = os.path.join(output_path,date_ref.strftime('%Y'))
+                if not os.path.exists(output_path_year): os.mkdir(output_path_year)
+                output_path_date = os.path.join(output_path_year,date_ref.strftime('%j'))
+                if not os.path.exists(output_path_date): os.mkdir(output_path_date)
+                file_output = os.path.join(output_path_date, name)
+                create_copy_correcting_time_stamp(file_input,file_output,date_ref)
 
         date_ref = date_ref + timedelta(hours=24)
 
