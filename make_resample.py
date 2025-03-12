@@ -44,7 +44,8 @@ def main():
     import os
 
     if args.mode == "CHECK":
-        do_check10()
+        check_model()
+        # do_check10()
         # from datetime import datetime as dt
         # correcting_time_variable_in_plankton_files(dt(2016, 6, 1), dt(2016, 9, 30))
         # correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
@@ -64,7 +65,7 @@ def main():
         # copy_nc_excluding_variables(path_input, path_output, vars)
 
         # check_chla()
-        # check_model()
+
         # run_resampling_info()
         # do_check7()  # gettig combinatons
         # do_check8() #information about combinations
@@ -888,28 +889,56 @@ def check_chla():
 
 
 def check_model():
-    jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
+    #jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
+    jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_WORK/CIAO/CIAO_Algorithm.json'
     from arc_gpr_model import ARC_GPR_MODEL
     model = ARC_GPR_MODEL(jsonfile)
-    val_443 = 0.0094
-    val_490 = 0.0100
-    val_560 = 0.0037
-    val_665 = 0.000048831
-    val_longitude = -70.2275
-    day = 207
-    input_vector_orig = np.array([val_longitude, day, val_443, val_490, val_560, val_665])
-    input_vector = np.array(
-        [val_longitude, day, np.log10(val_443), np.log10(val_490), np.log10(val_560), np.log10(val_665)])
+
+
+
+
+
+    ###SEASarc Example
+    # val_443 = 0.0094
+    # val_490 = 0.0100
+    # val_560 = 0.0037
+    # val_665 = 0.000048831
+    # val_longitude = -70.2275
+    # day = 207
+    # input_vector_orig = np.array([val_longitude, day, val_443, val_490, val_560, val_665])
+    # input_vector = np.array(
+    #     [val_longitude, day, np.log10(val_443), np.log10(val_490), np.log10(val_560), np.log10(val_665)])
     # active_vector = model.active_set_vectors
 
+    ##CIAO Example
+    input_vector = np.array([103, -2.775414369, -2.804895253, -2.791867274, -2.902936795])
     res = model.compute_chla_impl(input_vector)
-    print('Res', res)
+    print('Result', res)
     chla = 10 ** res
     print('Chla', chla)
-    res = model.compute_chla(input_vector_orig, True)
-    print('Chla', res)
-    res = model.compute_chla_from_param(val_longitude, day, val_443, val_490, val_560, val_665)
-    print('Chla', res)
+
+
+    # input_file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_WORK/CIAO/TestingDataset.csv'
+    # import pandas as pd
+    # df = pd.read_csv(input_file,sep=';')
+    #
+    # doy = df['DOY']
+    # rrs_443 = df['log_Rrs_443']
+    # rrs_490 = df['log_Rrs_490']
+    # rrs_510 = df['log_Rrs_510']
+    # rrs_560 = df['log_Rrs_560']
+    # chla_ciao = np.zeros(doy.shape)
+    # for idx in range(chla_ciao.shape[0]):
+    #     chla_ciao[idx]=model.compute_chla([doy[idx],rrs_443[idx],rrs_490[idx],rrs_510[idx],rrs_560[idx]],False)
+    #     print(chla_ciao[idx])
+    # df['chla_CIAO_py'] = chla_ciao
+    # df.to_csv(input_file,sep=';')
+
+
+    # res = model.compute_chla(input_vector_orig, True)
+    # print('Chla', res)
+    # res = model.compute_chla_from_param(val_longitude, day, val_443, val_490, val_560, val_665)
+    # print('Chla', res)
     #
     # from sklearn.gaussian_process import GaussianProcessRegressor
     # from sklearn.gaussian_process.kernels import RationalQuadratic

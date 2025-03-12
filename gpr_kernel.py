@@ -6,13 +6,21 @@ class GPR_KERNEL:
         self.kernel_type = kernel_dict['Name']
         self.alpharq = None
         self.sigmaf = None
+        self.sigmal = None
         self.length_scale = None
         if self.kernel_type == 'ARDRationalQuadratic':
             self.start_kernel_ARDRationalQuadratic(kernel_dict)
+        if self.kernel_type == 'RationalQuadratic':
+            self.start_kernel_RationalQuadratic(kernel_dict)
 
         # print('Kernel alpha:',self.alpharq)
         # print('Kernel sigma F :',self.sigmaf)
         # print('Kernel lscale :', self.length_scale)
+
+    def start_kernel_RationalQuadratic(self, kernel_dict):
+        self.alpharq = kernel_dict['AlphaRQ']
+        self.sigmaf = kernel_dict['SigmaF']
+        self.sigmal = kernel_dict['SigmaL']
 
     def start_kernel_ARDRationalQuadratic(self, kernel_dict):
         self.alpharq = kernel_dict['AlphaRQ']
@@ -31,6 +39,18 @@ class GPR_KERNEL:
     def compute_kernel(self, vector1, vector2):
         if self.kernel_type == 'ARDRationalQuadratic':
             return self.compute_ard_rational_quadratic(vector1, vector2)
+        if self.kernel_type == 'RationalQuadratic':
+            return self.compute_rational_quadratic(vector1, vector2)
+
+    def compute_rational_quadratic(self,vector1,vector2):
+        if len(vector1) != len(vector2):
+            print('[WARNING] Kernel can not be computed, both vectors must have the same length')
+            return np.NaN
+        result = (self.sigmaf ** 2) * ((1 + (np.sum((vector1-vector2)**2)/(2*self.alpharq*(self.sigmal**2))))**-self.alpharq)
+        return result
+
+
+
 
     def compute_ard_rational_quadratic(self, vector1, vector2):
         if len(vector1) != len(vector2):

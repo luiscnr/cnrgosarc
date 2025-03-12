@@ -11,7 +11,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
+                    choices=["CHECKPY", "CHECK_ALGORITHM", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
                              "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP","CHECK_TIMESTAMP"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
@@ -304,6 +304,10 @@ def main():
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
         check_py()
+        return
+
+    if args.mode == 'CHECK_ALGORITHM':
+
         return
 
     if args.mode == 'GRID' and args.outputpath:  ##creating single file grid
