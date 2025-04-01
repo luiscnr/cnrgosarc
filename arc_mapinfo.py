@@ -298,11 +298,11 @@ class ArcMapInfo:
             print(f'[ERROR] Grid file base: {self.ifile_base} does not exist')
             return dst
         if self.verbose:
-            print(f'[INFO] Copying file grid: {self.ifile_base}...')
+            print(f'[INFO] Copying file grid base: {self.ifile_base}...')
 
         # shutil.copy(self.ifile_base,ofile)
 
-        cmd = f'cp -a {self.ifile_base} {ofile}'
+        cmd = f'cp -a "{self.ifile_base}" "{ofile}"'
         if self.verbose:
             print(f'[INFO] cmd: {cmd}')
         import subprocess

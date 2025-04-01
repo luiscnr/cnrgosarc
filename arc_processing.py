@@ -1,5 +1,5 @@
 import os.path
-
+import __init__
 from arc_mapinfo import ArcMapInfo
 from arc_gpr_model import ARC_GPR_MODEL
 from kd_algorithm import KD_ALGORITHMS
@@ -20,14 +20,27 @@ class ArcProcessing:
         self.ami = ArcMapInfo(self.arc_opt, False)
         self.width = self.ami.area_def.width
         self.height = self.ami.area_def.height
+
+        self.chla_algo = None
         self.chla_model = None
         if output_type is None:
             output_type = 'CHLA'
+            self.chla_algo = 'CIAO'
+        if output_type.startswith('CHLA'):
+            self.chla_algo = output_type.split('_')[1]
+            output_type = 'CHLA'
+
+
+
         self.output_type = output_type
         self.file_attributes = file_attributes
 
         # FILE DEFAULTS
-        file_model_default = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
+        if self.chla_algo=='CIAO':
+            file_model_default = os.path.join(os.path.dirname(__init__.__file__),'CIAO_Algorithm.json')
+        elif self.chla_algo=='SeaSARC':
+            file_model_default = os.path.join(os.path.dirname(__init__.__file__),'SeaSARC_Algorithm.json')
+
         file_grid_default = self.ami.ifile_base
 
         if arc_opt is None:  # only for creating the file base
@@ -42,7 +55,10 @@ class ArcProcessing:
             self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
 
         if os.path.exists(self.file_model) and output_type == 'CHLA':
-            self.chla_model = ARC_GPR_MODEL(self.file_model)
+            use_ciao = True if self.chla_algo=='CIAO' else False
+            self.chla_model = ARC_GPR_MODEL(self.file_model,use_ciao)
+        else:
+            print(f'[ERROR] Model file {self.file_model} is not available')
 
         self.climatology_path = None
 
@@ -466,16 +482,17 @@ class ArcProcessing:
     def compute_chla_image(self, filein, fileout, timeliness):
 
         if self.chla_model is None:
-            print('[ERROR] Chla model could not be initiated. Please review file_model option in PROCESSING section.')
+            print('[ERROR] Chla model could not be initiated. Please review chla_model option in GENERAL section.')
             return
-        section = 'PROCESSING'
+        section = 'CHLA'
         file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
         if file_base is None:
-            section = 'CHLA'
+            section = 'PROCESSING'
             file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
 
         if file_base is None:
             file_base = self.file_grid
+
         if not os.path.exists(file_base):
             print(f'[ERROR] File base {file_base} could not be found.')
             return

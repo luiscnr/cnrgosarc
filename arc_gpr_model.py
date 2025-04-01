@@ -3,11 +3,10 @@ import os
 
 class ARC_GPR_MODEL():
 
-    def __init__(self, fmodel):
-        self.use_ciao = False
-        if os.path.basename(fmodel).startswith('CIAO_'):
+    def __init__(self, fmodel,use_ciao):
+        self.use_ciao = use_ciao
+        if self.use_ciao:
             print('[INFO] Started GPR model - CIAO Algorithm')
-            self.use_ciao = True
         else:
             print('[INFO] Started GPR model - SeaSARC Algorithm')
         import json
@@ -101,7 +100,7 @@ class ARC_GPR_MODEL():
         result = np.power(10, result)
         return result
 
-    ##FAST CHECK OF INPUT VALID
+    ##FAST CHECK OF INPUT VALID - SeaSARC
     def check_chla_valid(self, array_443, array_490, array_560, array_665):
         indices = np.where(
             np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_560 > 0, array_665 > 0)))

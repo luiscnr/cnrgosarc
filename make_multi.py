@@ -24,6 +24,7 @@ parser.add_argument('-c', "--config_file", help="Configuration file (Default: ar
 parser.add_argument('-bf', "--base_file", help="Create base file for the following mode: RESAMPLE,INTEGRATE.")
 parser.add_argument('-var', "--variable_plot", help="Variable to be plot using QL mode. Default: CHL",
                     choices=["CHL", "KD490"])
+parser.add_argument("-chla_algo", "--chla_algorithm",help="Chl-a algorithm",choices=["SeaSARC","CIAO"],default="CIAO")
 parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true")
 args = parser.parse_args()
 
@@ -366,26 +367,25 @@ def main():
     if args.mode == 'CHLA' and args.base_file and args.config_file and args.outputpath:
         output_file = args.outputpath
         if not os.path.isdir(os.path.dirname(output_file)) or not output_file.endswith('.nc'):
-            print(f'[ERROR] Output file: {output_file} is not valid')
+            print(f'[ERROR] Output file: {output_file} is not valid. It should be a nc file in an existing directory')
             return
         # file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
         file_at = args.config_file
         if not os.path.isfile(file_at):
-            print(f'[ERROR] Attributes files: {file_at} is not valid')
+            print(f'[ERROR] Attributes files: {file_at} does not exist or is not a valid file')
+
         file_base = args.base_file
         if not os.path.isfile(file_base):
-            print(f'[ERROR] File base: {file_base} is not valid')
-        modes = ['NR', 'NT']
-        mode = None
-        for m in modes:
-            if output_file.find(m) > 0:
-                mode = m
+            print(f'[ERROR] File base: {file_base} does not exist of is not a valid file')
+
+        mode = 'NR' if output_file.find('NR')>0 else 'NT' if output_file.find('NT')>0 else None
         if mode is None:
             print(f'[ERROR] Mode is not defined in output file name. It should be NR or NT')
             return
 
         from arc_processing import ArcProcessing
-        arcProc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
+        output_type  = f'CHLA_{args.chla_algorithm}'
+        arcProc = ArcProcessing(None, args.verbose, output_type, file_at)
 
         arcProc.ami.set_area_definition('polar_stereographic_4km')
         dout = arcProc.create_nc_file_out(output_file, file_base, mode)
@@ -695,14 +695,16 @@ def run_chla(arc_opt, start_date, end_date):
     overwrite = arc_opt.get_value_param(section, 'overwrite', False, 'boolean')
     file_base = arc_opt.get_value_param(section, 'file_base', None, 'file')
     file_att = arc_opt.get_value_param(section, 'file_att', None, 'file')
+    chla_algo = args.chla_algorithm if args.chla_algorithm else arc_opt.get_value_param(section,'chla_algorithm','CIAO','str')
+    if chla_algo not in ["SeaSARC","CIAO"]:
+        print(f'[ERROR] {chla_algo} is not a valid chl-a algorithm. Possible values are: SeaSARC, CIAO')
+        return
+
     if file_base is None:
         print(f'[ERROR] file_base does not exist or is not available in the config file. Please review it')
         return
 
-    timelinesses = ['NR', 'NT']
-    for t in timelinesses:
-        if file_base.split('/')[-1].find(t) > 0:
-            timeliness = t
+    timeliness = 'NR' if os.path.basename(file_base).find('NR')>0 else 'NT' if os.path.basename(file_base).find('NT')>0 else None
     if timeliness is None:
         print(f'[ERROR] Timeliness is not defined in the file base. It should be NR or NT')
         return
@@ -716,6 +718,7 @@ def run_chla(arc_opt, start_date, end_date):
         print(f'[INFO]  file_att:->{file_att}')
         print(f'[INFO]  overwrite:->{overwrite}')
         print(f'[INFO]  timeliness:->{timeliness}')
+        print(f'[INFO]  chl-a algorithm:->{chla_algo}')
 
     climatology_path = options['climatology_path']
 
@@ -747,7 +750,9 @@ def run_chla(arc_opt, start_date, end_date):
         end_date = options['end_date']
     date_run = start_date
 
-    arc_proc = ArcProcessing(arc_opt, args.verbose, 'CHLA', None)
+    output_type = f'CHLA_{chla_algo}'
+
+    arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
     arc_proc.climatology_path = climatology_path
     while date_run <= end_date:
         if args.verbose:

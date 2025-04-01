@@ -187,7 +187,7 @@ class ARC_OPTIONS:
     def get_value(self, section, key):
         value = None
         if self.options.has_option(section, key):
-            value = self.options[section][key]
+            value = self.options[section][key].strip()
         return value
 
     def get_value_param(self, section, key, default, type):
