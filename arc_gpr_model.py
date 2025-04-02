@@ -155,10 +155,7 @@ class ARC_GPR_MODEL():
             active_vector = self.active_set_vectors[idv]
             KTemp[:, :] = np.power((active_vector[:] - matrix[:, 1:self.npredictors+1]), 2)
             KSum = np.sum(KTemp, 1)
-            if idv==0:
-                print(idv,KSum.shape)
-                for tal in KSum:
-                    print(tal)
+            
             KResults[:, idv] = (self.kernel.sigmaf ** 2) * ((1 + (
                         KSum / (2 * self.kernel.alpharq * (self.kernel.sigmal ** 2)))) ** -self.kernel.alpharq)
 
