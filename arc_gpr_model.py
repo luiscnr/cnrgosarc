@@ -24,38 +24,29 @@ class ARC_GPR_MODEL():
         self.sigma = model_dict['Sigma']
         self.beta = np.array(model_dict['Beta'])
 
-        # print(model_dict.keys())
-        # print(kernel_dict)
-        # print(type(self.active_set_vectors),self.active_set_vectors.shape)
-
-        # for idx in range(self.nactive_set_vectors):
-        #     active_vector = self.active_set_vectors[idx]
-        #     print(active_vector)
-        # print(model_dict['BasisFunction'])
-        # print(model_dict['Beta'])
-        # print(model_dict['Sigma'])
 
     ##Basic implmentation, with log-transformed RRS data, valid for SeaSARC and CIAO
     def compute_chla_impl(self, feature_vector):
-        # term 1->linear equation
+
         X = np.concatenate(([1], feature_vector))
 
+        # term 1->linear equation
         H = X @ self.beta
-
 
         # term 2->kernel
         kresult = np.zeros(self.nactive_set_vectors)
         for idx in range(self.nactive_set_vectors):
             active_vector = self.active_set_vectors[idx]
-            kresult[idx] = self.kernel.compute_kernel(active_vector, feature_vector)
-
+            kresult[idx] = self.kernel.compute_kernel(active_vector,feature_vector)
         K = kresult @ self.alpha
 
+        #term 1 + term 2
         val_fin = H + K
 
         return val_fin
 
-    ##Basic implementation valid for SeaSARC and CIAO. RRS could log-transormed or no transformed.
+
+    ##Basic implementation valid for SeaSARC and CIAO, using linear or log-tranformed Rrs
     def compute_chla(self, feature_vector, transform_input):
         if len(feature_vector) != self.npredictors:
             return np.nan
@@ -64,11 +55,10 @@ class ARC_GPR_MODEL():
                 feature_vector[1:] = np.log10(feature_vector[1:])
             else:
                 feature_vector[2:] = np.log10(feature_vector[2:])
-            # for idx in range(2, self.npredictors):
-            #     feature_vector[idx] = np.log10(feature_vector[idx])
         val_fin = self.compute_chla_impl(feature_vector)
         chla = 10 ** val_fin
         return chla
+
     ##SeaSARC#######################################################################################################
     ##compute chla from params (no log-transformed rrs) for SeaSARC algorithm
     def compute_chla_from_param(self, long_value, day, val_443, val_490, val_560, val_665):
@@ -100,10 +90,12 @@ class ARC_GPR_MODEL():
         result = np.power(10, result)
         return result
 
-    ##FAST CHECK OF INPUT VALID - SeaSARC
-    def check_chla_valid(self, array_443, array_490, array_560, array_665):
+    ##FAST CHECK OF INPUT VALID - Valid for CIAO and SeaSARC
+    ##SeaSARC: 443, 490, 560, 665
+    ##CIAO: 443, v490, 510, 560
+    def check_chla_valid(self, array_1, array_2, array_3, array_4):
         indices = np.where(
-            np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_560 > 0, array_665 > 0)))
+            np.logical_and(np.logical_and(array_1 > 0, array_2 > 0), np.logical_and(array_3 > 0, array_4 > 0)))
         nvalid = len(indices[0])
         return nvalid
 
@@ -132,3 +124,46 @@ class ARC_GPR_MODEL():
     def compute_ciao_from_param(self, day, val_443, val_490, val_510, val_560):
         feature_vector = [day, val_443, val_490, val_510, val_560]
         return self.compute_chla(feature_vector, True)
+
+    def compute_chla_ciao_from_2d_arrays(self, day, array_443, array_490, array_510, array_560):
+        chla_array = np.zeros(array_443.shape)
+        chla_array[:] = -999
+        indices = np.where(
+            np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_510 > 0, array_560 > 0)))
+        nvalid = len(indices[0])
+        if nvalid == 0:
+            return chla_array
+        input_matrix = np.ones((nvalid, self.npredictors + 1))
+        input_matrix[:, 1] = day
+        input_matrix[:, 2] = np.log10(array_443[indices])
+        input_matrix[:, 3] = np.log10(array_490[indices])
+        input_matrix[:, 4] = np.log10(array_510[indices])
+        input_matrix[:, 5] = np.log10(array_560[indices])
+        chla_1d = self.compute_chla_ciao_from_matrix(input_matrix)
+        chla_array[indices] = chla_1d
+        return chla_array
+
+    ##fast implementantion, with transformed data, for CIAO algorithm
+    def compute_chla_ciao_from_matrix(self, matrix):
+        if len(matrix.shape) != 2 or matrix.shape[1] != (self.npredictors + 1):
+            return None
+        H = self.beta @ matrix.transpose()
+        nobs = matrix.shape[0]
+        KResults = np.zeros((nobs, self.nactive_set_vectors))
+        KTemp = np.zeros((nobs, self.npredictors))
+        for idv in range(self.nactive_set_vectors):
+            active_vector = self.active_set_vectors[idv]
+            KTemp[:, :] = np.power((active_vector[:] - matrix[:, 1:self.npredictors+1]), 2)
+            KSum = np.sum(KTemp, 1)
+
+            KResults[:, idv] = (self.kernel.sigmaf ** 2) * ((1 + (
+                        KSum / (2 * self.kernel.alpharq * (self.kernel.sigmal ** 2)))) ** -self.kernel.alpharq)
+
+            KResults[:, idv] = KResults[:, idv] * self.alpha[idv]
+
+        K = np.sum(KResults, 1)
+        result = H + K
+        result = np.power(10, result)
+
+        return result
+

@@ -1,5 +1,8 @@
 import os.path
 from datetime import datetime as dt
+from datetime import timedelta
+
+from fontTools.misc.plistlib import end_date
 
 
 def create_folder(folder):
@@ -98,15 +101,22 @@ class ARC_OPTIONS:
         if not self.options.has_section(section):
             print(f'[ERROR] {section} section is not included in config file')
             return None
-        compulsory_options = ['input_path', 'output_path', 'start_date', 'end_date']
+        #compulsory_options = ['input_path', 'output_path', 'start_date', 'end_date']
+        compulsory_options = ['input_path', 'output_path']
         if not self.check_compulsory_options(section, compulsory_options):
             return None
         input_path = self.get_path(section, 'input_path', False)
         output_path = self.get_path(section, 'output_path', True)
         if input_path is None or output_path is None:
             return None
-        start_date_str = self.options[section]['start_date']
-        end_date_str = self.options[section]['end_date']
+        if self.options.has_option(section,'start_date'):
+            start_date_str = self.options[section]['start_date']
+        else:
+            start_date_str = (dt.now()-timedelta(days=1)).strftime('%Y-%m-%d')
+        if self.options.has_option(section, 'end_date'):
+            end_date_str = self.options[section]['end_date']
+        else:
+            end_date_str = start_date_str
         start_date, end_date = get_dates_from_stroptions(start_date_str, end_date_str)
         if start_date is None or end_date is None:
             return None

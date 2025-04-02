@@ -287,6 +287,31 @@ def check_coverage():
 
     return True
 
+def do_test_array():
+    file_csv = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/OCTAC_WORK/ARC_WORK/CIAO/CIAO_Test_Dataset.csv'
+    import pandas as pd
+    df = pd.read_csv(file_csv,sep=',')
+    ndata = len(df.index)
+    matrix = np.ones((ndata,6))
+    col_names = ['','DOY','Rrs_443','Rrs_490','Rrs_510','Rrs_560']
+    for idx in range(1,6):
+        if idx>1:
+            matrix[:, idx] = np.log10(np.array(df[col_names[idx]]))
+        else:
+            matrix[:,idx] = np.array(df[col_names[idx]])
+
+    from arc_gpr_model import ARC_GPR_MODEL
+    fModel = '/home/lois/PycharmProjects/cnrgosarc/CIAO_Algorithm.json'
+    gModel = ARC_GPR_MODEL(fModel,True)
+    model_chl = gModel.compute_chla_ciao_from_matrix(matrix)
+
+    for idx in range(ndata):
+        val_fin = gModel.compute_chla_impl(matrix[idx,1:])
+        computed = 10 ** val_fin
+        print(computed,'??',model_chl[idx],'-------------------->',f'{computed/model_chl[idx]:.8f}')
+
+
+    return True
 def main():
     # if do_global_grid_monthly():
     #     return
@@ -300,6 +325,8 @@ def main():
     #     return
 
     # if check_coverage():
+    #     return
+    # if do_test_array():
     #     return
 
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
@@ -761,9 +788,7 @@ def run_chla(arc_opt, start_date, end_date):
         make_processing = True
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
         dateyj = date_run.strftime('%Y%j')
-        # dateymd = date_run.strftime('%Y%m%d')
         name_rrs = f'C{dateyj}_rrs-arc-4km.nc'
-        # name_rrs = f'{dateymd}_cmems_obs-oc_arc_bgc-reflectance_my_l3-multi-4km_P1D.nc'
         input_file = os.path.join(input_path, name_rrs)
         if not os.path.exists(input_file):
             print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')

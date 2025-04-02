@@ -1,5 +1,6 @@
 import os.path
 import __init__
+import pytz
 from arc_mapinfo import ArcMapInfo
 from arc_gpr_model import ARC_GPR_MODEL
 from kd_algorithm import KD_ALGORITHMS
@@ -498,7 +499,12 @@ class ArcProcessing:
             return
 
         ncsat = Dataset(filein)
-        rrs_bands = ['RRS442_5', 'RRS490', 'RRS560', 'RRS665']
+
+        if self.chla_algo=='SeaSARC':
+            rrs_bands = ['RRS442_5', 'RRS490', 'RRS560', 'RRS665']
+        elif self.chla_algo=='CIAO':
+            rrs_bands = ['RRS442_5', 'RRS490', 'RRS510','RRS560']
+
         if self.verbose:
             print('[INFO] Checking RRS bands')
         for band in rrs_bands:
@@ -514,21 +520,26 @@ class ArcProcessing:
                     return
         var443 = ncsat.variables[rrs_bands[0]]
         var490 = ncsat.variables[rrs_bands[1]]
-        var560 = ncsat.variables[rrs_bands[2]]
-        var665 = ncsat.variables[rrs_bands[3]]
+        if self.chla_algo == 'SeaSARC':
+            var560 = ncsat.variables[rrs_bands[2]]
+            var665 = ncsat.variables[rrs_bands[3]]
+        if self.chla_algo == 'CIAO':
+            var510 = ncsat.variables[rrs_bands[2]]
+            var560 = ncsat.variables[rrs_bands[3]]
 
-        if self.verbose:
-            print('[INFO] Checking longitude... ')
-        if 'lon' in ncsat.variables:
-            varLong = ncsat.variables['lon']
-            ncgrid = None
-        else:
-            ncgrid = Dataset(file_base)
-            if 'lon' in ncgrid.variables:
-                varLong = ncgrid.variables['lon']
+        ncgrid = None
+        if self.chla_algo=='SeaSARC':
+            if self.verbose:
+                print('[INFO] Checking longitude... ')
+            if 'lon' in ncsat.variables:
+                varLong = ncsat.variables['lon']
             else:
-                print(f'[ERROR] Longitude variable is not available in {file_base}. Exiting.')
-                return
+                ncgrid = Dataset(file_base)
+                if 'lon' in ncgrid.variables:
+                    varLong = ncgrid.variables['lon']
+                else:
+                    print(f'[ERROR] Longitude variable is not available in {file_base}. Exiting.')
+                    return
         if self.verbose:
             print('[INFO] Checking date...')
         sat_date = None
@@ -566,7 +577,7 @@ class ArcProcessing:
             datasetout.stop_date = sat_date.strftime('%Y-%m-%d')
         if timeliness is not None:
             datasetout.timeliness = timeliness
-        cdate = dt.utcnow()
+        cdate = dt.now().astimezone(pytz.utc)
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
 
@@ -603,8 +614,12 @@ class ArcProcessing:
                 array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
-                array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
-                nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if self.chla_algo == 'SeaSARC':
+                    array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if self.chla_algo == 'CIAO':
+                    array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_510, array_560)
                 if self.verbose:
                     if self.height < self.ystep and self.width < self.xstep:
                         print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
@@ -629,18 +644,28 @@ class ArcProcessing:
                 array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
-                array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
-                nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if self.chla_algo == 'SeaSARC':
+                    array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                if self.chla_algo == 'CIAO':
+                    array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_510, array_560)
+
                 if self.height < self.ystep and self.width < self.xstep:
                     print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
                 else:
                     print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
 
                 if nvalid > 0:
-                    array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
 
-                    array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
+                    if self.chla_algo == 'SeaSARC':
+                        array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
+                        array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
                                                                              array_560, array_665)
+
+                    if self.chla_algo == 'CIAO':
+                        array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,
+                                                                             array_510, array_560)
 
                     array_chla[array_chla < min_value] = -999.0
                     array_chla[array_chla > max_value] = -999.0
@@ -669,6 +694,8 @@ class ArcProcessing:
                     print(f'[INFO] Computing  climatology uisng file: {file_clima}')
                 output_array = self.compute_climatology(file_clima, var_chla,True)
                 var_output_qi[0, :, :] = output_array[:, :]
+        else:
+            datasetout.noqi = 'No climatatology data available'
 
         ncsat.close()
         if ncgrid is not None:
