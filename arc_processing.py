@@ -605,15 +605,14 @@ class ArcProcessing:
             print(f'[INFO] Checking chla pixels: YStep: {self.ystep} XStep: {self.xstep}')
 
         iprogress = 0
-        iprogress_end = int(np.ceil((self.height / self.ystep) * (self.width / self.xstep)))
         if self.height < self.ystep and self.width < self.xstep:
             iprogress_end = 1
+        else:
+            iprogress_end = int(np.ceil(self.height/self.ystep)*np.ceil(self.width/self.xstep))
 
-        overthershold = False
-
+        limits_list = []
+        nvalid_list = []
         for y in range(0, self.height, self.ystep):
-            if overthershold:
-                break
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
@@ -632,25 +631,33 @@ class ArcProcessing:
                     else:
                         print(f'[INFO] Checking -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 if nvalid > 500000:
-                    if self.ystep>=500:
-                        self.ystep=500
-                    if self.xstep>=500:
-                        self.xstep = 500
-                    overthershold = True
-                    break
+                    ystep_tmp = int(np.ceil(self.ystep)/ 2)
+                    xstep_tmp = int(np.ceil(self.xstep) / 2)
+                    for ytmp in range(limits[0],limits[1],ystep_tmp):
+                        for xtmp in range(limits[2],limits[3],xstep_tmp):
+                            limits_tmp = self.get_limits(ytmp, xtmp, ystep_tmp, xstep_tmp, self.height, self.width)
+                            limits_list.append(limits_tmp)
+                            nvalid_list.append(nvalid)
+                else:
+                    limits_list.append(limits)
+                    nvalid_list.append(nvalid)
+
+
 
         if self.verbose:
             print(f'[INFO] Computing chla: YStep: {self.ystep} XStep: {self.xstep}')
+
         iprogress = 0
         iprogress_end = int(np.ceil((self.height / self.ystep) * (self.width / self.xstep)))
         if self.height < self.ystep and self.width < self.xstep:
             iprogress_end = 1
 
-        for y in range(0, self.height, self.ystep):
-            for x in range(0, self.width, self.xstep):
-                iprogress = iprogress + 1
-                limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-
+        nlimits = len(limits_list)
+        for idx in range(nlimits):
+            nvalid_here = nvalid_list[idx]
+            print(f'[INFO] Computing chl-a -> {idx+1} / {nlimits}) -> {nvalid_here}')
+            if nvalid_here > 0:
+                limits = limits_list[idx]
                 if rrs_bands[0] == 'RRS442_5':
                     print(f'[INFO] Band shifting from 442.5 to 443...')
                     array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
@@ -658,38 +665,66 @@ class ArcProcessing:
                 else:
                     array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
-
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 if self.chla_algo == 'SeaSARC':
                     array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
-                    nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+                    array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
+                    array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,array_560, array_665)
                 if self.chla_algo == 'CIAO':
                     array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
-                    nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_510, array_560)
+                    array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,array_510, array_560)
+                array_chla[array_chla < min_value] = -999.0
+                array_chla[array_chla > max_value] = -999.0
+                var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+                if self.output_type == 'COMPARISON':
+                    array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+                    array_diff = array_chla_prev / array_chla
+                    var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
 
-                if self.height < self.ystep and self.width < self.xstep:
-                    print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
-                else:
-                    print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
 
-                if nvalid > 0:
-
-
-                    if self.chla_algo == 'SeaSARC':
-                        array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
-                        array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
-                                                                             array_560, array_665)
-                    if self.chla_algo == 'CIAO':
-                        array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,
-                                                                             array_510, array_560)
-
-                    array_chla[array_chla < min_value] = -999.0
-                    array_chla[array_chla > max_value] = -999.0
-                    var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
-                    if self.output_type == 'COMPARISON':
-                        array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
-                        array_diff = array_chla_prev / array_chla
-                        var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+        # for y in range(0, self.height, self.ystep):
+        #     for x in range(0, self.width, self.xstep):
+        #         iprogress = iprogress + 1
+        #         limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+        #
+        #         if rrs_bands[0] == 'RRS442_5':
+        #             print(f'[INFO] Band shifting from 442.5 to 443...')
+        #             array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
+        #             array_443 = np.ma.filled(array_443,-999.0)##masked values doesn't work with check_chla_valid
+        #         else:
+        #             array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
+        #         array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+        #
+        #         array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+        #         if self.chla_algo == 'SeaSARC':
+        #             array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
+        #             nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
+        #         if self.chla_algo == 'CIAO':
+        #             array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
+        #             nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_510, array_560)
+        #
+        #         if self.height < self.ystep and self.width < self.xstep:
+        #             print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
+        #         else:
+        #             print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+        #
+        #         if nvalid > 0:
+        #
+        #             if self.chla_algo == 'SeaSARC':
+        #                 array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
+        #                 array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
+        #                                                                      array_560, array_665)
+        #             if self.chla_algo == 'CIAO':
+        #                 array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,
+        #                                                                      array_510, array_560)
+        #
+        #             array_chla[array_chla < min_value] = -999.0
+        #             array_chla[array_chla > max_value] = -999.0
+        #             var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+        #             if self.output_type == 'COMPARISON':
+        #                 array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+        #                 array_diff = array_chla_prev / array_chla
+        #                 var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
 
         if self.climatology_path is not None and os.path.exists(self.climatology_path):
             nameqi = f'QI_CHL'
