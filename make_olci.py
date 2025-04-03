@@ -1,9 +1,6 @@
-import math
-import os
-import argparse
-import shutil
-from datetime import timedelta
 
+import __init__,math,os,argparse,configparser
+from datetime import timedelta
 # import netCDF4
 # import numpy as np
 # import zipfile as zp
@@ -12,10 +9,14 @@ from datetime import timedelta
 # from olci_l2 import OLCI_L2
 # import simplekml
 import numpy as np
+from arc_mapinfo import ArcMapInfo
+from olci_l2 import OLCI_L2
+from arc_processing import ArcProcessing
+from arc_gpr_model import ARC_GPR_MODEL
 
-parser = argparse.ArgumentParser(description="Artic resampler")
+parser = argparse.ArgumentParser(description="Arctic OLCI processor")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL",
+                    choices=["CHECKPY", "CHECKMODEL", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL",
                              "MONTHLY_CHLA", "MONTHLY_KD490"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
@@ -29,56 +30,20 @@ parser.add_argument('-bf', "--base_file", help="Create base file for the followi
                     action="store_true")
 parser.add_argument('-var', "--variable_plot", help="Variable to be plot using QL mode. Default: CHL",
                     choices=["CHL", "KD490"])
+parser.add_argument("-chla_algo", "--chla_algorithm",help="Chl-a algorithm",choices=["SeaSARC","CIAO"],default="CIAO")
 parser.add_argument("-v", "--verbose", help="Verbose mode.", action="store_true")
 args = parser.parse_args()
 
 
 def main():
     print('[INFO] Started Artic Processing Tool')
+
     if args.mode == "CHECKPY":
         check_py()
         return
 
-    from arc_mapinfo import ArcMapInfo
-    from olci_l2 import OLCI_L2
-    import os
-
-    if args.mode == "CHECK":
+    if args.mode == "CHECKMODEL":
         check_model()
-        # do_check10()
-        # from datetime import datetime as dt
-        # correcting_time_variable_in_plankton_files(dt(2016, 6, 1), dt(2016, 9, 30))
-        # correcting_time_variable_in_plankton_files(dt(2017, 5, 1), dt(2017, 9, 30))
-        # correcting_time_variable_in_plankton_files(dt(2018, 5, 1), dt(2018, 9, 30))
-        # correcting_time_variable_in_plankton_files(dt(2020, 5, 1), dt(2020, 9, 30))
-        #
-        # correcting_time_variable_in_plankton_files(dt(2019, 1, 1), dt(2019, 2, 28))
-        # correcting_time_variable_in_plankton_files(dt(2019, 4, 1), dt(2019, 9, 30))
-        # correcting_time_variable_in_plankton_files(dt(2019, 11, 1), dt(2019, 12, 31))
-        # ami = ArcMapInfo(None,True)
-        # adding_time()
-        # add_vega_changes()
-        # modify_chunksizes()
-        # path_input = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-        # path_output = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
-        # vars = ['SENSORMASK']
-        # copy_nc_excluding_variables(path_input, path_output, vars)
-
-        # check_chla()
-
-        # run_resampling_info()
-        # do_check7()  # gettig combinatons
-        # do_check8() #information about combinations
-        # do_resampled_vm_list()
-        # do_resampled_vm_christmas()
-        # do_check6()
-        # path_olci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T005835_20180715T005917_20211121T192724_0042_033_245______MAR_R_NT_003.SEN3'
-        # olimage = OLCI_L2(path_olci, True)
-        # olimage.get_geo_and_params()
-        # print(olimage.params)
-        # dirorig = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
-        # unzip_path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/temp'
-        # make_resample_dir(dirorig, dirorig,unzip_path, True, False)
         return
 
     if args.mode == 'GRID' and args.outputpath:  ##creating single file grid
@@ -116,24 +81,12 @@ def main():
         from arc_integration import ArcIntegration
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
 
-        # arcInt = ArcIntegration(None, args.verbose, None, 'RRS', file_at)
-        # arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-        # fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NR_Base.nc')
-        # arcInt.create_nc_file_out(fout, 'NR')
-        # fout = os.path.join(output_path, 'ArcGrid_65_90_300m_RRS_NT_Base.nc')
-        # arcInt.create_nc_file_out(fout, 'NT')
-
         arcInt = ArcIntegration(None, args.verbose, None, 'TRANSP', file_at)
         arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
         fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NR_Base.nc')
         arcInt.create_nc_file_out(fout, 'NR')
         fout = os.path.join(output_path, 'ArcGrid_69_90_300m_TRANSP_NT_Base.nc')
         arcInt.create_nc_file_out(fout, 'NT')
-        # arcInt.ami.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-        # fout = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_Base.nc')
-        # fouttemp = os.path.join(output_path, 'ArcGrid_69_90_300m_AVERAGE_BaseTemp.nc')
-        # arcInt.create_nc_file_out_avg(fouttemp)
-        # copy_nc_excluding_variables(fouttemp, fout, ['lat', 'lon'])
 
         return
 
@@ -199,7 +152,6 @@ def main():
         print(f'[ERROR] Config file {args.config_file} does not exist. Exiting...')
         return
     try:
-        import configparser
         options = configparser.ConfigParser()
         options.read(args.config_file)
     except:
@@ -207,6 +159,7 @@ def main():
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
+
     # check if dates from args should be used
     start_date = None
     end_date = None
@@ -268,7 +221,6 @@ def main():
         return
 
     if args.mode == 'QL':
-        # print('to be done')
         run_ql(arc_opt, start_date, end_date)
 
 
@@ -448,105 +400,6 @@ def compute_month_chl(arc_opt):
     arc_proc.compute_chla_month(fileout, timeliness)
 
 
-def add_vega_changes():
-    print('VEGA CHANGES')
-    ##Grid file
-    file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/DEPRECATED/ArcGrid_65_90_300m_GridBase.nc'
-    file_out = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
-    from netCDF4 import Dataset
-    src = Dataset(file_base)
-    dst = Dataset(file_out, 'w', format='NETCDF4')
-
-    # dimensions
-    # copy dimensions
-    for name, dimension in src.dimensions.items():
-        if args.verbose:
-            print(f'[INFO] -> Copying dimension: {name}')
-        dst.createDimension(
-            name, (len(dimension) if not dimension.isunlimited() else None))
-    if args.verbose:
-        print('Addding time...')
-    # add time dimension
-    dst.createDimension('time', 1)
-
-    # add time variable
-    var_time = dst.createVariable('time', 'i4', ('time',), zlib=True, complevel=6)
-    var_time.long_name = "reference time"
-    var_time.standard_name = "time"
-    var_time.axis = "T"
-    var_time.calendar = "Gregorian"
-    var_time.units = "seconds since 1981-01-01 00:00:00"
-    var_time[0] = [np.int32(0)]
-
-    for name, variable in src.variables.items():
-        if args.verbose:
-            print(f'[INFO] -> Copying variable: {name}')
-        if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
-            dst.createVariable(name, variable.datatype, variable.dimensions, zlib=True, shuffle=True, complevel=6)
-        else:
-            dst.createVariable(name, variable.datatype, ('time', 'y', 'x'), fill_value=-999, zlib=True, shuffle=True,
-                               complevel=6)
-        # copy variable attributes all at once via dictionary
-        if name == 'time' or name == 'y' or name == 'x':
-            dst[name].setncatts(src[name].__dict__)
-        elif name == 'lat' or name == 'lon':
-            for at in src[name].ncattrs():
-                if at == 'valid_min' or at == 'valid_max':
-                    continue
-                else:
-                    value = src[name].getncattr(at)
-                    dst[name].setncattr(at, value)
-            if name == 'lat':
-                dst[name].comment = 'Spherical latidude from 65 to 90 degrees north'
-            if name == 'lon':
-                dst[name].comment = 'Spherical longitude from -180 to 180 degrees east'
-        elif name == 'stereographic':
-            dst[name].setncatts(src[name].__dict__)
-            dst[name].longitude_of_projection_origin = -45.0
-            dst[name].straight_vertical_longitude_from_pole = -45.0
-            dst[name].earth_radius = int(6378273)
-            dst[name].proj4 = "+proj=stere +lon_0=-45 +lat_0=90 +k=1 +R=6378273 +no_defs"
-
-        else:  # SENSOR MASK
-            for at in src[name].ncattrs():
-                if at == '_FillValue':
-                    continue
-                elif at == 'coordinates':
-                    dst[name].coordinates = "lon lat"
-                else:
-                    value = src[name].getncattr(at)
-                    dst[name].setncattr(at, value)
-
-        # copy data
-        if name == 'time' or name == 'y' or name == 'x' or name == 'lat' or name == 'lon' or name == 'stereographic':
-            dst[name][:] = src[name][:]
-        else:
-            # print('variable: ', name)
-            dst[name][0, :, :] = src[name][:, :]
-
-    # DONE
-    src.close()
-    dst.close()
-
-
-def kk():
-    print('DEPRECATED')
-    # fgrid = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGrid_65_90_300m.nc'
-    # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/ArcGridOlciQuickLook.png'
-    # ami.create_nc_filegrid(fgrid,True)
-    # ami.save_quick_look_fgrid(fout,fgrid)
-
-    # folci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20180715T110812_20180715T111112_20211121T193318_0180_033_251______MAR_R_NT_003.SEN3'
-    # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
-    # olimage = OLCI_L2(folci)
-    # array, info = olimage.get_observation_angle()
-    # print(info)
-
-    # ami.make_resample_impl(olimage,fout)
-
-    # fdata = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.nc'
-    # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/test.png'
-    # ami.save_quick_look_fdata(fout,fdata)
 
 
 def adding_time():
@@ -889,89 +742,16 @@ def check_chla():
 
 
 def check_model():
-    #jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SeSARC/ArcModel.json'
-    jsonfile = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_WORK/CIAO/CIAO_Algorithm.json'
-    from arc_gpr_model import ARC_GPR_MODEL
-    model = ARC_GPR_MODEL(jsonfile)
+    file_model = None
+    if args.chla_algorithm == 'CIAO':
+        file_model = os.path.join(os.path.dirname(__init__.__file__), 'CIAO_Algorithm.json')
+    elif args.chla_algorithm == 'SeaSARC':
+        file_model = os.path.join(os.path.dirname(__init__.__file__), 'SeaSARC_Algorithm.json')
 
-
-
-
-
-    ###SEASarc Example
-    # val_443 = 0.0094
-    # val_490 = 0.0100
-    # val_560 = 0.0037
-    # val_665 = 0.000048831
-    # val_longitude = -70.2275
-    # day = 207
-    # input_vector_orig = np.array([val_longitude, day, val_443, val_490, val_560, val_665])
-    # input_vector = np.array(
-    #     [val_longitude, day, np.log10(val_443), np.log10(val_490), np.log10(val_560), np.log10(val_665)])
-    # active_vector = model.active_set_vectors
-
-    ##CIAO Example
-    input_vector = np.array([103, -2.775414369, -2.804895253, -2.791867274, -2.902936795])
-    res = model.compute_chla_impl(input_vector)
-    print('Result', res)
-    chla = 10 ** res
-    print('Chla', chla)
-
-
-    # input_file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_WORK/CIAO/TestingDataset.csv'
-    # import pandas as pd
-    # df = pd.read_csv(input_file,sep=';')
-    #
-    # doy = df['DOY']
-    # rrs_443 = df['log_Rrs_443']
-    # rrs_490 = df['log_Rrs_490']
-    # rrs_510 = df['log_Rrs_510']
-    # rrs_560 = df['log_Rrs_560']
-    # chla_ciao = np.zeros(doy.shape)
-    # for idx in range(chla_ciao.shape[0]):
-    #     chla_ciao[idx]=model.compute_chla([doy[idx],rrs_443[idx],rrs_490[idx],rrs_510[idx],rrs_560[idx]],False)
-    #     print(chla_ciao[idx])
-    # df['chla_CIAO_py'] = chla_ciao
-    # df.to_csv(input_file,sep=';')
-
-
-    # res = model.compute_chla(input_vector_orig, True)
-    # print('Chla', res)
-    # res = model.compute_chla_from_param(val_longitude, day, val_443, val_490, val_560, val_665)
-    # print('Chla', res)
-    #
-    # from sklearn.gaussian_process import GaussianProcessRegressor
-    # from sklearn.gaussian_process.kernels import RationalQuadratic
-    # kernel = RationalQuadratic()
-    # res = kernel.__call__(input_vector,active_vector)
-    # print(res[0].shape)
-    # ymean = res @ model.alpha
-    # print(ymean.shape)
-    # print(ymean)
-    #
-    # kernel_dict = {
-    #     'Name': 'RationalQuadratic',
-    #     'AlphaRQ' : 1.0,
-    #     'LengthScale': 1.0
-    # }
-    # from gpr_kernel import GPR_KERNEL
-    # klois = GPR_KERNEL(kernel_dict)
-    # res_lois = np.zeros((1,864))
-    # for idx in range(864):
-    #     res_lois[0,idx] = klois.compute_kernel(input_vector,active_vector[idx])
-    # print(res_lois.shape)
-    # ymean_lois = res_lois @ model.alpha
-    # print('ymean lois',ymean_lois)
-
-    # dif = res_lois[0]-res[0]
-    # print(dif)
-
-    # kernel = RationalQuadratic()
-    # kernel.__call__(input_vector)
-
-    #from sklearn.gaussian_process import GaussianProcessRegressor
-    # gmodel = GaussianProcessRegressor()
-    # print(gmodel)
+    if not os.path.exists(file_model):
+        print(f'[ERROR] File model for algorithm: {args.chla_algorithm} is not available')
+    else:
+        print(f'[INFO] File model for algorithm {args.chla_algorithm} is avaiable. ')
 
 
 def check_py():
@@ -1267,7 +1047,7 @@ def run_chla(arc_opt, start_date, end_date):
     overwrite = arc_opt.get_value_param('PROCESSING', 'overwrite', False, 'boolean')
     if not output_type == 'CHLA':
         return
-    from arc_processing import ArcProcessing
+
     if args.verbose:
         print('[INFO] PROCESSING OPTIONS:')
         for opt in options:
@@ -1310,8 +1090,14 @@ def run_chla(arc_opt, start_date, end_date):
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
+    if start_date is None or end_date is None:
+        return
+
     date_run = start_date
+    if output_type=='CHLA':
+        output_type = f'CHLA_{args.chla_algorithm}'
     arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
+
     while date_run <= end_date:
         if args.verbose:
             print('*****************************')
@@ -1326,8 +1112,8 @@ def run_chla(arc_opt, start_date, end_date):
             make_processing = True
         output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
                                               True)
-        if output_path is None:
-            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+        if output_path is None and not overwrite:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skipping...')
             make_processing = False
 
         output_name = f'O{dateyj}_plankton-arc-fr.nc'
@@ -1465,385 +1251,6 @@ def get_limits(y, x, ystep, xstep, ny, nx):
     limits = [yini, yfin, xini, xfin]
     return limits
 
-
-def do_check10():
-    print('STARTED DO CHECK 10')
-    from olci_l2 import OLCI_L2
-    from netCDF4 import Dataset
-    import numpy as np
-    from arc_mapinfo import ArcMapInfo
-    ami = ArcMapInfo(None, args.verbose)
-    y, x = ami.area_def.get_array_coordinates_from_lonlat(-10.58157, 65.62573)
-    print(y, x)
-    path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/REPROCESSING/S3B_OL_2_WFR____20230821T121630_20230821T121930_20230821T142834_0180_083_109_1800_MAR_O_NR_003.SEN3'
-    oimage = OLCI_L2(path, True)
-
-    array = oimage.get_reflectance_band_array(412, -999)
-    print(array[1960, 4290])
-    array_orig = array * np.pi
-    print(array_orig[1960, 4290])
-
-    new_image = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/REPROCESSING/S3B_OL_2_WFR____20230821T121630_20230821T121930_20230821T142834_0180_083_109_1800_MAR_O_NR_003_resampled_bis.nc'
-    dataset = Dataset(new_image, 'r')
-    array_d = dataset.variables['RRS412_5']
-    print(array_d[1804, 14220])
-    dataset.close()
-
-
-def do_check9():
-    print('STARTED DO CHECK 9')
-    from datetime import datetime as dt
-    from netCDF4 import Dataset
-    import numpy.ma as ma
-    dir_in = '/store/COP2-OC-TAC/arc/integrated'
-    # bands = ['RRS400', 'RRS412_5', 'RRS442_5', 'RRS490', 'RRS510', 'RRS560', 'RRS620', 'RRS665', 'RRS673_75',
-    #          'RRS681_25', 'RRS708_75']
-    first_line = ['Date']
-    bands = ['RRS400', 'RRS442_5']
-    for band in bands:
-        first_line.append(band)
-    # first_line.append('KD490')
-    first_line_str = ';'.join(first_line)
-    lines = [first_line_str]
-    date_here = dt(2016, 4, 26)
-    end_date = dt(2023, 4, 25)
-    while date_here <= end_date:
-        line = date_here.strftime('%Y-%m-%d')
-        year = date_here.strftime('%Y')
-        jday = date_here.strftime('%j')
-        file_rrs = os.path.join(dir_in, year, jday, f'O{year}{jday}_rrs-arc-fr.nc')
-        file_transp = os.path.join(dir_in, year, jday, f'O{year}{jday}_transp-arc-fr.nc')
-        if os.path.exists(file_rrs) & os.path.exists(file_transp):
-            print(f'DATE: {date_here}')
-            dataset_rrs = Dataset(file_rrs)
-            for band in bands:
-                print(f'-->{band}')
-                variable = dataset_rrs.variables[band]
-                # array = ma.array(variable[:])
-                # nvalid_all = ma.count(array)
-                nvalid_all = compute_statistics(variable)
-                line = f'{line};{nvalid_all}'
-            dataset_rrs.close()
-            # print(f'-->KD490')
-            # dataset_transp = Dataset(file_transp)
-            # variable = dataset_transp.variables['KD490']
-            # # array = ma.array(variable[:])
-            # # nvalid_all = ma.count(array)
-            # nvalid_all = compute_statistics(variable)
-            # line = f'{line};{nvalid_all}'
-            # dataset_transp.close()
-            lines.append(line)
-        date_here = date_here + timedelta(hours=24)
-    file_out = '/store/COP2-OC-TAC/arc/nvalid_bydate.csv'
-    f1 = open(file_out, 'w')
-    for line in lines:
-        f1.write(line)
-        f1.write('\n')
-    f1.close()
-    # from arc_mapinfo import ArcMapInfo
-    # ami = ArcMapInfo(None, args.verbose)
-    # from netCDF4 import Dataset
-    # import numpy.ma as ma
-    # for name in os.listdir(dir_in):
-    #     file_in = os.path.join(dir_in,name)
-    #     # name_out = f'{name[:-3]}.png'
-    #     # file_out = os.path.join(dir_out,name_out)
-    #     #print(file_in,'->',file_out)
-    #     dataset = Dataset(file_in)
-    #     mask = ma.array(dataset.variables['mask'][:])
-    #     mvalues = mask[~mask.mask]
-    #     nvalues = ma.count(mvalues)
-    #     if nvalues>1000000:
-    #         print('-------------------------------->',name,nvalues)
-    #     dataset.close()
-    # ami.save_quick_look_fdata(file_out, file_in, 'mask')
-
-
-def do_check7():
-    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
-    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
-    from arc_analysis import ArcAnalysis
-    arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
-    # nvalues = arcAna.check_n_overlappping()
-    # print(nvalues)
-    arcAna.check_overlapping_index(5)
-
-
-def do_check88():
-    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
-
-    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
-    from arc_analysis import ArcAnalysis
-    arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
-
-    arcAna.get_info_valid(None)
-
-
-def do_check8():
-    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_rrs-arc-fr.nc'
-
-    dir_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/RESAMPLED/2019/06/24'
-    from arc_analysis import ArcAnalysis
-    arcAna = ArcAnalysis(None, args.verbose, file_in, dir_in)
-
-    # c_folder = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/C_2_1_1'
-    # arcAna.compute_average_spectra(c_folder)
-
-    c_foder_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175'
-    import json
-    nremaining = 0
-    for name in os.listdir(c_foder_base):
-        if name.startswith('C_2'):
-            c_folder = os.path.join(c_foder_base, name)
-            finfo = os.path.join(c_folder, name + '.json')
-            with open(finfo) as j:
-                info = json.load(j)
-
-            granules = info['granules']
-            npixels = info['npixels']
-            datestr1 = granules[0].split('_')[7]
-            datestr2 = granules[1].split('_')[7]
-            from datetime import datetime as dt
-            time1 = dt.strptime(datestr1, '%Y%m%dT%H%M%S')
-            time2 = dt.strptime(datestr2, '%Y%m%dT%H%M%S')
-            timedif = abs((time1 - time2).total_seconds() / 3600)
-            print(npixels, timedif)
-            if npixels < 100:
-                dirpixels = 'Pixels100'
-            elif 100 <= npixels < 1000:
-                dirpixels = 'Pixels1000'
-            else:
-                dirpixels = 'PixelsOver1000'
-
-            if timedif < 1.5:
-                dirtime = 'Time_to_1_5'
-            elif 1.5 < timedif < 3.0:
-                dirtime = 'Time_1_5_to_3'
-            elif 3.0 < timedif < 12.0:
-                dirtime = 'Time_3_to_12'
-            elif 12.0 < timedif < 24.0:
-                dirtime = 'Time_12_to_24'
-
-            dirimage = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/SpectraExamples/2GranulesOverlap/A_B'
-            dirimagepixels = os.path.join(dirimage, dirpixels)
-            dirimagetime = os.path.join(dirimagepixels, dirtime)
-            if not os.path.exists(dirimagepixels):
-                os.mkdir(dirimagepixels)
-            if not os.path.exists(dirimagetime):
-                os.mkdir(dirimagetime)
-
-            # fimage = os.path.join(dirimage)
-            fout = os.path.join(dirimage, f'AvgSpectra_{name}.jpg')
-            if os.path.exists(fout):
-                print('COPYING...')
-                foutnew = os.path.join(dirimagetime, f'AvgSpectra_{name}.jpg')
-                shutil.copy(fout, foutnew)
-                # os.remove(fout)
-            else:
-                foutnew = os.path.join(dirimagetime, f'AvgSpectra_{name}.jpg')
-                if os.path.exists(foutnew):
-                    print('ALREADY DONE')
-                    continue
-                doimages = False
-                if granules[0].startswith('S3A') and granules[1].startswith('S3B'):
-                    doimages = True
-                if granules[0].startswith('S3B') and granules[1].startswith('S3A'):
-                    doimages = True
-                if doimages:
-                    print('DOING: ')
-                    arcAna.compute_average_spectra(c_folder)
-                    nremaining = nremaining + 1
-                    print('REMANINNG: ', nremaining, '/241')
-
-
-def do_check6():
-    import numpy as np
-
-    file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/NERC_EXAMPLES/202207_mm-metno-MODEL-topaz4-ARC-fv02.0.nc'
-    from netCDF4 import Dataset
-    dataset = Dataset(file_in)
-    xcoords = dataset.variables['x']
-    ycoords = dataset.variables['y']
-    xmin = xcoords[0] * 100000
-    xmax = xcoords[-1] * 100000
-    ymin = ycoords[0] * 100000
-    ymax = ycoords[-1] * 100000
-    print(xmin, xmax, ymin, ymax)
-    latitude = dataset.variables['latitude']
-    longitude = dataset.variables['longitude']
-    print(np.min(latitude[:]), np.max(latitude[:]), np.min(longitude[:]), np.max(longitude[:]))
-    from arc_mapinfo import ArcMapInfo
-    ami = ArcMapInfo(None, True)
-
-    x0 = xcoords[0] * 100000
-    y0 = ycoords[0] * 100000
-    xn = xcoords[608] * 100000
-    yn = ycoords[880] * 100000
-    lon1, lat1 = ami.area_def.get_lonlat_from_projection_coordinates(x0, y0)
-    lon2, lat2 = ami.area_def.get_lonlat_from_projection_coordinates(xn, y0)
-    lon3, lat3 = ami.area_def.get_lonlat_from_projection_coordinates(x0, yn)
-    lon4, lat4 = ami.area_def.get_lonlat_from_projection_coordinates(xn, yn)
-    print(lon1, lat1)
-    print(lon2, lat2)
-    print(lon3, lat3)
-    print(lon4, lat4)
-
-    lon1, lat1 = ami.area_def.get_lonlat_from_array_coordinates(0, 0)
-    lon2, lat2 = ami.area_def.get_lonlat_from_array_coordinates(608, 0)
-    lon3, lat3 = ami.area_def.get_lonlat_from_array_coordinates(0, 880)
-    lon4, lat4 = ami.area_def.get_lonlat_from_array_coordinates(608, 880)
-    print('..........................................')
-    print(lon1, lat1)
-    print(lon2, lat2)
-    print(lon3, lat3)
-    print(lon4, lat4)
-    print('##################################################################')
-
-    for ypix in range(881):
-        xc, yc = ami.area_def.get_lonlat_from_array_coordinates(0, ypix)
-        print(ypix, '->', yc)
-
-    # lats = np.zeros((881,609))
-    # lons = np.zeros((881,609))
-    # for y in range(881):
-    #     print(y)
-    #     for x in range(609):
-    #         xc = xcoords[x]*100000
-    #         yc = ycoords[y]*100000
-    #         lon, lat = ami.area_def.get_lonlat_from_projection_coordinates(xc,yc)
-    #         lats[y,x] = lat
-    #         lons[y,x] = lon
-    #
-    # latdif = lats-latitude
-    # londif = lons-longitude
-    # print(np.min(latdif),np.max(latdif),np.min(londif),np.max(londif))
-
-    # print(np.min(latdif),np.max(latdif),np.min(londif),np.max(londif))
-
-
-def do_resampled_vm_christmas():
-    input_dir_base = '/store/COP2-OC-TAC/arc/'
-    output_dir_base = '/store/COP2-OC-TAC/arc/resampled'
-    unzip_path = '/store/COP2-OC-TAC/arc/unzip'
-    from datetime import datetime as dt
-    from datetime import timedelta
-    date_ref = dt(2016, 5, 1)
-    date_fin = dt(2016, 5, 31)
-    while date_ref <= date_fin:
-        print(f'[INFO]******************************************************************************->{date_ref}')
-        input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
-        do_resample = True
-        if not os.path.exists(input_dir):
-            print(f'[WARNING] Input directory {input_dir} is not available. Skiping...')
-            do_resample = False
-        output_dir_year = os.path.join(output_dir_base, date_ref.strftime('%Y'))
-        output_dir_month = os.path.join(output_dir_year, date_ref.strftime('%m'))
-        output_dir_day = os.path.join(output_dir_month, date_ref.strftime('%d'))
-        date_ref_str = date_ref.strftime('%Y%m%d')
-        output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
-        file_output = os.path.join(output_dir_day, output_name)
-        if os.path.exists(file_output):
-            print(f'[WARNING] Output file {file_output} already exist. Skiping...')
-            do_resample = False
-        if not do_resample:
-            date_ref = date_ref + timedelta(hours=24)
-            continue
-        if not os.path.exists(output_dir_year):
-            os.mkdir(output_dir_year)
-        if not os.path.exists(output_dir_month):
-            os.mkdir(output_dir_month)
-        if not os.path.exists(output_dir_day):
-            os.mkdir(output_dir_day)
-
-        make_resample_dir(input_dir, output_dir_day, unzip_path, True, False)
-        date_ref = date_ref + timedelta(hours=24)
-
-
-def do_resampled_vm_list():
-    flista = '/store/COP2-OC-TAC/arc/matchups_Rrs/match-up_dates.csv'
-    # flista = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MATCH-UPS/match-up_dates.csv'
-    input_dir_base = '/store/COP2-OC-TAC/arc/'
-    output_dir_base = '/store/COP2-OC-TAC/arc/resampled'
-    unzip_path = '/store/COP2-OC-TAC/arc/unzip'
-    from datetime import datetime as dt
-    dates = []
-    f1 = open(flista)
-    for line in f1:
-        date_ref = dt.strptime(line.strip(), '%Y-%m-%d')
-        dates.append(date_ref)
-    f1.close()
-
-    for date_ref in dates:
-        print(f'[INFO]******************************************************************************->{date_ref}')
-        input_dir = os.path.join(input_dir_base, date_ref.strftime('%Y%m%d'))
-        do_resample = True
-        if not os.path.exists(input_dir):
-            print(f'[WARNING] Input directory {input_dir} is not available. Skiping...')
-            do_resample = False
-        output_dir_year = os.path.join(output_dir_base, date_ref.strftime('%Y'))
-        output_dir_month = os.path.join(output_dir_year, date_ref.strftime('%m'))
-        output_dir_day = os.path.join(output_dir_month, date_ref.strftime('%d'))
-        date_ref_str = date_ref.strftime('%Y%m%d')
-        output_name = f'{date_ref_str}_cmems_cnr_arc_rrs_resampled.nc'
-        file_output = os.path.join(output_dir_day, output_name)
-        if os.path.exists(file_output):
-            print(f'[WARNING] Output file {file_output} already exist. Skiping...')
-            do_resample = False
-        if not do_resample:
-            continue
-        if not os.path.exists(output_dir_year):
-            os.mkdir(output_dir_year)
-        if not os.path.exists(output_dir_month):
-            os.mkdir(output_dir_month)
-        if not os.path.exists(output_dir_day):
-            os.mkdir(output_dir_day)
-        make_resample_dir(input_dir, output_dir_day, unzip_path, True, False)
-
-
-def do_check5():
-    print('do check 5')
-    input_dir = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/15072018'
-    fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/20180715_CNR_ARC_Resampled_v3.nc'
-    from arc_integration import ArcIntegration
-    arc_integration = ArcIntegration(None, args.verbose, input_dir)
-    arc_integration.make_integration_avg(fout)
-    # arc_integration.get_info()
-
-    # for name in arc_integration.info:
-    #     print(name,'-------------------------------------------')
-    #     yini = arc_integration.info[name]['y_min']
-    #     yfin = arc_integration.info[name]['y_max']
-    #     xini = arc_integration.info[name]['x_min']
-    #     xfin = arc_integration.info[name]['x_max']
-    #     info_over = arc_integration.get_overlapping_images(name,yini,yfin,xini,xfin,False)
-    #     print(name, '------------------------------------------->',len(info_over))
-    #     # for nameo in info_over:
-    #     #     print('        ',nameo)
-    # # print(arc_integration.info)
-
-    # print(arc_integration.time_min,arc_integration.time_max)
-    # from datetime import datetime as dt
-    # print(dt.fromtimestamp(arc_integration.time_min))
-    # print(dt.fromtimestamp(arc_integration.time_max))
-    # print(dt.fromtimestamp(arc_integration.time_min-1))
-    # print((dt.fromtimestamp(arc_integration.time_max)-dt.fromtimestamp(arc_integration.time_min)).total_seconds()/3600)
-
-
-def do_check44():
-    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/inforesampling.txt'
-    f1 = open(file, 'r')
-    lines = []
-    for line in f1:
-        line = line.strip()
-        if line.startswith('[INFO] Number of non-masked pixels:'):
-            istart = line.find(':') + 1
-            iend = line.find('(')
-            nhere = line[istart:iend].strip()
-            lines.append(nhere)
-    f1.close()
-
-    for idx in range(0, len(lines), 2):
-        print(lines[idx])
 
 
 # ami.make_resample_impl(olimage, file_out, granule_index, orbit_index, arc_opt)
@@ -2058,151 +1465,6 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             fw.write(line)
             fw.write('\n')
         fw.close()
-
-
-def do_check3():
-    import netCDF4
-
-    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/20220713_cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D.nc'
-    dataset = netCDF4.Dataset(file)
-    import numpy as np
-    var = dataset.variables['RRS510']
-    filters = var.filters()
-    print(filters)
-
-
-def do_check2():
-    import netCDF4
-    # import numpy as np
-    # import zipfile as zp
-    print('-----------------------')
-    print('ORIGINAL')
-    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/PML_EXAMPLES/20220713_cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D.nc'
-    dataset = netCDF4.Dataset(file)
-    import numpy as np
-    # for namevar in dataset.variables:
-    #     if namevar.startswith('RRS'):
-    #         var = dataset.variables[namevar]
-    #         ny = var.shape[1]
-    #         nx = var.shape[2]
-    #         total = ny*nx
-    # nvalid = 0
-    # ystep = 1200
-    # xstep = nx
-    #
-    # for y in range(0, ny, ystep):
-    #     for x in range(0,nx,xstep):
-    #         #print(y,x)
-    #         yini = y
-    #         yfin = y + ystep
-    #         if yfin > ny:
-    #             yfin = ny
-    #         xini = 0
-    #         xfin = nx
-    #         rrsarray = np.ma.array(var[0, yini:yfin, xini:xfin])
-    #         nvalid = nvalid + rrsarray.count()
-
-    # porc = (nvalid/total)*100
-    # line = f'{namevar};{var.shape[1]};{var.shape[2]};{total};{nvalid};{porc}'
-    # print(line)
-    dataset.close()
-
-    print('----------------------')
-    print('RESAMPLED')
-    file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/PML_EXAMPLES/20220713_cmems_obs-oc_arc_bgc-reflectance_nrt_l3-olci-300m_P1D_resampled.nc'
-    dataset = netCDF4.Dataset(file)
-    for namevar in dataset.variables:
-        if namevar.startswith('RRS'):
-            var = dataset.variables[namevar]
-            ny = var.shape[0]
-            nx = var.shape[1]
-            total = ny * nx
-            nvalid = 0
-            ystep = 5000
-            xstep = nx
-
-            for y in range(0, ny, ystep):
-                for x in range(0, nx, xstep):
-                    yini = y
-                    yfin = y + ystep
-                    if yfin > ny:
-                        yfin = ny
-                    xini = 0
-                    xfin = nx
-                    rrsarray = np.ma.array(var[yini:yfin, xini:xfin])
-                    nvalid = nvalid + rrsarray.count()
-
-            porc = (nvalid / total) * 100
-            line = f'{namevar};{var.shape[0]};{var.shape[1]};{total};{nvalid};{porc}'
-            print(line)
-
-    dataset.close()
-
-    # lat_array = np.array(dataset.variables['latitude'])
-    # lon_array = np.array(dataset.variables['longitude'])
-    # from geopy import distance
-    # lines = []
-    # for y in range(len(lat_array)-2,1,-50):
-    #     print(y)
-    #     #dist = []
-    #     for x in range(0,len(lon_array)-1,1000):
-    #         coords_1 = (lat_array[y],lon_array[x])
-    #         coords_2 = (lat_array[y],lon_array[x+1])
-    #         d1 = distance.distance(coords_1,coords_2).meters
-    #         coords_1 = (lat_array[y], lon_array[x])
-    #         coords_2 = (lat_array[y], lon_array[x - 1])
-    #         d2 = distance.distance(coords_1, coords_2).meters
-    #         coords_1 = (lat_array[y-1], lon_array[x])
-    #         coords_2 = (lat_array[y], lon_array[x])
-    #         d3 = distance.distance(coords_1, coords_2).meters
-    #         coords_1 = (lat_array[y+1], lon_array[x])
-    #         coords_2 = (lat_array[y], lon_array[x])
-    #         d4 = distance.distance(coords_1, coords_2).meters
-    #         l = [d1,d2,d3,d4]
-    #         ly = [d3,d4]
-    #         lx = [d1,d2]
-    #         m = np.mean(np.array(l))
-    #         my = np.mean(np.array(ly))
-    #         mx = np.mean(np.array(lx))
-    #         #dist.append(m)
-    #         line = f'{y};{x};{lat_array[y]};{lon_array[x]};{my};{mx};{m}'
-    #         lines.append(line)
-    # fout = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GridPML.csv'
-    # with open(fout, 'w') as f:
-    #     for line in lines:
-    #         f.write(line)
-    #         f.write('\n')
-    # y = 7573
-    # x = 3600
-    # coords_1 = (lat_array[y], lon_array[x])
-    # coords_2 = (lat_array[y], lon_array[x + 1])
-    # d1 = distance.distance(coords_1, coords_2).meters
-    # coords_1 = (lat_array[y], lon_array[x])
-    # coords_2 = (lat_array[y], lon_array[x - 1])
-    # d2 = distance.distance(coords_1, coords_2).meters
-    # coords_1 = (lat_array[y - 1], lon_array[x])
-    # coords_2 = (lat_array[y], lon_array[x])
-    # d3 = distance.distance(coords_1, coords_2).meters
-    # coords_1 = (lat_array[y+1], lon_array[x])
-    # coords_2 = (lat_array[y], lon_array[x])
-    # d4 = distance.distance(coords_1, coords_2).meters
-    # l = [d1,d2,d3,d4]
-    # ly = [d3,d4]
-    # lx = [d1,d2]
-    # m = np.mean(np.array(l))
-    # my = np.mean(np.array(ly))
-    # mx = np.mean(np.array(lx))
-    # line = f'{y};{x};{lat_array[y]};{lon_array[x]};{my};{mx};{m}'
-    # print(line)
-
-
-def do_check():
-    from olci_l2 import OLCI_L2
-    folci = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST' \
-            '/S3A_OL_2_WFR____20180715T110812_20180715T111112_20211121T193318_0180_033_251______MAR_R_NT_003.SEN3 '
-    olimage = OLCI_L2(folci, args.verbose)
-    array = olimage.get_observation_angle_array()
-    print(array.shape)
 
 
 def get_dates_from_arg():

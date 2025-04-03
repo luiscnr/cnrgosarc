@@ -124,8 +124,6 @@ class ARC_OPTIONS:
         climatology_path = self.get_path(section,'climatology_path',False)
         use_myint_sources = self.get_value_param(section, 'use_myint_sources', False, 'boolean')
 
-
-
         input_path_organization = self.get_path_organization(section, 'input_path_organization')
         output_path_organization = self.get_path_organization(section, 'output_path_organization')
         if input_path_organization == 'INVALID' or output_path_organization == 'INVALID':

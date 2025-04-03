@@ -1,6 +1,10 @@
 import os.path
+
+
+
 import __init__
 import pytz
+
 from arc_mapinfo import ArcMapInfo
 from arc_gpr_model import ARC_GPR_MODEL
 from kd_algorithm import KD_ALGORITHMS
@@ -501,23 +505,20 @@ class ArcProcessing:
         ncsat = Dataset(filein)
 
         if self.chla_algo=='SeaSARC':
-            rrs_bands = ['RRS442_5', 'RRS490', 'RRS560', 'RRS665']
+            rrs_bands = ['RRS443', 'RRS490', 'RRS560', 'RRS665']
         elif self.chla_algo=='CIAO':
-            rrs_bands = ['RRS442_5', 'RRS490', 'RRS510','RRS560']
+            rrs_bands = ['RRS443', 'RRS490', 'RRS510','RRS560']
 
         if self.verbose:
             print('[INFO] Checking RRS bands')
         for band in rrs_bands:
             if band not in ncsat.variables:
-                if band == 'RRS442_5':
-                    if 'RRS443' in ncsat.variables:
-                        rrs_bands[0] = 'RRS443'
-                    else:
-                        print(f'[ERROR] RRS variable {band} is not available. Exiting...')
-                        return
+                if band=='RRS443' and 'RRS442_5' in ncsat.variables:
+                    rrs_bands[0] = 'RRS442_5'
                 else:
                     print(f'[ERROR] RRS variable {band} is not available. Exiting...')
                     return
+
         var443 = ncsat.variables[rrs_bands[0]]
         var490 = ncsat.variables[rrs_bands[1]]
         if self.chla_algo == 'SeaSARC':
@@ -604,10 +605,15 @@ class ArcProcessing:
             print(f'[INFO] Checking chla pixels: YStep: {self.ystep} XStep: {self.xstep}')
 
         iprogress = 0
-        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        iprogress_end = int(np.ceil((self.height / self.ystep) * (self.width / self.xstep)))
         if self.height < self.ystep and self.width < self.xstep:
             iprogress_end = 1
+
+        overthershold = False
+
         for y in range(0, self.height, self.ystep):
+            if overthershold:
+                break
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
@@ -622,18 +628,21 @@ class ArcProcessing:
                     nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_510, array_560)
                 if self.verbose:
                     if self.height < self.ystep and self.width < self.xstep:
-                        print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
+                        print(f'[INFO] Checking -> {iprogress} / {iprogress_end} -> {nvalid}')
                     else:
-                        print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
+                        print(f'[INFO] Checking -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
                 if nvalid > 500000:
-                    self.ystep = 500
-                    self.xstep = 500
+                    if self.ystep>=500:
+                        self.ystep=500
+                    if self.xstep>=500:
+                        self.xstep = 500
+                    overthershold = True
                     break
 
         if self.verbose:
             print(f'[INFO] Computing chla: YStep: {self.ystep} XStep: {self.xstep}')
         iprogress = 0
-        iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
+        iprogress_end = int(np.ceil((self.height / self.ystep) * (self.width / self.xstep)))
         if self.height < self.ystep and self.width < self.xstep:
             iprogress_end = 1
 
@@ -641,8 +650,15 @@ class ArcProcessing:
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-                array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
+
+                if rrs_bands[0] == 'RRS442_5':
+                    print(f'[INFO] Band shifting from 442.5 to 443...')
+                    array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
+                    array_443 = np.ma.filled(array_443,-999.0)##masked values doesn't work with check_chla_valid
+                else:
+                    array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 if self.chla_algo == 'SeaSARC':
                     array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
@@ -658,11 +674,11 @@ class ArcProcessing:
 
                 if nvalid > 0:
 
+
                     if self.chla_algo == 'SeaSARC':
                         array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
                         array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
                                                                              array_560, array_665)
-
                     if self.chla_algo == 'CIAO':
                         array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,
                                                                              array_510, array_560)
@@ -714,6 +730,27 @@ class ArcProcessing:
         if self.verbose:
             print('[INFO] Chla computation completed. ')
 
+
+    def get_band_shifted_olci_array(self,ncsat,output_band,limits):
+        input_bands = ['RRS412_5','RRS442_5','RRS490','RRS560','RRS665']
+        input_bands_num = [412.5, 442.5, 490, 560, 665]
+        output_bands = [output_band]
+        ny = limits[1]-limits[0]
+        nx = limits[3]-limits[2]
+        nvalues = ny*nx
+        input_data = np.ma.masked_all((nvalues,5))
+        output_data = np.ma.masked_all((nvalues,))
+        for iband,band in enumerate(input_bands):
+            input_data[:,iband] = np.ma.array(ncsat.variables[band][0, limits[0]:limits[1], limits[2]:limits[3]]).flatten()
+        valid_spectra = np.ma.count_masked(input_data,1)
+        input_data_valid = input_data[valid_spectra==0,:]
+        if input_data_valid.shape[0]>0:
+            import BSC_QAA.bsc_qaa_EUMETSAT as bsc_qaa
+            output_data_valid = bsc_qaa.bsc_qaa(input_data_valid.transpose(),input_bands_num,output_bands)
+            output_data_valid = np.squeeze(output_data_valid[0])
+            output_data[valid_spectra==0]=output_data_valid
+        output_array = output_data.reshape((ny,nx))
+        return output_array
 
     def compute_climatology(self, file_clima,input_variable,log_transformed):
         dclima = Dataset(file_clima)
