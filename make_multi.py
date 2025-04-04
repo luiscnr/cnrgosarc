@@ -312,6 +312,41 @@ def do_test_array():
 
 
     return True
+
+def make_sbatch():
+    from datetime import datetime as dt
+    from datetime import timedelta
+    ncores = 10
+    index_job = 1
+    ifile = 1
+    work_date = dt(2019,1,1)
+    end_date = dt(2019,6,30)
+    base_file = '/home/gosuser/Processing/gos-oc-processingchains_v202411/arcProcessing/config/cnrarc_config_hpc01_operational_DT_'
+    pr = f" | awk '{{print $NF}}')"
+    while work_date <= end_date:
+
+        work_date_str = work_date.strftime('%Y-%m-%d')
+        if index_job<=ncores:
+            line=f'job{index_job}=$(sbatch make_processing.slurm {base_file}_{ifile}.ini {work_date_str} {work_date_str}'
+            print(line)
+            line=f'job{index_job}id=$(echo "$job{index_job}"{pr}'
+            print(line)
+        else:
+            index_job_wait = index_job-ncores
+            line = f'job{index_job}=$(sbatch --dependency=afterany:$job{index_job_wait}id make_processing.slurm {base_file}_{ifile}.ini {work_date_str} {work_date_str}'
+            print(line)
+            line = f'job{index_job}id=$(echo "$job{index_job}"{pr}'
+            print(line)
+
+        index_job = index_job + 1
+        ifile = ifile + 1
+        if ifile>ncores:
+            ifile = 1
+
+        work_date = work_date + timedelta(days=1)
+
+    return True
+
 def main():
     # if do_global_grid_monthly():
     #     return
@@ -328,6 +363,8 @@ def main():
     #     return
     # if do_test_array():
     #     return
+    if make_sbatch():
+        return
 
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":

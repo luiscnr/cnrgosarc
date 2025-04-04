@@ -715,8 +715,8 @@ class ArcProcessing:
                         array_diff = array_chla_prev / array_chla
                         var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
                     dataset_here.close()
-            #         os.remove(file_out)
-            # os.rmdir(dir_out_tmp)
+                    os.remove(file_out)
+            os.rmdir(dir_out_tmp)
 
 
         if self.climatology_path is not None and os.path.exists(self.climatology_path):

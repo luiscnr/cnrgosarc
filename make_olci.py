@@ -36,6 +36,8 @@ args = parser.parse_args()
 
 
 def main():
+
+
     print('[INFO] Started Artic Processing Tool')
 
     if args.mode == "CHECKPY":
