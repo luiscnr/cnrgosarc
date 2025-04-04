@@ -1,6 +1,5 @@
 import os.path
-
-
+from hashlib import file_digest
 
 import __init__
 import pytz
@@ -10,6 +9,7 @@ from arc_gpr_model import ARC_GPR_MODEL
 from kd_algorithm import KD_ALGORITHMS
 from netCDF4 import Dataset
 from datetime import datetime as dt
+from multiprocessing import Pool
 import numpy as np
 import warnings
 
@@ -58,6 +58,7 @@ class ArcProcessing:
             self.file_grid = arc_opt.get_value_param(section, 'grid_base', file_grid_default, 'str')
             self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
             self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
+            self.applyPool = arc_opt.get_value_param(section,'applyPool',0,'int')
 
         if os.path.exists(self.file_model) and output_type == 'CHLA':
             use_ciao = True if self.chla_algo=='CIAO' else False
@@ -504,6 +505,7 @@ class ArcProcessing:
 
         ncsat = Dataset(filein)
 
+        rrs_bands = ['RRS443', 'RRS490', 'RRS510', 'RRS560']
         if self.chla_algo=='SeaSARC':
             rrs_bands = ['RRS443', 'RRS490', 'RRS560', 'RRS665']
         elif self.chla_algo=='CIAO':
@@ -529,6 +531,7 @@ class ArcProcessing:
             var560 = ncsat.variables[rrs_bands[3]]
 
         ncgrid = None
+        varLong = None
         if self.chla_algo=='SeaSARC':
             if self.verbose:
                 print('[INFO] Checking longitude... ')
@@ -597,6 +600,8 @@ class ArcProcessing:
         min_value = var_chla.valid_min
         max_value = var_chla.valid_max
 
+        var_chla_prev = None
+        var_diff = None
         if self.output_type == 'COMPARISON':
             var_chla_prev = datasetout.variables['chla']
             var_diff = datasetout.variables['DIFF']
@@ -630,9 +635,9 @@ class ArcProcessing:
                         print(f'[INFO] Checking -> {iprogress} / {iprogress_end} -> {nvalid}')
                     else:
                         print(f'[INFO] Checking -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
-                if nvalid > 500000:
-                    ystep_tmp = int(np.ceil(self.ystep)/ 2)
-                    xstep_tmp = int(np.ceil(self.xstep) / 2)
+                if nvalid > 50000:
+                    ystep_tmp = 250
+                    xstep_tmp = 250
                     for ytmp in range(limits[0],limits[1],ystep_tmp):
                         for xtmp in range(limits[2],limits[3],xstep_tmp):
                             limits_tmp = self.get_limits(ytmp, xtmp, ystep_tmp, xstep_tmp, self.height, self.width)
@@ -643,88 +648,76 @@ class ArcProcessing:
                     nvalid_list.append(nvalid)
 
 
-
+        npool = os.cpu_count() if self.applyPool==-1 else self.applyPool
         if self.verbose:
-            print(f'[INFO] Computing chla: YStep: {self.ystep} XStep: {self.xstep}')
+            print(f'[INFO] Computing chla: YStep: {self.ystep} XStep: {self.xstep} Pool: {npool}')
 
-        iprogress = 0
-        iprogress_end = int(np.ceil((self.height / self.ystep) * (self.width / self.xstep)))
-        if self.height < self.ystep and self.width < self.xstep:
-            iprogress_end = 1
+
+
+        dir_out_tmp = os.path.join(os.path.dirname(fileout),f'TEMP_{sat_date.strftime("%Y%m%d")}_{cdate.timestamp()}')
+        if npool>0:
+            if os.path.exists(dir_out_tmp):
+                for name in os.listdir(dir_out_tmp):
+                    os.remove(os.path.join(dir_out_tmp,name))
+            else:
+                os.mkdir(dir_out_tmp)
 
         nlimits = len(limits_list)
+        param_list = []
         for idx in range(nlimits):
             nvalid_here = nvalid_list[idx]
-            print(f'[INFO] Computing chl-a -> {idx+1} / {nlimits}) -> {nvalid_here}')
+
             if nvalid_here > 0:
                 limits = limits_list[idx]
-                if rrs_bands[0] == 'RRS442_5':
-                    print(f'[INFO] Band shifting from 442.5 to 443...')
-                    array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
-                    array_443 = np.ma.filled(array_443,-999.0)##masked values doesn't work with check_chla_valid
+                file_out = os.path.join(dir_out_tmp,f'CHL_{idx}.nc')
+                if npool>0:
+                    params = [filein,rrs_bands,limits,jday,min_value,max_value,file_out]
+                    print(f'[INFO] Setting param list ->   {idx + 1} / {nlimits}) Output file: CHL_{idx}.nc')
+                    param_list.append(params)
                 else:
-                    array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
-                array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
-                array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
-                if self.chla_algo == 'SeaSARC':
-                    array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
-                    array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
-                    array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,array_560, array_665)
-                if self.chla_algo == 'CIAO':
-                    array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
-                    array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,array_510, array_560)
-                array_chla[array_chla < min_value] = -999.0
-                array_chla[array_chla > max_value] = -999.0
-                var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
-                if self.output_type == 'COMPARISON':
-                    array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
-                    array_diff = array_chla_prev / array_chla
-                    var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+                    print(f'[INFO] Computing chl-a -> {idx + 1} / {nlimits}) -> {nvalid_here}')
+                    if rrs_bands[0] == 'RRS442_5':
+                        print(f'[INFO] Band shifting from 442.5 to 443...')
+                        array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
+                        array_443 = np.ma.filled(array_443,-999.0)##masked values doesn't work with check_chla_valid
+                    else:
+                        array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+                    if self.chla_algo == 'SeaSARC':
+                        array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
+                        array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
+                        array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,array_560, array_665)
+                    if self.chla_algo == 'CIAO':
+                        array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
+                        array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,array_510, array_560)
+                    array_chla[array_chla < min_value] = -999.0
+                    array_chla[array_chla > max_value] = -999.0
+                    var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+                    if self.output_type == 'COMPARISON':
+                        array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+                        array_diff = array_chla_prev / array_chla
+                        var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+        if npool>0:
+            poolhere = Pool(npool)
+            poolhere.map(self.run_parallel_chla_image, param_list)
+            for idx in range(nlimits):
+                nvalid_here = nvalid_list[idx]
+                print(f'[INFO] Setting data -> {idx+1} / {nlimits}) -> {nvalid_here}')
+                if nvalid_here > 0:
+                    limits = limits_list[idx]
+                    file_out = os.path.join(dir_out_tmp,f'CHL_{idx}.nc')
+                    dataset_here = Dataset(file_out)
+                    array_chla = dataset_here.variables['chla'][:]
+                    var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+                    if self.output_type == 'COMPARISON':
+                        array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+                        array_diff = array_chla_prev / array_chla
+                        var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+                    dataset_here.close()
+            #         os.remove(file_out)
+            # os.rmdir(dir_out_tmp)
 
-
-        # for y in range(0, self.height, self.ystep):
-        #     for x in range(0, self.width, self.xstep):
-        #         iprogress = iprogress + 1
-        #         limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-        #
-        #         if rrs_bands[0] == 'RRS442_5':
-        #             print(f'[INFO] Band shifting from 442.5 to 443...')
-        #             array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
-        #             array_443 = np.ma.filled(array_443,-999.0)##masked values doesn't work with check_chla_valid
-        #         else:
-        #             array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
-        #         array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
-        #
-        #         array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
-        #         if self.chla_algo == 'SeaSARC':
-        #             array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
-        #             nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_560, array_665)
-        #         if self.chla_algo == 'CIAO':
-        #             array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
-        #             nvalid = self.chla_model.check_chla_valid(array_443, array_490, array_510, array_560)
-        #
-        #         if self.height < self.ystep and self.width < self.xstep:
-        #             print(f'[INFO] -> {iprogress} / {iprogress_end} -> {nvalid}')
-        #         else:
-        #             print(f'[INFO] -> {self.ystep} {self.xstep} ({iprogress} / {iprogress_end}) -> {nvalid}')
-        #
-        #         if nvalid > 0:
-        #
-        #             if self.chla_algo == 'SeaSARC':
-        #                 array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
-        #                 array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,
-        #                                                                      array_560, array_665)
-        #             if self.chla_algo == 'CIAO':
-        #                 array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,
-        #                                                                      array_510, array_560)
-        #
-        #             array_chla[array_chla < min_value] = -999.0
-        #             array_chla[array_chla > max_value] = -999.0
-        #             var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
-        #             if self.output_type == 'COMPARISON':
-        #                 array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
-        #                 array_diff = array_chla_prev / array_chla
-        #                 var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
 
         if self.climatology_path is not None and os.path.exists(self.climatology_path):
             nameqi = f'QI_CHL'
@@ -752,19 +745,92 @@ class ArcProcessing:
         if ncgrid is not None:
             ncgrid.close()
 
-        # month july
-        # print('TEMPORAL MODIFICATION FOR MONTH.......')
-        # sdate = dt(2022, 8, 1)
-        # timeseconds = (sdate - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
-        # print(timeseconds)
-        # datasetout.variables['time'][0] = [np.int32(timeseconds)]
-        # datasetout.start_date = '2022-08-01'
-        # datasetout.stop_date = '2022-08-31'
-
         datasetout.close()
         if self.verbose:
             print('[INFO] Chla computation completed. ')
 
+    def run_parallel_chla_image(self,params):
+
+        file_in = params[0]
+        rrs_bands = params[1]
+        limits = params[2]
+        jday = params[3]
+        min_value = params[4]
+        max_value = params[5]
+        file_out = params[6]
+        name_out = os.path.basename(file_out)
+        print(f'[INFO] [{name_out}] Started')
+
+        ncsat = Dataset(file_in)
+
+
+        var443 = ncsat.variables[rrs_bands[0]]
+        var490 = ncsat.variables[rrs_bands[1]]
+        if self.chla_algo == 'SeaSARC':
+            var560 = ncsat.variables[rrs_bands[2]]
+            var665 = ncsat.variables[rrs_bands[3]]
+        if self.chla_algo == 'CIAO':
+            var510 = ncsat.variables[rrs_bands[2]]
+            var560 = ncsat.variables[rrs_bands[3]]
+
+        ncgrid = None
+        if self.chla_algo=='SeaSARC':
+            if self.verbose:
+                print('[INFO] Checking longitude... ')
+            if 'lon' in ncsat.variables:
+                varLong = ncsat.variables['lon']
+            else:
+                file_base = self.arc_opt.get_value_param('CHLA', 'file_base', None, 'str')
+                if file_base is None:
+                    section = 'PROCESSING'
+                    file_base = self.arc_opt.get_value_param(section, 'file_base', None, 'str')
+                if file_base is None:
+                    file_base = self.file_grid
+                ncgrid = Dataset(file_base)
+                if 'lon' in ncgrid.variables:
+                    varLong = ncgrid.variables['lon']
+                else:
+                    print(f'[ERROR] Longitude variable is not available in {file_base}. Exiting.')
+                    return
+
+        if rrs_bands[0] == 'RRS442_5':
+            print(f'[INFO] [{name_out}] Band shifting from 442.5 to 443...')
+            array_443 = self.get_band_shifted_olci_array(ncsat, 443, limits)
+            array_443 = np.ma.filled(array_443,-999.0)##masked values doesn't work with check_chla_valid
+        else:
+            array_443 = np.array(var443[0, limits[0]:limits[1], limits[2]:limits[3]])
+        array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
+        array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
+        print(f'[INFO] [{name_out}] Computing chl-a...')
+        if self.chla_algo == 'SeaSARC':
+            array_665 = np.array(var665[0, limits[0]:limits[1], limits[2]:limits[3]])
+            array_long = np.array(varLong[limits[0]:limits[1], limits[2]:limits[3]])
+            array_chla = self.chla_model.compute_chla_from_2d_arrays(array_long, jday, array_443, array_490,array_560, array_665)
+        if self.chla_algo == 'CIAO':
+            array_510 =  np.array(var510[0, limits[0]:limits[1], limits[2]:limits[3]])
+            array_chla = self.chla_model.compute_chla_ciao_from_2d_arrays(jday, array_443, array_490,array_510, array_560)
+        array_chla[array_chla < min_value] = -999.0
+        array_chla[array_chla > max_value] = -999.0
+
+
+        dataset_w = Dataset(file_out,'w')
+        nlat = array_chla.shape[0]
+        nlon = array_chla.shape[1]
+        dataset_w.createDimension('lat',nlat)
+        dataset_w.createDimension('lon',nlon)
+        var = dataset_w.createVariable('chla','f4',('lat','lon'),fill_value=-999, zlib=True,complevel=6)
+        var[:] = array_chla[:]
+        dataset_w.close()
+
+        # var_chla[0, limits[0]:limits[1], limits[2]:limits[3]] = [array_chla[:, :]]
+        # if self.output_type == 'COMPARISON':
+        #     array_chla_prev = np.array(var_chla_prev[limits[0]:limits[1], limits[2]:limits[3]])
+        #     array_diff = array_chla_prev / array_chla
+        #     var_diff[limits[0]:limits[1], limits[2]:limits[3]] = [array_diff]
+        ncsat.close()
+        if ncgrid is not None:
+            ncgrid.close()
+        print(f'[INFO] [{name_out}] Completed')
 
     def get_band_shifted_olci_array(self,ncsat,output_band,limits):
         input_bands = ['RRS412_5','RRS442_5','RRS490','RRS560','RRS665']

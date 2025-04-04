@@ -134,6 +134,7 @@ class ARC_OPTIONS:
         alternative_path = self.get_path(section, 'alternative_path', False)
         alternative_path_organization = self.get_path_organization(section, 'alternative_path_organization')
 
+
         options_out = {
             'input_path': input_path,
             'output_path': output_path,

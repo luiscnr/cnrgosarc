@@ -1065,6 +1065,8 @@ def run_chla(arc_opt, start_date, end_date):
     if args.verbose:
         print(f'[INFO] File base: {file_base}')
         print(f'[INFO] Timeliness: {timeliness}')
+        npool = os.cpu_count()
+        print(f'[INFO] Maximum number of available cores: {npool}')
 
     ##WORKING WITH SINGLE GRANULE, ONLY CHLA
     input_name = arc_opt.get_value_param('PROCESSING', 'name_input', None, 'str')
