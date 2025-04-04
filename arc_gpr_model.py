@@ -94,8 +94,20 @@ class ARC_GPR_MODEL():
     ##SeaSARC: 443, 490, 560, 665
     ##CIAO: 443, v490, 510, 560
     def check_chla_valid(self, array_1, array_2, array_3, array_4):
-        indices = np.where(
-            np.logical_and(np.logical_and(array_1 > 0, array_2 > 0), np.logical_and(array_3 > 0, array_4 > 0)))
+
+        if self.use_ciao:
+            min_valid = 1e-8
+            max_valid = 1 / np.pi
+            indices = np.where(np.logical_and(
+                np.logical_and(np.logical_and(array_1 > min_valid, array_2 > min_valid),
+                               np.logical_and(array_3 > min_valid, array_4 > min_valid)),
+                np.logical_and(np.logical_and(array_1 < max_valid, array_2 < max_valid),
+                               np.logical_and(array_3 < max_valid, array_4 < max_valid))
+            ))
+        else:
+            indices = np.where(np.logical_and(np.logical_and(array_1 > 0, array_2 > 0), np.logical_and(array_3 > 0, array_4 > 0)))
+
+
         nvalid = len(indices[0])
         return nvalid
 
@@ -128,9 +140,14 @@ class ARC_GPR_MODEL():
     def compute_chla_ciao_from_2d_arrays(self, day, array_443, array_490, array_510, array_560):
         chla_array = np.zeros(array_443.shape)
         chla_array[:] = -999
-        indices = np.where(
-            np.logical_and(np.logical_and(array_443 > 0, array_490 > 0), np.logical_and(array_510 > 0, array_560 > 0)))
+        min_valid = 1e-8
+        max_valid = 1/np.pi
+        indices = np.where(np.logical_and(
+            np.logical_and(np.logical_and(array_443 > min_valid, array_490 > min_valid), np.logical_and(array_510 > min_valid, array_560 > min_valid)),
+            np.logical_and(np.logical_and(array_443 < max_valid, array_490 < max_valid),np.logical_and(array_510 < max_valid, array_560 < max_valid))
+        ))
         nvalid = len(indices[0])
+        print(f'[INFO] Number of valid pixels for CIAO chl-a computation: {nvalid}')
         if nvalid == 0:
             return chla_array
         input_matrix = np.ones((nvalid, self.npredictors + 1))
