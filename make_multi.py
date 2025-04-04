@@ -363,8 +363,8 @@ def main():
     #     return
     # if do_test_array():
     #     return
-    if make_sbatch():
-        return
+    # if make_sbatch():
+    #     return
 
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
