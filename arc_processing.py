@@ -1,5 +1,5 @@
 import os.path
-from hashlib import file_digest
+
 
 import __init__
 import pytz
