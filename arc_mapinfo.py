@@ -388,17 +388,34 @@ class ArcMapInfo:
             datehere = dt(1981, 1, 1) + timedelta(seconds=float(dataset.variables['time'][0]))
             dateherestr = datehere.strftime('%Y-%m-%d')
 
+        if dateherestr is None and name_var == 'MEDIAN':
+            try:
+                from datetime import datetime as dt
+                datehere_n = os.path.basename(fileout).split('_')[0]
+                datehere = dt.strptime(datehere_n,'%Y%m%d')
+                dateherestr = datehere.strftime('%d %B')
+            except:
+                pass
+
         if self.verbose:
             print(f'[INFO] Date: {dateherestr}')
             print(f'[INFO] Starting figure and axes')
 
         fig, ax = self.start_full_figure()
 
+
         ##plotting images
         xstep = int(np.ceil(self.area_def.width / 2))
         ystep = int(np.ceil(self.area_def.height / 2))
         nsteps = 4
         iprogress = 1
+
+
+        dataset_grid = None
+        if 'lat' not in dataset.variables or 'lon' not in dataset.variables:
+            dataset_grid = Dataset(self.ifile_base)
+
+
 
         for y in range(0, self.area_def.height, ystep):
             for x in range(0, self.area_def.width, xstep):
@@ -410,17 +427,32 @@ class ArcMapInfo:
                 yfin = limits[1]
                 xini = limits[2]
                 xfin = limits[3]
-                data = np.ma.array(dataset.variables[name_var][0, yini:yfin, xini:xfin])
-                lats = np.array(dataset.variables['lat'][yini:yfin, xini:xfin])
-                lons = np.array(dataset.variables['lon'][yini:yfin, xini:xfin])
-                if name_var == 'CHL':
+                if len(dataset.variables[name_var].shape)==3:
+                    data = np.ma.array(dataset.variables[name_var][0, yini:yfin, xini:xfin])
+                elif len(dataset.variables[name_var].shape) == 2:
+                    data = np.ma.array(dataset.variables[name_var][yini:yfin, xini:xfin])
+
+                if name_var=='MEDIAN':
+                    data = np.ma.power(10,data)
+
+                if dataset_grid is not None:
+                    lats = np.array(dataset_grid.variables['lat'][yini:yfin, xini:xfin])
+                    lons = np.array(dataset_grid.variables['lon'][yini:yfin, xini:xfin])
+                else:
+                    lats = np.array(dataset.variables['lat'][yini:yfin, xini:xfin])
+                    lons = np.array(dataset.variables['lon'][yini:yfin, xini:xfin])
+
+                if name_var == 'CHL' or name_var == 'MEDIAN':
                     img = self.show_map_chl_impl(ax, data, lats, lons)
+
+        if dataset_grid is not None:
+            dataset_grid.close()
 
         if self.verbose:
             print(f'[INFO] Setting colorbar and title...')
 
-        # color bar
-        if name_var == 'CHL':
+        ##color bar and title
+        if name_var == 'CHL' or name_var == 'MEDIAN':
             cbar = fig.colorbar(img, format="$%.2f$", anchor=(0.1, 0.5))
             cbar.ax.tick_params(labelsize=20)
             units = r'mg m$^-$$^3$'
@@ -429,6 +461,9 @@ class ArcMapInfo:
             if dateherestr is not None:
                 title = f'{title} - {dateherestr}'
             ax.set_title(title, fontsize=25, pad=36)
+
+
+
         fig.savefig(fileout, dpi=150, bbox_inches='tight')
         self.close_figure(fig)
         dataset.close()
@@ -446,6 +481,7 @@ class ArcMapInfo:
         import matplotlib.path as mpath
         import matplotlib.ticker as mticker
 
+
         # start figure and axes
         crs = self.area_def.to_cartopy_crs()
         fig, ax = plt.subplots(subplot_kw=dict(projection=crs))
@@ -454,6 +490,10 @@ class ArcMapInfo:
 
         # coastlines
         ax.coastlines(resolution='50m')
+
+        ##NOT WORKING WITH PROBLEMS WITH THE BOUNDARIES OF THE POLYGONS
+        ##ax.add_feature(cartopy.feature.LAND, edgecolor='black', linewidth=0.5, transform = cartopy.crs.PlateCarree())
+
 
         # Prep circular boundary
         r_extent = self.area_def.area_extent[1]
@@ -573,7 +613,10 @@ class ArcMapInfo:
 
     def set_area_definition(self, area_id):
         self.area_def = self.get_area_definition(area_id)
-        if area_id == 'polar_stereographic_4km':
+        ifile_base_default = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300mNOGEO.nc'
+        print(self.ifile_base)
+        print(ifile_base_default)
+        if area_id == 'polar_stereographic_4km' and self.ifile_base==ifile_base_default:
             self.ifile_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/MULTI/GRID_FILES/ArcGrid_65_90_4KM_GridBase.nc'
         if self.verbose:
             print('--------------------------------------------------------------------------------------------')

@@ -30,7 +30,7 @@ args = parser.parse_args()
 
 
 def only_test():
-    path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20220715T232353_20220715T232653_20220717T115842_0179_087_301_1800_MAR_O_NT_003.SEN3'
+    path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20230715T232353_20230715T232653_20230717T115842_0179_087_301_1800_MAR_O_NT_003.SEN3'
     from netCDF4 import Dataset
     import numpy as np
     from kd_algorithm import KD_ALGORITHMS
@@ -235,7 +235,7 @@ def check_sources():
     moi_pass = 'MegaRoma17!'
     ams = ARC_MULTI_SOURCES(input_path, None, moi_user, moi_pass, False, True)
 
-    for year in range(1997,2022):
+    for year in range(1997,2023):
         for month in range(1,13):
             if year==1997 and month<9:
                 continue
@@ -245,7 +245,7 @@ def check_sources():
                 fout.write(date.strftime('%Y-%m-%d'))
                 fout.write('\n')
     # date_ref = dt(1997, 9, 4)
-    # date_end = dt(2022, 12, 31)
+    # date_end = dt(2023, 12, 31)
     # while date_ref <= date_end:
     #     if date_ref.day == 1:
     #         print('-->', date_ref)
@@ -319,24 +319,36 @@ def make_sbatch():
     ncores = 10
     index_job = 1
     ifile = 1
-    work_date = dt(2019,1,1)
-    end_date = dt(2019,6,30)
+    work_date = dt(2018,1,1)
+    end_date = dt(2018,12,31)
     base_file = '/home/gosuser/Processing/gos-oc-processingchains_v202411/arcProcessing/config/cnrarc_config_hpc01_operational_DT_'
     pr = f" | awk '{{print $NF}}')"
+
+    print('#!/bin/bash')
+    print('')
+    print(f'tfile=/home/gosuser/Processing/gos-oc-processingchains_v202411/arcProcessing/s3olciProcessing/mail_2018.txt')
+    print(f'subject="Multiple OLCI ARC processing {work_date.strftime("%Y-%m-%d")} {end_date.strftime("%Y-%m-%d")}"')
+    print(f'mailrcpt="luis.gonzalezvilas@artov.ismar.cnr.it"')
+    print('')
+    print(f'echo "Launching multiple OLCI ARC processing from {work_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}">$tfile')
+    print(f'echo "">>$tfile')
+    print('')
     while work_date <= end_date:
 
         work_date_str = work_date.strftime('%Y-%m-%d')
         if index_job<=ncores:
-            line=f'job{index_job}=$(sbatch make_processing.slurm {base_file}_{ifile}.ini {work_date_str} {work_date_str}'
+            line=f'job{index_job}=$(sbatch make_processing.slurm {base_file}{ifile}.ini {work_date_str} {work_date_str})'
             print(line)
             line=f'job{index_job}id=$(echo "$job{index_job}"{pr}'
             print(line)
         else:
             index_job_wait = index_job-ncores
-            line = f'job{index_job}=$(sbatch --dependency=afterany:$job{index_job_wait}id make_processing.slurm {base_file}_{ifile}.ini {work_date_str} {work_date_str}'
+            line = f'job{index_job}=$(sbatch --dependency=afterany:$job{index_job_wait}id make_processing.slurm {base_file}{ifile}.ini {work_date_str} {work_date_str})'
             print(line)
             line = f'job{index_job}id=$(echo "$job{index_job}"{pr}'
             print(line)
+
+        print(f'echo "Date: {work_date_str} ID: $job{index_job}id">>$tfile')
 
         index_job = index_job + 1
         ifile = ifile + 1
@@ -345,7 +357,76 @@ def make_sbatch():
 
         work_date = work_date + timedelta(days=1)
 
+    print(f'cat $tfile | mail -s "$subject" "$mailrcpt"')
     return True
+
+def run_ql(arc_opt, start_date, end_date):
+    options = arc_opt.get_ql_options()
+    if options is None:
+        return
+    output_type = arc_opt.get_value_param('QL', 'output_type', 'CHL', 'str')
+    # if not output_type == 'CHL':
+    #     return
+
+    print(f'[INFO] Output type for quick looks: {output_type}')
+
+    name_file_format_default = None
+    name_file_date_format_default = '%Y%j'
+    if output_type == 'CHL':
+        name_file_format_default = 'C$DATE$_chl-arc-4km.nc'
+        output_var = 'CHL'
+    elif output_type=='CHL_CLIMA':
+        name_file_format_default = '1998$DATE$_2022$DATE$_chl_arc_multi_clima.nc'
+        name_file_date_format_default = '%m%d'
+        output_var = 'MEDIAN'
+    else:
+        output_var = output_type
+
+    name_file_format = arc_opt.get_value_param('QL', 'name_file_format', name_file_format_default, 'str')
+    name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format_default',
+                                                    name_file_date_format_default, 'str')
+
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
+    date_run = start_date
+
+    from arc_mapinfo import ArcMapInfo
+    ami = ArcMapInfo(arc_opt, args.verbose)
+    ami.set_area_definition('polar_stereographic_4km')
+
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run}')
+        make_ql = True
+        input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
+        date_file_str = date_run.strftime(name_file_date_format)
+        name_file = name_file_format.replace('$DATE$', date_file_str)
+        input_file = os.path.join(input_path, name_file)
+        if not os.path.exists(input_file):
+            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
+            make_ql = False
+        output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
+                                              True)
+        if output_path is None:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+            make_ql = False
+
+        output_name = f'{name_file[:-3]}_{output_type}.png'
+        output_file = os.path.join(output_path, output_name)
+        if os.path.exists(output_file):
+            print(f'[INFO] Output file {output_file} already exists. Skipping...')
+            make_ql = False
+
+        if make_ql:
+            if args.verbose:
+                print(f'[INFO] Input file: {input_file}')
+                print(f'[INFO] Output file: {output_file}')
+            #ami.save_quick_look_fdata(output_file, input_file, output_type)
+
+            ami.save_full_fdata(output_file, input_file, output_var)
+        date_run = date_run + timedelta(hours=24)
 
 def main():
     # if do_global_grid_monthly():
@@ -372,7 +453,6 @@ def main():
         return
 
     if args.mode == 'CHECK_ALGORITHM':
-
         return
 
     if args.mode == 'GRID' and args.outputpath:  ##creating single file grid
@@ -543,7 +623,7 @@ def main():
         run_correct_time_stamp(start_date,end_date,args.inputpath,None)
         return
 
-    ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION MODEL. DATES COULD BE ALSO PASSED AS ARGS
+    ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION FILES, BUT DATES COULD BE ALSO PASSED AS ARGS
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
         return
@@ -593,6 +673,10 @@ def main():
     if args.mode == 'MONTHLY_RRS_TEST':
         run_month(arc_opt, 'RRS510', start_date, end_date)
         return
+
+    if args.mode == 'QL':
+        # print('to be done')
+        run_ql(arc_opt, start_date, end_date)
 
 
 
@@ -977,7 +1061,7 @@ def run_month(arc_opt, mode, start_date, end_date):
     date_run = start_date
 
     # from datetime import datetime as dt
-    # date_run = dt(2022,10,11)
+    # date_run = dt(2023,10,11)
     # date_run.replace(day=15)
 
     if output_type == 'CHLA':

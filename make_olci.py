@@ -1116,15 +1116,15 @@ def run_chla(arc_opt, start_date, end_date):
             make_processing = True
         output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
                                               True)
-        if output_path is None and not overwrite:
-            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skipping...')
+        if output_path is None:
+            print(f'[WARNING] Output path {output_path} for date {date_run} is not available. Skipping...')
             make_processing = False
-
-        output_name = f'O{dateyj}_plankton-arc-fr.nc'
-        output_file = os.path.join(output_path, output_name)
-        if os.path.exists(output_file) and not overwrite:
-            print(f'[INFO] Output file {output_file} already exists. Skipping...')
-            make_processing = False
+        else:
+            output_name = f'O{dateyj}_plankton-arc-fr.nc'
+            output_file = os.path.join(output_path, output_name)
+            if os.path.exists(output_file) and not overwrite:
+                print(f'[INFO] Output file {output_file} already exists. Skipping...')
+                make_processing = False
 
         if make_processing:
             if args.verbose:
