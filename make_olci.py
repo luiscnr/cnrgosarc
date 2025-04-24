@@ -1139,41 +1139,47 @@ def run_ql(arc_opt, start_date, end_date):
     if options is None:
         return
     output_type = arc_opt.get_value_param('QL', 'output_type', 'CHL', 'str')
-    if not output_type == 'CHL':
-        return
+    # if not output_type == 'CHL':
+    #     return
 
     if args.verbose:
         print('[INFO] QL OPTIONS:')
         for opt in options:
             print(f'[INFO]  {opt}->{options[opt]}')
-
-    from arc_mapinfo import ArcMapInfo
-    ami = ArcMapInfo(None, args.verbose)
+        print(f'[INFO] Output type for quick looks: {output_type}')
 
     ##WORKING WITH SINGLE GRANULE, ONLY CHLA
-    input_name = arc_opt.get_value_param('QL', 'name_input', None, 'str')
-    if input_name is not None:
-        input_file = os.path.join(options['input_path'], input_name)
-        if os.path.exists(input_file):
-            if args.verbose:
-                print(f'[INFO] Working with the single file: {input_file}')
-        else:
-            print(f'[ERROR] File {input_file} does not exist')
-        output_name = arc_opt.get_value_param('QL', 'name_output', None, 'str')
-        if output_name is None:
-            output_name = 'QuickLookChla.nc'
-        output_file = os.path.join(options['output_path'], output_name)
-        if args.verbose:
-            print(f'[INFO] Output file: {output_file}')
-        # ami.save_quick_look_fdata(output_file, input_file, output_type)
-        ami.save_full_fdata(output_file, input_file, output_file)
-        return
+    # input_name = arc_opt.get_value_param('QL', 'name_input', None, 'str')
+    # if input_name is not None:
+    #     input_file = os.path.join(options['input_path'], input_name)
+    #     if os.path.exists(input_file):
+    #         if args.verbose:
+    #             print(f'[INFO] Working with the single file: {input_file}')
+    #     else:
+    #         print(f'[ERROR] File {input_file} does not exist')
+    #     output_name = arc_opt.get_value_param('QL', 'name_output', None, 'str')
+    #     if output_name is None:
+    #         output_name = 'QuickLookChla.nc'
+    #     output_file = os.path.join(options['output_path'], output_name)
+    #     if args.verbose:
+    #         print(f'[INFO] Output file: {output_file}')
+    #     # ami.save_quick_look_fdata(output_file, input_file, output_type)
+    #     ami.save_full_fdata(output_file, input_file, output_file)
+    #     return
 
     ##WORKING WITH DATES
     name_file_format_default = None
     name_file_date_format_default = '%Y%j'
     if output_type == 'CHL':
         name_file_format_default = 'O$DATE$_plankton-arc-fr.nc'
+        output_var = 'CHL'
+    elif output_type=='CHL_MONTHLY':
+        name_file_format_default = 'O$DATE$-plankton_monthly-arc-fr.nc'
+        name_file_date_format_default = '%Y%j%j'
+        output_var = 'CHL'
+    else:
+        output_var = output_type
+
     name_file_format = arc_opt.get_value_param('QL', 'name_file_format', name_file_format_default, 'str')
     name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format_default',
                                                     name_file_date_format_default, 'str')
@@ -1181,14 +1187,30 @@ def run_ql(arc_opt, start_date, end_date):
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
+
+    if output_type.endswith('MONTHLY'):
+        start_date = start_date.replace(day=15)
+        end_date  = end_date.replace(day=15)
+
     date_run = start_date
+
+    from arc_mapinfo import ArcMapInfo
+    from calendar import monthrange
+    ami = ArcMapInfo(None, args.verbose)
+
     while date_run <= end_date:
         if args.verbose:
             print('*****************************')
             print(f'[INFO] Date: {date_run}')
         make_ql = True
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
-        date_file_str = date_run.strftime(name_file_date_format)
+        if name_file_date_format=='%Y%j%j': ##format used for months
+            nfiles_month = monthrange(date_run.year, date_run.month)[1]
+            sdate = date_run.replace(day=1).strftime('%Y%j')
+            edate = date_run.replace(day=nfiles_month).strftime('%j')
+            date_file_str = f'{sdate}{edate}'
+        else:
+            date_file_str = date_run.strftime(name_file_date_format)
         name_file = name_file_format.replace('$DATE$', date_file_str)
         input_file = os.path.join(input_path, name_file)
         if not os.path.exists(input_file):
@@ -1211,8 +1233,13 @@ def run_ql(arc_opt, start_date, end_date):
                 print(f'[INFO] Input file: {input_file}')
                 print(f'[INFO] Output file: {output_file}')
             # ami.save_quick_look_fdata(output_file, input_file, output_type)
-            ami.save_full_fdata(output_file, input_file, output_type)
-        date_run = date_run + timedelta(hours=24)
+            ami.save_full_fdata(output_file, input_file, output_var)
+        if output_type.endswith('MONTHLY'):
+            month_new = 1 if date_run.month==12 else date_run.month + 1
+            year_new = date_run.year+1 if date_run.month==12 else date_run.year
+            date_run = date_run.replace(month=month_new,year=year_new)
+        else:
+            date_run = date_run + timedelta(hours=24)
 
     # file_out = args.outputpath
     # fdataset = args.product

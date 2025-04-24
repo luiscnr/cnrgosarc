@@ -414,6 +414,12 @@ class ArcMapInfo:
         nsteps = 4
         iprogress = 1
 
+        ##plotting images
+        # xstep = int(np.ceil(self.area_def.width / 4))
+        # ystep = int(np.ceil(self.area_def.height / 4))
+        # nsteps = 8
+        # iprogress = 1
+
 
         dataset_grid = None
         if 'lat' not in dataset.variables or 'lon' not in dataset.variables:

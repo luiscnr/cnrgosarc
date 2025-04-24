@@ -368,7 +368,11 @@ def run_ql(arc_opt, start_date, end_date):
     # if not output_type == 'CHL':
     #     return
 
-    print(f'[INFO] Output type for quick looks: {output_type}')
+    if args.verbose:
+        print('[INFO] QL OPTIONS:')
+        for opt in options:
+            print(f'[INFO]  {opt}->{options[opt]}')
+        print(f'[INFO] Output type for quick looks: {output_type}')
 
     name_file_format_default = None
     name_file_date_format_default = '%Y%j'
