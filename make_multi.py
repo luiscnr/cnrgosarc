@@ -379,6 +379,10 @@ def run_ql(arc_opt, start_date, end_date):
         name_file_format_default = '1998$DATE$_2022$DATE$_chl_arc_multi_clima.nc'
         name_file_date_format_default = '%m%d'
         output_var = 'MEDIAN'
+    elif output_type=='CHL_MONTHLY':
+        name_file_format_default = 'C$DATE$-plankton_monthly-arc-4km.nc'
+        name_file_date_format_default = '%Y%j%j'
+        output_var = 'CHL'
     else:
         output_var = output_type
 
@@ -389,9 +393,16 @@ def run_ql(arc_opt, start_date, end_date):
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
+
+    if output_type.endswith('MONTHLY'):
+        start_date = start_date.replace(day=15)
+        end_date  = end_date.replace(day=15)
+
     date_run = start_date
 
+
     from arc_mapinfo import ArcMapInfo
+    from calendar import monthrange
     ami = ArcMapInfo(arc_opt, args.verbose)
     ami.set_area_definition('polar_stereographic_4km')
 
@@ -401,7 +412,13 @@ def run_ql(arc_opt, start_date, end_date):
             print(f'[INFO] Date: {date_run}')
         make_ql = True
         input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
-        date_file_str = date_run.strftime(name_file_date_format)
+        if name_file_date_format=='%Y%j%j': ##format used for months
+            nfiles_month = monthrange(date_run.year, date_run.month)[1]
+            sdate = date_run.replace(day=1).strftime('%Y%j')
+            edate = date_run.replace(day=nfiles_month).strftime('%j')
+            date_file_str = f'{sdate}{edate}'
+        else:
+            date_file_str = date_run.strftime(name_file_date_format)
         name_file = name_file_format.replace('$DATE$', date_file_str)
         input_file = os.path.join(input_path, name_file)
         if not os.path.exists(input_file):
@@ -426,7 +443,12 @@ def run_ql(arc_opt, start_date, end_date):
             #ami.save_quick_look_fdata(output_file, input_file, output_type)
 
             ami.save_full_fdata(output_file, input_file, output_var)
-        date_run = date_run + timedelta(hours=24)
+        if output_type.endswith('MONTHLY'):
+            month_new = 1 if date_run.month==12 else date_run.month + 1
+            year_new = date_run.year+1 if date_run.month==12 else date_run.year
+            date_run = date_run.replace(month=month_new,year=year_new)
+        else:
+            date_run = date_run + timedelta(hours=24)
 
 def main():
     # if do_global_grid_monthly():

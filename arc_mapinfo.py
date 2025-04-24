@@ -386,7 +386,11 @@ class ArcMapInfo:
             from datetime import datetime as dt
             from datetime import timedelta
             datehere = dt(1981, 1, 1) + timedelta(seconds=float(dataset.variables['time'][0]))
-            dateherestr = datehere.strftime('%Y-%m-%d')
+            var_count = f'{name_var}_count' ##count variable in the file indicates that this is a monthly file
+            if var_count in dataset.variables:
+                dateherestr =  datehere.strftime('%B %Y')
+            else:
+                dateherestr = datehere.strftime('%Y-%m-%d')
 
         if dateherestr is None and name_var == 'MEDIAN':
             try:
