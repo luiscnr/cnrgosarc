@@ -41,6 +41,7 @@ class ArcProcessing:
         self.file_attributes = file_attributes
 
         # FILE DEFAULTS
+        file_model_default = None
         if self.chla_algo=='CIAO':
             file_model_default = os.path.join(os.path.dirname(__init__.__file__),'CIAO_Algorithm.json')
         elif self.chla_algo=='SeaSARC':
@@ -54,7 +55,9 @@ class ArcProcessing:
         else:
             ##GETTING GENERAL PARAMETERS
             section = 'GENERAL'
-            self.file_model = self.arc_opt.get_value_param(section, 'chla_model', file_model_default, 'str')
+            self.file_model = None
+            if file_model_default is not None: ##file_mode_default and file_model only required for chla, 
+                self.file_model = self.arc_opt.get_value_param(section, 'chla_model', file_model_default, 'str')
             self.file_grid = arc_opt.get_value_param(section, 'grid_base', file_grid_default, 'str')
             self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
             self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
