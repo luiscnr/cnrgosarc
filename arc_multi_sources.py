@@ -20,8 +20,8 @@ class ARC_MULTI_SOURCES:
             self.moi_user = moi_user
             self.moi_pass = moi_pass
 
-    def get_output_file(self,date_here,datasetname,output_path,output_path_organization):
-      print('fdf')
+    # def get_output_file(self,date_here,datasetname,output_path,output_path_organization):
+    #   print('fdf')
 
     def get_file_date(self, date_here, make_download):
         dirdate = self.get_input_folder_date(date_here, True)
@@ -29,9 +29,15 @@ class ARC_MULTI_SOURCES:
             return None
         date_here_str = date_here.strftime('%Y%m%d')
         name = f'{date_here_str}_{self.name_dataset}.nc'
-        if self.use_myint_sources:
-            name = name.replace('my','myint')
+
         fdate = os.path.join(dirdate, name)
+
+        if not os.path.exists(fdate):
+            name_myint = name.replace('my','myint')
+            fdate_myint = os.path.join(dirdate,name_myint)
+            if os.path.exists(fdate_myint):
+                fdate = os.path.join(dirdate,name_myint)
+
         if not os.path.exists(fdate) and make_download:
             self.download_file(date_here, dirdate, name)
 
