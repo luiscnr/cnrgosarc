@@ -346,6 +346,10 @@ class ArcProcessing:
         var490 = ncsat.variables[rrs_bands[1]]
         var510 = ncsat.variables[rrs_bands[2]]
         var560 = ncsat.variables[rrs_bands[3]]
+        print('==============================================')
+        print(rrs_bands)
+        print(var443.shape)
+
 
         datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
         if datasetout is None:
