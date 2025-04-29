@@ -1065,6 +1065,15 @@ def run_month(arc_opt, mode, start_date, end_date):
     else:
         output_type = mode
 
+    chla_algo = None
+    if output_type=='CHLA':
+        chla_algo = args.chla_algorithm if args.chla_algorithm else arc_opt.get_value_param('PROCESSING', 'chla_algorithm','CIAO', 'str')
+        if chla_algo not in ["SeaSARC", "CIAO"]:
+            print(f'[ERROR] {chla_algo} is not a valid chl-a algorithm. Possible values are: SeaSARC, CIAO')
+            return
+
+
+
     from arc_processing import ArcProcessing
     from calendar import monthrange
 
@@ -1078,6 +1087,8 @@ def run_month(arc_opt, mode, start_date, end_date):
     if args.verbose:
         print(f'[INFO] File base: {file_base}')
         print(f'[INFO] Timeliness: {timeliness}')
+    if output_type=='CHLA':
+        output_type = f'CHLA_{chla_algo}'
     arc_proc = ArcProcessing(arc_opt, args.verbose, output_type, None)
 
     if start_date is None or end_date is None:
@@ -1091,9 +1102,11 @@ def run_month(arc_opt, mode, start_date, end_date):
     # date_run = dt(2023,10,11)
     # date_run.replace(day=15)
 
-    if output_type == 'CHLA':
+    if output_type.startswith('CHLA'):
         file_date = 'CDATE_chl-arc-4km.nc'
         param_name = 'plankton'
+
+
     if output_type == 'TRANSP':
         file_date = 'CDATE_kd490-arc-4km.nc'
         param_name = 'transp'
