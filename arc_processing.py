@@ -346,9 +346,7 @@ class ArcProcessing:
         var490 = ncsat.variables[rrs_bands[1]]
         var510 = ncsat.variables[rrs_bands[2]]
         var560 = ncsat.variables[rrs_bands[3]]
-        print('==============================================')
-        print(rrs_bands)
-        print(var443.shape)
+
 
 
         datasetout = self.create_nc_file_out(fileout, file_base, timeliness)
@@ -383,7 +381,7 @@ class ArcProcessing:
             datasetout.stop_date = sat_date.strftime('%Y-%m-%d')
         if timeliness is not None:
             datasetout.timeliness = timeliness
-        cdate = dt.utcnow()
+        cdate = dt.now(pytz.utc)
         datasetout.creation_date = cdate.strftime('%Y-%m-%d')
         datasetout.creation_time = cdate.strftime('%H:%M:%S UTC')
 
@@ -413,10 +411,18 @@ class ArcProcessing:
         iprogress_end = np.ceil((self.height / self.ystep) * (self.width / self.xstep))
         if self.height < self.ystep and self.width < self.xstep:
             iprogress_end = 1
+
+        print('==============================================')
+        print(rrs_bands)
+        print(var443.shape)
+        print(self.height,self.ystep)
+        print(self.width,self.xstep)
+
         for y in range(0, self.height, self.ystep):
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
+                print('-->',y,x,limits)
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = kda.check_kd490_ok2_560(array_490,array_560)
