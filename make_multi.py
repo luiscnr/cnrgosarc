@@ -371,6 +371,8 @@ def run_ql(arc_opt, start_date, end_date):
     if args.verbose:
         print('[INFO] QL OPTIONS:')
         for opt in options:
+            if opt=='start_date' or opt=='end_date':
+                continue
             print(f'[INFO]  {opt}->{options[opt]}')
         print(f'[INFO] Output type for quick looks: {output_type}')
 
@@ -401,6 +403,10 @@ def run_ql(arc_opt, start_date, end_date):
     if output_type.endswith('MONTHLY'):
         start_date = start_date.replace(day=15)
         end_date  = end_date.replace(day=15)
+
+    if args.verbose:
+        print(f'[INFO] Start date: {start_date.strftime("%m/%Y")}')
+        print(f'[INFO] End date: {end_date.strftime("%m/%Y")}')
 
     date_run = start_date
 
@@ -888,6 +894,8 @@ def run_chla(arc_opt, start_date, end_date):
     if args.verbose:
         print('[INFO] CHLA PROCESSING OPTIONS:')
         for opt in options:
+            if opt=='start_date' or opt=='end_date':
+                continue
             print(f'[INFO]  {opt}->{options[opt]}')
         print(f'[INFO]  file_base:->{file_base}')
         print(f'[INFO]  file_att:->{file_att}')
@@ -923,6 +931,11 @@ def run_chla(arc_opt, start_date, end_date):
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
+
+    if args.verbose:
+        print(f'[INFO] Start date: {start_date.strftime("%m/%Y")}')
+        print(f'[INFO] End date: {end_date.strftime("%m/%Y")}')
+
     date_run = start_date
 
     output_type = f'CHLA_{chla_algo}'
@@ -987,6 +1000,8 @@ def run_kd490(arc_opt, start_date, end_date):
     if args.verbose:
         print('[INFO] KD400 PROCESSING OPTIONS:')
         for opt in options:
+            if opt=='start_date' or opt=='end_date':
+                continue
             print(f'[INFO]  {opt}->{options[opt]}')
         print(f'[INFO]  file_base:->{file_base}')
         print(f'[INFO]  file_att:->{file_att}')
@@ -1020,6 +1035,12 @@ def run_kd490(arc_opt, start_date, end_date):
     if start_date is None or end_date is None:
         start_date = options['start_date']
         end_date = options['end_date']
+
+    if args.verbose:
+        print(f'[INFO] Start date: {start_date.strftime("%m/%Y")}')
+        print(f'[INFO] End date: {end_date.strftime("%m/%Y")}')
+
+
     date_run = start_date
 
     arc_proc = ArcProcessing(arc_opt, args.verbose, 'KD490', file_att)
@@ -1078,8 +1099,10 @@ def run_month(arc_opt, mode, start_date, end_date):
     from calendar import monthrange
 
     if args.verbose:
-        print('[INFO] PROCESSING OPTIONS:')
+        print('[INFO] MONTHLY PROCESSING OPTIONS:')
         for opt in options:
+            if opt=='start_date' or opt=='end_date':
+                continue
             print(f'[INFO]  {opt}->{options[opt]}')
 
     file_base, timeliness = get_monthly_timeliness(arc_opt)
@@ -1096,6 +1119,10 @@ def run_month(arc_opt, mode, start_date, end_date):
         end_date = options['end_date']
     start_date = start_date.replace(day=15)
     end_date = end_date.replace(day=15)
+
+    if args.verbose:
+        print(f'[INFO] Start date: {start_date.strftime("%m/%Y")}')
+        print(f'[INFO] End date: {end_date.strftime("%m/%Y")}')
     date_run = start_date
 
     # from datetime import datetime as dt
