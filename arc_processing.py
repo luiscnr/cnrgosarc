@@ -56,18 +56,19 @@ class ArcProcessing:
             ##GETTING GENERAL PARAMETERS
             section = 'GENERAL'
             self.file_model = None
-            if file_model_default is not None: ##file_mode_default and file_model only required for chla, 
+            if file_model_default is not None: ##file_mode_default and file_model only required for chla,
                 self.file_model = self.arc_opt.get_value_param(section, 'chla_model', file_model_default, 'str')
             self.file_grid = arc_opt.get_value_param(section, 'grid_base', file_grid_default, 'str')
             self.ystep = arc_opt.get_value_param(section, 'ystep', 6500, 'int')
             self.xstep = arc_opt.get_value_param(section, 'xstep', 6500, 'int')
             self.applyPool = arc_opt.get_value_param(section,'applyPool',0,'int')
 
-        if os.path.exists(self.file_model) and output_type == 'CHLA':
-            use_ciao = True if self.chla_algo=='CIAO' else False
-            self.chla_model = ARC_GPR_MODEL(self.file_model,use_ciao)
-        else:
-            print(f'[ERROR] Model file {self.file_model} is not available')
+        if output_type=='CHLA':
+            if self.file_model is not None and os.path.exists(self.file_model):
+                use_ciao = True if self.chla_algo=='CIAO' else False
+                self.chla_model = ARC_GPR_MODEL(self.file_model,use_ciao)
+            else:
+                print(f'[ERROR] Model file {self.file_model} is not available')
 
         self.climatology_path = None
 
