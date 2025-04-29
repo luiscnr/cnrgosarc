@@ -354,7 +354,7 @@ class ArcProcessing:
             print('[ERROR] Output dataset could not be started. Exiting.')
             return
 
-        datasetout.references = "Zoffoli et al. (in preparation); Morel et al. (2007).  Examining the consistency of " \
+        datasetout.references = "Zoffoli et al. (2025). CIAO: A machine-learning algorithm for mapping Arctic Ocean Chlorophyll-a from space. Sci. Remote Sens., 100212; Morel et al. (2007).  Examining the consistency of " \
                                 "products derived from various ocean color sensors in open ocean (Case 1) waters in " \
                                 "the perspective of a multi-sensor approach. Remote Sens. Environ., 111(1), 69-88 "
 
@@ -394,7 +394,7 @@ class ArcProcessing:
             sensor_mask_array = np.array(ncsat.variables['SENSORMASK'])
             datasetout.variables['SENSORMASK'] = [sensor_mask_array]
 
-        ncsat.close()
+
 
         if self.verbose:
             print(f'[INFO] Getting kd-490 variable...')
@@ -412,17 +412,12 @@ class ArcProcessing:
         if self.height < self.ystep and self.width < self.xstep:
             iprogress_end = 1
 
-        print('==============================================')
-        print(rrs_bands)
-        print(var443.shape)
-        print(self.height,self.ystep)
-        print(self.width,self.xstep)
+
 
         for y in range(0, self.height, self.ystep):
             for x in range(0, self.width, self.xstep):
                 iprogress = iprogress + 1
                 limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-                print('-->',y,x,limits)
                 array_490 = np.array(var490[0, limits[0]:limits[1], limits[2]:limits[3]])
                 array_560 = np.array(var560[0, limits[0]:limits[1], limits[2]:limits[3]])
                 nvalid = kda.check_kd490_ok2_560(array_490,array_560)
@@ -492,7 +487,7 @@ class ArcProcessing:
 
 
 
-        #ncsat.close()
+        ncsat.close()
 
 
         datasetout.close()
