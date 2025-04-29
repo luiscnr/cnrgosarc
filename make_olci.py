@@ -1181,7 +1181,7 @@ def run_ql(arc_opt, start_date, end_date):
         output_var = output_type
 
     name_file_format = arc_opt.get_value_param('QL', 'name_file_format', name_file_format_default, 'str')
-    name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format_default',
+    name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format',
                                                     name_file_date_format_default, 'str')
 
     if start_date is None or end_date is None:

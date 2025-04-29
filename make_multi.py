@@ -391,7 +391,7 @@ def run_ql(arc_opt, start_date, end_date):
         output_var = output_type
 
     name_file_format = arc_opt.get_value_param('QL', 'name_file_format', name_file_format_default, 'str')
-    name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format_default',
+    name_file_date_format = arc_opt.get_value_param('QL', 'name_file_date_format',
                                                     name_file_date_format_default, 'str')
 
     if start_date is None or end_date is None:
@@ -825,14 +825,15 @@ def run_resample(arc_opt, start_date, end_date):
             print(f'[WARNING] Output file: {output_path} already exists. Skipping...')
             continue
 
+        file_date = ams.get_file_date(date_ref, False) ##make_download = true does not work
         ##implements 3 attemps to download the file
-        nattemps = 0
-        file_date = None
-        while nattemps < 3:
-            file_date = ams.get_file_date(date_ref, True)
-            if os.path.exists(file_date):
-                break
-            nattemps = nattemps + 1
+        # nattemps = 0
+        # file_date = None
+        # while nattemps < 3:
+        #     file_date = ams.get_file_date(date_ref, True)
+        #     if os.path.exists(file_date):
+        #         break
+        #     nattemps = nattemps + 1
 
         if file_date is None:
             date_ref = date_ref + timedelta(hours=24)
