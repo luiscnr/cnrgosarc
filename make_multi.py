@@ -319,8 +319,8 @@ def make_sbatch_bal():
     ncores = 12
     index_job = 1
     ifile = 1
-    work_date = dt(2017, 11, 1)
-    end_date = dt(2017, 12, 31)
+    work_date = dt(2018, 1, 1)
+    end_date = dt(2018, 12, 31)
     dir_orig = '/store/COP2-OC-TAC/BAL_Evolutions/POLYMERWHPC'
     dir_dest = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
 
@@ -328,7 +328,7 @@ def make_sbatch_bal():
     pr = f" | awk '{{print $NF}}')"
     log_base = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/log_files'
     #output_file = '/mnt/c/DATA/launch_multiple_processing_olci_l3_202411.sh'
-    output_file =  '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/launch_multiple_processing_olci_l3_202411_remaining_2017.sh'
+    output_file =  '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/launch_multiple_processing_olci_l3_202411_remaining_2018.sh'
     fw = open(output_file,'w')
     fw.write('#!/bin/bash')
     add_line(fw,'')
