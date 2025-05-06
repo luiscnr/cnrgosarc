@@ -321,10 +321,10 @@ def make_sbatch_bal(year):
     ifile = 1
     work_date = dt(year, 1, 1)
     end_date = dt(year, 12, 31)
-    # dir_orig = '/store/COP2-OC-TAC/BAL_Evolutions/POLYMERWHPC'
-    # dir_dest = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
-    dir_orig = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
-    dir_dest = '/store3/OC/OLCI_BAL/dailyolci_202411'
+    dir_orig = '/store/COP2-OC-TAC/BAL_Evolutions/POLYMERWHPC'
+    dir_dest = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
+    # dir_orig = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
+    # dir_dest = '/store3/OC/OLCI_BAL/dailyolci_202411'
 
     script = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/make_processing_olci_l3_202411.slurm'
     pr = f" | awk '{{print $NF}}')"
