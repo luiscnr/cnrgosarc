@@ -358,7 +358,10 @@ def make_sbatch_bal():
             work_date = work_date + timedelta(days=1)
             continue
 
+
+        add_line(fw_mv, f'mkdir {dir_dest_date}')
         add_line(fw_mv, f'cp {dir_orig_date}/O{yyyy}{jjj}-rrs* {dir_dest_date}')
+        add_line(fw_mv, '')
         work_date_str = work_date.strftime('%Y-%m-%d')
         log_file = os.path.join(log_base,f'log_processing_olci_l3_{work_date_str}')
         if index_job <= ncores:
