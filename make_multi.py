@@ -11,7 +11,7 @@ warnings.filterwarnings(action='ignore', category=ResourceWarning)
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECK_ALGORITHM", "GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
+                    choices=["CHECKPY", "CHECK_ALGORITHM", "TEST","GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
                              "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP","CHECK_TIMESTAMP"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
@@ -313,6 +313,85 @@ def do_test_array():
 
     return True
 
+def make_sbatch_bal():
+    from datetime import datetime as dt
+    from datetime import timedelta
+    ncores = 12
+    index_job = 1
+    ifile = 1
+    work_date = dt(2017, 11, 1)
+    end_date = dt(2017, 12, 31)
+    dir_orig = '/store/COP2-OC-TAC/BAL_Evolutions/POLYMERWHPC'
+    dir_dest = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
+
+    script = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/make_processing_olci_l3_202411.slurm'
+    pr = f" | awk '{{print $NF}}')"
+    log_base = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/log_files'
+    #output_file = '/mnt/c/DATA/launch_multiple_processing_olci_l3_202411.sh'
+    output_file =  '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/launch_multiple_processing_olci_l3_202411_remaining_2017.sh'
+    fw = open(output_file,'w')
+    fw.write('#!/bin/bash')
+    add_line(fw,'')
+
+    output_file_mv = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/launch_mv.sh'
+    fw_mv = open(output_file_mv, 'w')
+    fw_mv.write('#!/bin/bash')
+    add_line(fw_mv, '')
+
+    add_line(fw,f'tfile=/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/multiple_mail.mail')
+    add_line(fw,f'subject="Multiple OLCI BAL processing {work_date.strftime("%Y-%m-%d")} {end_date.strftime("%Y-%m-%d")}"')
+    add_line(fw,f'mailrcpt="luis.gonzalezvilas@artov.ismar.cnr.it"')
+    add_line(fw,'')
+    add_line(fw,f'echo "Launching multiple OLCI BAL processing from {work_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}">$tfile')
+    add_line(fw,f'echo "">>$tfile')
+    add_line(fw,'')
+    while work_date <= end_date:
+
+        yyyy = work_date.strftime('%Y')
+        jjj = work_date.strftime('%j')
+        dir_dest_date = os.path.join(dir_dest,yyyy,jjj)
+        if os.path.exists(dir_dest_date):
+            work_date = work_date + timedelta(days=1)
+            continue
+        dir_orig_date = os.path.join(dir_orig,yyyy,jjj)
+        if not os.path.exists(dir_orig_date):
+            work_date = work_date + timedelta(days=1)
+            continue
+
+        add_line(fw_mv, f'cp {dir_orig_date}/O{yyyy}{jjj}-rrs* {dir_dest_date}')
+        work_date_str = work_date.strftime('%Y-%m-%d')
+        log_file = os.path.join(log_base,f'log_processing_olci_l3_{work_date_str}')
+        if index_job <= ncores:
+            line = f'job{index_job}=$(sbatch {script} NT {work_date_str} {work_date_str} {log_file})'
+            add_line(fw, line)
+            line = f'job{index_job}id=$(echo "$job{index_job}"{pr}'
+            add_line(fw, line)
+        else:
+            index_job_wait = index_job - ncores
+            line = f'job{index_job}=$(sbatch --dependency=afterany:$job{index_job_wait}id {script} NT {work_date_str} {work_date_str} {log_file})'
+            add_line(fw, line)
+            line = f'job{index_job}id=$(echo "$job{index_job}"{pr}'
+            add_line(fw, line)
+
+        add_line(fw, f'echo "Date: {work_date_str} ID: $job{index_job}id Log file: {log_file} ">>$tfile')
+
+        index_job = index_job + 1
+        ifile = ifile + 1
+        if ifile > ncores:
+            ifile = 1
+
+        work_date = work_date + timedelta(days=1)
+
+    add_line(fw, f'cat $tfile | mail -s "$subject" "$mailrcpt"')
+
+    fw.close()
+    fw_mv.close()
+    return True
+
+def add_line(fw,line):
+    fw.write('\n')
+    fw.write(line)
+
 def make_sbatch():
     from datetime import datetime as dt
     from datetime import timedelta
@@ -478,6 +557,11 @@ def main():
     #     return
     # if make_sbatch():
     #     return
+    # if make_sbatch_bal():
+    #     return
+
+    if args.mode == "TEST":
+        make_sbatch_bal()
 
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":
