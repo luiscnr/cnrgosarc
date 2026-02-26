@@ -275,7 +275,7 @@ class OLCI_L2_COL4:
         nc_sat = Dataset(file_path, 'r')
         satellite_flag = nc_sat.variables['WQSF']
         flagging = flag.Class_Flags_OLCI(satellite_flag.flag_masks, satellite_flag.flag_meanings)
-        flag_list = 'LAND,COASTLINE,CLOUD,CLOUD_AMBIGUOUS,CLOUD_MARGIN,INVALID,COSMETIC,SATURATED,SUSPECT,HISOLZEN,HIGHGLINT,SNOW_ICE,AC_FAIL,WHITECAPS,RWNEG_O2,RWNEG_O3,RWNEG_O4,RWNEG_O5,RWNEG_O6,RWNEG_O7,RWNEG_O8'
+        flag_list = 'LAND,COASTLINE,CLOUD,CLOUD_AMBIGUOUS,CLOUD_MARGIN,INVALID,COSMETIC,SATURATED,SUSPECT,HISOLZEN,UNCORR_GLINT,SNOW_ICE,AC_FAIL,WHITECAPS,ADJAC, RWNEG_O2,RWNEG_O3,RWNEG_O4,RWNEG_O5,RWNEG_O6,RWNEG_O7,RWNEG_O8'
         flag_list = flag_list.replace(" ", "")
         flag_list = str.split(flag_list, ',')
 
