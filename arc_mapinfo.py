@@ -805,6 +805,17 @@ class ArcMapInfo:
         if self.verbose:
             print('--------------------')
             print(f'[INFO] Starting resampling for granule: {olimage.path_source}')
+
+        if self.verbose:
+            print(f'[INFO][{granuleindex}] Defining subarea for the granule...')
+        lats, lons = olimage.get_lat_long_arrays()
+        if self.verbose:
+            print(f'[INFO][{granuleindex}] Granule geographic limits. Lat: {np.min(lats)} - {np.max(lats)}  Long: {np.min(lons)} - {np.max(lons)}')
+
+        if np.max(lats)<65:
+            print(f'[ERROR][{granuleindex}] Granule is not located over the Arctic Ocean (north latitude {np.max(lats)} is southern 65ºN)')
+            return
+
         section = 'RESAMPLE'
         rrs_bands = arc_opt.get_value_param(section, 'rrs_bands', self.olci_l2_bands, 'floatlist')
         olimage.set_reflectance_bands_mask(rrs_bands)
@@ -829,13 +840,7 @@ class ArcMapInfo:
             return line_output
         ##END CHECKING
 
-        if self.verbose:
-            print(f'[INFO][{granuleindex}] Defining subarea for the granule...')
-        lats, lons = olimage.get_lat_long_arrays()
 
-        if self.verbose:
-            print(
-                f'[INFO][{granuleindex}] Granule geographic limits. Lat: {np.min(lats)} - {np.max(lats)}  Long: {np.min(lons)} - {np.max(lons)}')
 
         limits, sub_area_def = self.get_subarea_def(lats, lons)
         swath_def = SwathDefinition(lons=lons, lats=lats)
@@ -858,6 +863,7 @@ class ArcMapInfo:
 
         if datasetout is None:
             print(f'[ERROR][{granuleindex}] Output file {fileout} could not be created')
+            return
 
         if self.verbose:
             print(f'[INFO][{granuleindex}] Resampling variables...')
@@ -866,7 +872,7 @@ class ArcMapInfo:
         result = get_sample_from_neighbour_info('nn', output_shape, mask, valid_input_index,
                                                 valid_output_index, index_array,
                                                 distance_array=distance_array, fill_value=10)
-        result_m = np.zeros(result.shape, dtype=np.int)
+        result_m = np.zeros(result.shape, dtype=np.int32)
         result_m[result == 10] = -999
         result_m[result == 0] = 1
         resampled_n_total = np.count_nonzero(result_m >= 0)

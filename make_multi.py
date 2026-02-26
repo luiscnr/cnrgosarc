@@ -3,6 +3,7 @@ import os
 from datetime import timedelta
 
 import numpy as np
+import pandas as pd
 
 from arc_multi_sources import ARC_MULTI_SOURCES
 import warnings
@@ -313,6 +314,68 @@ def do_test_array():
 
     return True
 
+def make_sbatch_dates(start_date,end_date):
+    from datetime import datetime as dt
+    from datetime import timedelta
+    ncores = 12
+    index_job = 1
+    ifile = 1
+    work_date = start_date
+    script = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/make_processing_olci_l3_202411.slurm'
+    pr = f" | awk '{{print $NF}}')"
+    log_base = '/store/COP2-OC-TAC/BAL_Evolutions/slurmscripts_202411/log_files'
+    # output_file = '/mnt/c/DATA/launch_multiple_processing_olci_l3_202411.sh'
+    output_file = f'/mnt/c/DATA/launch_multiple_processing_olci_l3_202411_remaining_1.sh'
+    fw = open(output_file, 'w')
+    fw.write('#!/bin/bash')
+    add_line(fw, '')
+
+    while work_date <= end_date:
+
+        # yyyy = work_date.strftime('%Y')
+        # jjj = work_date.strftime('%j')
+        # dir_dest_date = os.path.join(dir_dest,yyyy,jjj)
+        # if os.path.exists(dir_dest_date):
+        #     work_date = work_date + timedelta(days=1)
+        #     continue
+        # dir_orig_date = os.path.join(dir_orig,yyyy,jjj)
+        # if not os.path.exists(dir_orig_date):
+        #     work_date = work_date + timedelta(days=1)
+        #     continue
+
+
+
+        work_date_str = work_date.strftime('%Y-%m-%d')
+        log_file = os.path.join(log_base,f'log_processing_olci_l3_{work_date_str}')
+        if index_job <= ncores:
+            line = f'job{index_job}=$(sbatch {script} NT {work_date_str} {work_date_str} {log_file})'
+            add_line(fw, line)
+            line = f'job{index_job}id=$(echo "$job{index_job}"{pr}'
+            add_line(fw, line)
+        else:
+            index_job_wait = index_job - ncores
+            line = f'job{index_job}=$(sbatch --dependency=afterany:$job{index_job_wait}id {script} NT {work_date_str} {work_date_str} {log_file})'
+            add_line(fw, line)
+            line = f'job{index_job}id=$(echo "$job{index_job}"{pr}'
+            add_line(fw, line)
+
+        add_line(fw, f'echo "Date: {work_date_str} ID: $job{index_job}id Log file: {log_file} ">>$tfile')
+
+        index_job = index_job + 1
+        ifile = ifile + 1
+        if ifile > ncores:
+            ifile = 1
+
+        work_date = work_date + timedelta(days=1)
+
+    add_line(fw, f'cat $tfile | mail -s "$subject" "$mailrcpt"')
+
+    fw.close()
+
+    return True
+
+
+
 def make_sbatch_bal(year):
     from datetime import datetime as dt
     from datetime import timedelta
@@ -321,6 +384,9 @@ def make_sbatch_bal(year):
     ifile = 1
     work_date = dt(year, 1, 1)
     end_date = dt(year, 12, 31)
+
+
+
     dir_orig = '/store/COP2-OC-TAC/BAL_Evolutions/POLYMERWHPC'
     dir_dest = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
     # dir_orig = '/store3/OC/OLCI_BAL/POLYMER_BAL202411'
@@ -403,14 +469,14 @@ def make_sbatch():
     ncores = 10
     index_job = 1
     ifile = 1
-    work_date = dt(2018,1,1)
-    end_date = dt(2018,12,31)
+    work_date = dt(2025,4,1)
+    end_date = dt(2025,6,15)
     base_file = '/home/gosuser/Processing/gos-oc-processingchains_v202411/arcProcessing/config/cnrarc_config_hpc01_operational_DT_'
     pr = f" | awk '{{print $NF}}')"
 
     print('#!/bin/bash')
     print('')
-    print(f'tfile=/home/gosuser/Processing/gos-oc-processingchains_v202411/arcProcessing/s3olciProcessing/mail_2018.txt')
+    print(f'tfile=/home/gosuser/Processing/gos-oc-processingchains_v202411/arcProcessing/s3olciProcessing/mail_2025_2.txt')
     print(f'subject="Multiple OLCI ARC processing {work_date.strftime("%Y-%m-%d")} {end_date.strftime("%Y-%m-%d")}"')
     print(f'mailrcpt="luis.gonzalezvilas@artov.ismar.cnr.it"')
     print('')
@@ -544,6 +610,57 @@ def run_ql(arc_opt, start_date, end_date):
         else:
             date_run = date_run + timedelta(hours=24)
 
+def make_subset():
+    ##subset of TARA spectra list
+    from datetime import datetime as dt
+    dir_base = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/TARA_WORK/spectra_list/validspectra'
+    dir_out = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/TARA_WORK/spectra_list/validspectra_10_14'
+
+    time_first = 10
+    time_end = 13
+
+    for name in os.listdir(dir_base):
+        if not name.endswith('.csv'):
+            continue
+        file_in = os.path.join(dir_base,name)
+        file_out = os.path.join(dir_out,name)
+        df = pd.read_csv(file_in,sep=';')
+        insitu_first = np.array([int(dt.strptime(x, '%H:%M:%S').strftime('%H')) for x in df['InSituFirst'][:]])
+        insitu_last = np.array([int(dt.strptime(x, '%H:%M:%S').strftime('%H')) for x in df['InSituLast'][:]])
+        valid = np.logical_and(insitu_first >= time_first, insitu_last <= time_end)
+        df_new = df[valid]
+        df_new.to_csv(file_out,sep=';',index=False)
+
+    return True
+
+def make_count():
+    ##count of TARA spectra list
+    from datetime import datetime as dt
+    dir_base = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/TARA_WORK/spectra_list/daily'
+
+    time_first = 10
+    time_end = 14
+    files = ['spectra_cci_global.csv','spectra_multi_regional.csv','spectra_olci_regional.csv','spectra_cci_global_valid.csv','spectra_multi_regional_valid.csv','spectra_olci_regional_valid.csv']
+    for name in files:
+        #file_all_cci = os.path.join(dir_base,'spectra_cci_global.csv')
+        file_all = os.path.join(dir_base, name)
+        df = pd.read_csv(file_all,sep=';')
+        insitu_first = np.array([int(dt.strptime(x,'%H:%M:%S').strftime('%H')) for x in df['InSituFirst'][:]])
+        insitu_last = np.array([int(dt.strptime(x, '%H:%M:%S').strftime('%H')) for x in df['InSituLast'][:]])
+        valid = np.logical_and(insitu_first>=time_first,insitu_last<=time_end)
+        region = df['CMEMS_REGION'][:]
+        region= region[valid==True]
+        atl = region[region == 'ATL']
+        bal = region[region == 'BAL']
+        med = region[region == 'MED']
+        print(len(region))
+        print(len(atl))
+        print(len(bal))
+        print(len(med))
+        print('------------------------------------------')
+
+    return True
+
 def main():
     # if do_global_grid_monthly():
     #     return
@@ -560,14 +677,23 @@ def main():
     #     return
     # if do_test_array():
     #     return
-    # if make_sbatch():
-    #     return
+    #if make_sbatch():
+    #    return
+    #if make_count():
+    #    return
+    if make_subset():
+        return
     # if make_sbatch_bal():
     #     return
 
     if args.mode == "TEST":
-        year = int(args.inputpath)
-        make_sbatch_bal(year)
+        #year = int(args.inputpath)
+        #make_sbatch_bal(year)
+        from datetime import datetime as dt
+        start_date = dt(2020,4,12)
+        end_date = dt(2020,4,30)
+        make_sbatch_dates(start_date,end_date)
+        return
 
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')
     if args.mode == "CHECKPY":

@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 
-class KD_ALGORITHMS():
+class KD_ALGORITHMS:
 
     def __init__(self, kdalgorithm):
         self.kdalgorithm = kdalgorithm

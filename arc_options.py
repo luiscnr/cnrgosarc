@@ -79,7 +79,7 @@ class ARC_OPTIONS:
         unzip_path = self.get_path(section, 'unzip_path', False)
         if unzip_path is None:
             unzip_path = options['input_path']
-            print(f'[WARNING] Indepentent unzip_path was not defined, using input path as unzip_path')
+            print(f'[WARNING] Independent unzip_path was not defined, using input path as unzip_path')
         options['unzip_path'] = unzip_path
 
 
@@ -91,7 +91,6 @@ class ARC_OPTIONS:
 
     def get_processing_options(self):
         return self.get_basic_options('PROCESSING')
-
 
     def get_ql_options(self):
         return self.get_basic_options('QL')
@@ -153,6 +152,8 @@ class ARC_OPTIONS:
     def get_path_organization(self, section, key):
         if self.options.has_option(section, key):
             path_organization = self.options[section][key]
+            if path_organization.lower()=='none':
+                return None
             if not check_folder_organization(path_organization):
                 return 'INVALID'
             return path_organization
@@ -192,6 +193,12 @@ class ARC_OPTIONS:
                 print(f'[ERROR] Option {section}/{coption} is compulsory')
                 return False
         return True
+
+    def get_olci_collection(self):
+        collection =  self.get_value_param('GENERAL', 'olci_collection', 3, 'int')
+        if collection not in [3,4]:
+            return 3
+        return collection
 
     def get_value(self, section, key):
         value = None

@@ -1,22 +1,26 @@
 
-import __init__,math,os,argparse,configparser
+import __init__,math,os,argparse,configparser,subprocess,time
 from datetime import timedelta
-# import netCDF4
-# import numpy as np
-# import zipfile as zp
-# from arc_mapinfo import ArcMapInfo
-# from arc_integration import ArcIntegration
-# from olci_l2 import OLCI_L2
-# import simplekml
+from datetime import datetime as dt
+from calendar import monthrange
+from multiprocessing import Pool
 import numpy as np
+import numpy.ma as ma
+import zipfile as zp
+
+#import simplekml
+from netCDF4 import Dataset
+from arc_options import ARC_OPTIONS
 from arc_mapinfo import ArcMapInfo
+from arc_integration import ArcIntegration
 from olci_l2 import OLCI_L2
 from arc_processing import ArcProcessing
 from arc_gpr_model import ARC_GPR_MODEL
+from olci_l2_col4 import OLCI_L2_COL4
 
 parser = argparse.ArgumentParser(description="Arctic OLCI processor")
 parser.add_argument("-m", "--mode", help="Mode",
-                    choices=["CHECKPY", "CHECKMODEL", "GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL",
+                    choices=["CHECKPY", "CHECKMODEL", "CHECKCOL4","GRID", "RESAMPLE", "RESAMPLEPML", "INTEGRATE", "CHLA", "QL",
                              "MONTHLY_CHLA", "MONTHLY_KD490"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
@@ -38,7 +42,7 @@ args = parser.parse_args()
 def main():
 
 
-    print('[INFO] Started Artic Processing Tool')
+    print('[INFO] Started Arctic Processing Tool')
 
     if args.mode == "CHECKPY":
         check_py()
@@ -46,6 +50,10 @@ def main():
 
     if args.mode == "CHECKMODEL":
         check_model()
+        return
+
+    if args.mode == "CHECKCOL4":
+        check_col4()
         return
 
     if args.mode == 'GRID' and args.outputpath:  ##creating single file grid
@@ -80,7 +88,7 @@ def main():
             return
         if args.verbose:
             print('[INFO] Started creation of base files for integration...')
-        from arc_integration import ArcIntegration
+
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
 
         arcInt = ArcIntegration(None, args.verbose, None, 'TRANSP', file_at)
@@ -100,7 +108,7 @@ def main():
         if args.verbose:
             print(f'[INFO] Started creation of base files for processing CHLA')
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
-        from arc_processing import ArcProcessing
+
         arcProc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
         file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase.nc'
 
@@ -118,7 +126,7 @@ def main():
         if args.verbose:
             print(f'[INFO] Started creation of base files for processing monthly CHLA')
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
-        from arc_processing import ArcProcessing
+
         arcProc = ArcProcessing(None, args.verbose, 'CHLA', file_at)
         file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
 
@@ -136,7 +144,6 @@ def main():
         if args.verbose:
             print(f'[INFO] Started creation of base files for processing monthly KD490')
         file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
-        from arc_processing import ArcProcessing
         arcProc = ArcProcessing(None, args.verbose, 'TRANSP', file_at)
         file_base = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/GRID_FILES/ArcGrid_65_90_300m_GridBase_NOSENSORMASK.nc'
 
@@ -159,8 +166,9 @@ def main():
     except:
         print(f'[ERROR] Config file {args.config_file} could not be read. Exiting...')
 
-    from arc_options import ARC_OPTIONS
+
     arc_opt = ARC_OPTIONS(options)
+    id_collection =  arc_opt.get_olci_collection()
 
     # check if dates from args should be used
     start_date = None
@@ -173,7 +181,10 @@ def main():
 
     if args.mode == 'RESAMPLE' and args.base_file and args.product:  ##options are required
         folci = args.product
-        olimage = OLCI_L2(folci, args.verbose)
+        if id_collection==3:
+            olimage = OLCI_L2(folci, args.verbose)
+        elif id_collection==4:
+            olimage = OLCI_L2_COL4(folci, args.verbose)
         olimage.get_geo_and_params()
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
@@ -183,8 +194,32 @@ def main():
         ami = ArcMapInfo(None, args.verbose)
         file_out = args.outputpath
         folci = args.product
-        olimage = OLCI_L2(folci, args.verbose)
+        is_col_4 = True if '004' in os.path.basename(folci).split('_')[-1] else False
+        if id_collection==3 and is_col_4:
+            print(f'{folci} is a collection 4 product. Please use olci_collection = 4 in the configuration file')
+            return
+        if id_collection==4 and not is_col_4:
+            print(f'{folci} is a collection 3 product. Please use olci_collection = 4 in the [GENERAL] section in the configuration file')
+            return
+
+
+        if id_collection == 3:
+            olimage = OLCI_L2(folci, args.verbose)
+        elif id_collection == 4:
+            olimage = OLCI_L2_COL4(folci, args.verbose)
+
+        if not olimage.check_granule():
+            print(f'[ERROR] Granule {folci} is not valid')
+            return
         olimage.get_geo_and_params()
+        if file_out is None:
+            if folci.endswith('.SEN3'):
+                output_name = folci.split('/')[-1][0:-5]
+            else:
+                output_name = folci.split('/')[-1]
+            file_out = os.path.join(os.path.dirname(folci), f'{output_name}_resampled.nc')
+
+
         line_output = ami.make_resample_impl(olimage, file_out, 1, -1, arc_opt, None)
         if args.verbose:
             print(f'[INFO] Output line: {line_output}')
@@ -227,7 +262,7 @@ def main():
 
 
 def check_monthly_operative_mode(arc_opt):
-    from datetime import datetime as dt
+
     file_base, timeliness = get_monthly_timeliness(arc_opt)
     day_today = dt.utcnow().day
     if timeliness == 'NR' and day_today >= 8:
@@ -268,8 +303,8 @@ def run_month(arc_opt, mode, start_date, end_date):
         output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
     else:
         output_type = mode
-    from arc_processing import ArcProcessing
-    from calendar import monthrange
+
+
 
     if args.verbose:
         print('[INFO] PROCESSING OPTIONS:')
@@ -290,9 +325,6 @@ def run_month(arc_opt, mode, start_date, end_date):
     end_date = end_date.replace(day=15)
     date_run = start_date
 
-    # from datetime import datetime as dt
-    # date_run = dt(2022,10,11)
-    # date_run.replace(day=15)
 
     if output_type == 'CHLA':
         file_date = 'ODATE_plankton-arc-fr.nc'
@@ -379,7 +411,7 @@ def compute_month_chl(arc_opt):
     output_type = arc_opt.get_value_param('PROCESSING', 'output_type', 'CHLA', 'str')
     if not output_type == 'CHLA':
         return
-    from arc_processing import ArcProcessing
+
     if args.verbose:
         print('[INFO] PROCESSING OPTIONS:')
         for opt in options:
@@ -405,8 +437,7 @@ def compute_month_chl(arc_opt):
 
 
 def adding_time():
-    from datetime import datetime as dt
-    from datetime import timedelta
+
     dir_base = '/store/COP2-OC-TAC/arc/integrated'
     date_here = dt(2019, 6, 10)
     date_end = dt(2019, 6, 23)
@@ -455,13 +486,12 @@ def adding_time():
 
     ##TO SET ATRIBUTES
     # file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/integrated/2019/175/O2019175_plankton-arc-fr_NOTIME.nc'
-    # from netCDF4 import Dataset
     # ncsat = Dataset(file_in, 'a')
     # ncsat.cmems_product_id = "OCEANCOLOUR_ARC_BGC_L3_MY_009_123"
     # ncsat.title = "cmems_obs-oc_arc_bgc-plankton_my_l3-olci-300m_P1D"
     # ncsat.timeliness = "NT"
 
-    # import configparser
+
     # options = configparser.ConfigParser()
     # file_at = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/CONFIG_FILES/global_attributes.ini'
     # options.read(file_at)
@@ -470,7 +500,7 @@ def adding_time():
     # at_dict['parameter'] = 'Chlorophyll-a concentration'
     # at_dict['parameter_code'] = 'PLANKTON'
     # at_dict['product_level'] = 'L4'
-    # from datetime import datetime as dt
+
     # date = dt(2019,7,1)
     # date_fin = dt(2019,7,31)
     # names = []
@@ -493,7 +523,7 @@ def modify_chunksizes():
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2016/183/O2016183_transp-arc-fr.nc'
     file_in = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/O2019152181-plankton_monthly-arc-fr.nc'
     chunk_sizes = [1223, 3669]  # [1223, 3669, 6115, 18345]
-    from datetime import datetime as dt
+
 
     for idx in range(len(chunk_sizes)):
         chunk_size = chunk_sizes[idx]
@@ -520,8 +550,8 @@ def modify_chunksizes():
 def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
     # csizes = (1,chunk_size,chunk_size)
     csizes = None
-    from netCDF4 import Dataset
-    from datetime import datetime as dt
+
+
     with Dataset(ifile) as src:
         dst = Dataset(ofile, 'w', format='NETCDF4')
         # copy global attributes all at once via dictionary
@@ -570,7 +600,7 @@ def copy_nc_with_chunksize(ifile, ofile, chunk_size, date_here, date_here_end):
 def correcting_time_variable_in_plankton_files(start_date, end_date):
     dir_base = '/store/COP2-OC-TAC/arc/integrated'
     dir_output = '/store/COP2-OC-TAC/arc/daily'
-    import stat
+
     if not os.path.exists(dir_output):
         os.mkdir(dir_output)
         # os.chmod(dir_output,0o666)
@@ -609,8 +639,7 @@ def copy_nc_setting_time_variable(ifile_base, ofile):
     cmd = f'cp -a {ifile_base} {ofile}'
     if args.verbose:
         print(f'[INFO] cmd: {cmd}')
-    import subprocess
-    import time
+
     subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
     originalSize = os.path.getsize(ifile_base)
     historicalSize = -1
@@ -624,9 +653,9 @@ def copy_nc_setting_time_variable(ifile_base, ofile):
     if args.verbose:
         print('[INFO] Copy completed')
 
-    from netCDF4 import Dataset
+
     dst = Dataset(ofile, 'a', format='NETCDF4')
-    from datetime import datetime as dt
+
     date_here = dt.strptime(dst.start_date, '%Y-%m-%d')
     print(f'[INFO] Setting time: {dst.start_date}')
     timeseconds = (date_here - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
@@ -637,7 +666,7 @@ def copy_nc_setting_time_variable(ifile_base, ofile):
 
 
 def copy_nc_adding_time_variable(ifile, ofile):
-    from netCDF4 import Dataset
+
 
     with Dataset(ifile) as src:
         dst = Dataset(ofile, 'w', format='NETCDF4')
@@ -655,7 +684,7 @@ def copy_nc_adding_time_variable(ifile, ofile):
         # add time dimension
         dst.createDimension('time', 1)
 
-        from datetime import datetime as dt
+
         date_here = dt.strptime(src.start_date, '%Y-%m-%d')
         print(date_here)
         timeseconds = (date_here - dt(1981, 1, 1, 0, 0, 0)).total_seconds()
@@ -697,7 +726,7 @@ def copy_nc_adding_time_variable(ifile, ofile):
 
 
 def copy_nc_excluding_variables(ifile, ofile, excluded_variables):
-    from netCDF4 import Dataset
+
     with Dataset(ifile) as src:
         dst = Dataset(ofile, 'w', format='NETCDF4')
 
@@ -726,7 +755,7 @@ def copy_nc_excluding_variables(ifile, ofile, excluded_variables):
 
 def check_chla():
     file = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/INTEGRATED/2019/175/O2019175_AVERAGE-arc-fr.nc'
-    from netCDF4 import Dataset
+
     ncsat = Dataset(file)
     wmask = np.array(ncsat.variables['sum_weights'])
     nvalid = np.count_nonzero(wmask[wmask > 0])
@@ -811,13 +840,26 @@ def check_py():
         print('[INFO] All the packages are available')
 
 
+def check_col4():
+    path_base = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/OCTAC_WORK/OLCI_COL4_TEST'
+    path_granule = os.path.join(path_base,'S3B_OL_2_WFR____20200806T101835_20200806T102135_20260129T161613_0180_042_065______MAR_F_NT_004.SEN3')
+
+    output_name = path_granule.split('/')[-1][0:-5]
+
+
+
+    # olci_granule = OLCI_L2_COL4(path_granule,True)
+    #
+    # flag_mask, res, res_line = olci_granule.get_mask_default()
+
+
+
+
 def run_resampling_info():
     lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
 
     ##SINGLE IMAGE: LOCAL
-    import zipfile as zp
-    from olci_l2 import OLCI_L2
-    import os
+
     # path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3A_OL_2_WFR____20190624T004648_20190624T004948_20211129T080410_0180_046_145______MAR_R_NT_003.SEN3'
     path = '/mnt/c/DATA_LUIS/OCTAC_WORK/ARC_TEST/S3B_OL_2_WFR____20190624T164944_20190624T165103_20210813T114041_0078_027_012______MAR_R_NT_003.SEN3'
     oimage = OLCI_L2(path, True)
@@ -835,9 +877,7 @@ def run_resampling_info():
 
 
 def run_resampling_info_dir(base_path):
-    import zipfile as zp
-    from olci_l2 import OLCI_L2
-    import os
+
     lines = ['Source;Width;Height;NTotal;NWater1;NWater2;NValid;PValid;NValidNew;PValidNew;NErrors']
     path_out = os.path.join(base_path, 'INFO_RESAMPLING.csv')
     unzip_path = '/store/COP2-OC-TAC/arc/'
@@ -950,7 +990,7 @@ def run_integration(arc_opt, start_date, end_date):
             pl = platform[-1]
             if pl == '3':
                 pl = ''
-            from arc_integration import ArcIntegration
+
             dir_base = arc_opt.get_value_param('INTEGRATE', 'file_base', None, 'str')
             if args.verbose:
                 print(f'[INFO] Output type: {output_type}')
@@ -1023,8 +1063,7 @@ def copy_file(ifile, ofile):
     cmd = f'cp -a {ifile} {ofile}'
     if args.verbose:
         print(f'[INFO] cmd: {cmd}')
-    import subprocess
-    import time
+
     subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
     originalSize = os.path.getsize(ifile)
     historicalSize = -1
@@ -1194,8 +1233,7 @@ def run_ql(arc_opt, start_date, end_date):
 
     date_run = start_date
 
-    from arc_mapinfo import ArcMapInfo
-    from calendar import monthrange
+
     ami = ArcMapInfo(None, args.verbose)
 
     while date_run <= end_date:
@@ -1253,7 +1291,7 @@ def compute_statistics(variable):
     height = variable.shape[2]
     ystep = 1000
     xstep = 1000
-    import numpy.ma as ma
+
     nvalid_all = 0
     for y in range(0, height, ystep):
         # print(y)
@@ -1300,17 +1338,16 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
     doresample = arc_opt.get_value_param(section, 'do_resample', True, 'boolean')
     dokml = arc_opt.get_value_param(section, 'do_kml', False, 'boolean')
     timeliness = arc_opt.get_value_param(section, 'timeliness', 'NT', 'str')
+    resolution  = arc_opt.get_value_param(section,'resolution', 'WFR', 'str')
     if dirdest is None:
         dirdest = dirorig
     apply_pool = arc_opt.get_value_param(section, 'apply_pool', 0, 'int')
-    import zipfile as zp
-    from arc_mapinfo import ArcMapInfo
-    from olci_l2 import OLCI_L2
+
+    id_collection = arc_opt.get_olci_collection()
 
     ami = ArcMapInfo(arc_opt, args.verbose)
     if apply_pool != 0:
         params_list = []
-        from multiprocessing import Pool
         if args.verbose:
             print('[INFO] Starting parallel processing')
     else:
@@ -1343,6 +1380,10 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
             idx = idx + 1
         pt = f'_{timeliness}_'
         if name.find(pt) < 0:
+            print(f'[WARNING] File {name} is not in the timeliness {timeliness}. Skipping...')
+            continue
+        if name.find(resolution) < 0:
+            print(f'[WARNING] File {name} is not in the resolution {resolution}. Skipping...')
             continue
         prod_path = os.path.join(dirorig, name)
         do_zip_here = False
@@ -1357,8 +1398,14 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
 
         if path_prod_u.endswith('.SEN3'):
             output_name = path_prod_u.split('/')[-1][0:-5]
-        else:
+        else:##only if there is an error and .SEN3 is not added
             output_name = path_prod_u.split('/')[-1]
+
+        is_col_4 = True if output_name.split('_')[-1]=='004' else False
+        if is_col_4 and id_collection==3:
+            continue
+        if not is_col_4 and id_collection==4:
+            continue
 
         resample_done = False
         if doresample:
@@ -1373,7 +1420,10 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
                     print(f'[INFO] Unziping {name} to {unzip_path}')
                 zprod.extractall(path=unzip_path)
 
-        olimage = OLCI_L2(path_prod_u, args.verbose)
+        if id_collection==3:
+            olimage = OLCI_L2(path_prod_u, args.verbose)
+        elif id_collection==4:
+            olimage = OLCI_L2_COL4(path_prod_u, args.verbose)
 
         if olimage.check_granule():
             olimage.get_geo_and_params()
@@ -1488,18 +1538,20 @@ def make_resample_dir(dirorig, dirdest, unzip_path, arc_opt):
         poolhere.map(make_resample_dir_parallel, params_list)
 
     if doresample and apply_pool == 0:
-        fcsvout = os.path.join(dirdest, 'ResampleInfo.csv')
+        if len(lines_out)>1:
+            fcsvout = os.path.join(dirdest, 'ResampleInfo.csv')
+            if args.verbose:
+                print(f'[INFO] Creating info file:{fcsvout}')
+            fw = open(fcsvout, 'w')
+            for line in lines_out:
+                fw.write(line)
+                fw.write('\n')
+            fw.close()
         if args.verbose:
-            print(f'[INFO] Creating info file:{fcsvout}')
-        fw = open(fcsvout, 'w')
-        for line in lines_out:
-            fw.write(line)
-            fw.write('\n')
-        fw.close()
+            print(f'[INFO] Sequential processing completed')
 
 
 def get_dates_from_arg():
-    from datetime import datetime as dt
     start_date = None
     end_date = None
     if args.start_date:
