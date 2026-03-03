@@ -200,6 +200,13 @@ class ARC_OPTIONS:
             return 3
         return collection
 
+    def get_str_options_from_section_as_dict(self,section):
+        if not self.options.has_section(section):
+            return None
+        options = self.options.options(section)
+        results = {key:self.get_value(section,key) for key in options}
+        return results
+
     def get_value(self, section, key):
         value = None
         if self.options.has_option(section, key):

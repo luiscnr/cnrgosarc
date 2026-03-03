@@ -6,14 +6,19 @@ import numpy as np
 import pandas as pd
 
 from arc_multi_sources import ARC_MULTI_SOURCES
+from arc_processing import ArcProcessing
+
+
 import warnings
+
+from plankton_algorithm import PLANKTON_ALGORITHMS
 
 warnings.filterwarnings(action='ignore', category=ResourceWarning)
 
 parser = argparse.ArgumentParser(description="Artic resampler")
 parser.add_argument("-m", "--mode", help="Mode",
                     choices=["CHECKPY", "CHECK_ALGORITHM", "TEST","GRID", "RESAMPLE", "RESAMPLEFILE", "INTEGRATE", "CHLA", "KD490", "QL",
-                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP","CHECK_TIMESTAMP"],
+                             "MONTHLY_CHLA", "MONTHLY_KD490", "MONTHLY_RRS_TEST","QI","CORRECT_TIMESTAMP","CHECK_TIMESTAMP","PSC_PFT"],
                     required=True)
 parser.add_argument("-p", "--product", help="Input product (testing)")
 parser.add_argument('-i', "--inputpath", help="Input directory")
@@ -660,8 +665,61 @@ def make_count():
         print('------------------------------------------')
 
     return True
+def test_psc():
+    dir_base = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/OCTAC_WORK/ARC_WORK/PSC_PFT'
+    file_nc = os.path.join(dir_base,'C2024197_chl-arc-4km_PSC_PFT.nc')
+    from netCDF4 import Dataset
+    dataset = Dataset(file_nc)
+    pico = dataset.variables['PICO'][:]
+    nano = dataset.variables['NANO'][:]
+    micro = dataset.variables['MICRO'][:]
+    dino = dataset.variables['DINO'][:]
+    diato = dataset.variables['DIATO'][:]
+    hapt = dataset.variables['HAPT'][:]
+    crypto = dataset.variables['CRYPTO'][:]
+    green = dataset.variables['GREEN'][:]
+    prokar = dataset.variables['PROKAR'][:]
+    chl = dataset.variables['CHL'][:]
 
+    # pl = PLANKTON_ALGORITHMS()
+    # chl_valid, chl_valid_no_log, transform_array  = pl.get_input_valid_array(chl,True,True,True)
+    # print(chl_valid[0],chl_valid_no_log[0])
+    # res = pl.compute_all_functions_impl(chl_valid[0],True,None,array_no_log_chl=chl_valid_no_log[0])
+    # print(res)
+
+
+    indices_valid = np.where(pico.mask==False)
+
+    chl_orig = chl[indices_valid]
+    pico = pico[indices_valid]
+    micro = micro[indices_valid]
+    nano = nano[indices_valid]
+    dino = dino[indices_valid]
+    diato = diato[indices_valid]
+    hapt = hapt[indices_valid]
+    crypto =crypto[indices_valid]
+    green = green[indices_valid]
+    prokar = prokar[indices_valid]
+    chl_suma = micro + crypto + green + prokar + hapt
+    div = chl_suma/chl_orig
+
+    # micro_suma = dino+diato
+    # div = micro_suma/micro
+
+    #
+    #print(chl_orig[0],chl_suma[0],pico[0],nano[0],micro[0])
+    #print(dino[0],diato[0],micro_suma[0],micro[0])
+    print(chl_orig[0],chl_suma[0])
+    print(np.min(div),np.max(div))
+
+
+
+
+    dataset.close()
+
+    return True
 def main():
+
     # if do_global_grid_monthly():
     #     return
     # if do_test():
@@ -681,9 +739,11 @@ def main():
     #    return
     #if make_count():
     #    return
-    if make_subset():
-        return
+    # if make_subset():
+    #     return
     # if make_sbatch_bal():
+    #     return
+    # if test_psc():
     #     return
 
     if args.mode == "TEST":
@@ -871,6 +931,33 @@ def main():
         run_correct_time_stamp(start_date,end_date,args.inputpath,None)
         return
 
+    if args.mode == 'PSC_PFT' and args.inputpath:
+        input_path = args.inputpath
+        if not os.path.isfile(input_path):
+            print(f'[ERROR] {input_path} is not a valid file')
+            return
+        if not input_path.endswith('.nc'):
+            print(f'[ERROR] {input_path} should be a nc file')
+            return
+        if args.outputpath:
+            file_out = args.outputpath
+            if not os.path.isdir(os.path.dirname(file_out)):
+                try:
+                    os.makedirs(os.path.dirname(file_out),exist_ok=True)
+                except Exception as ex:
+                    print(f'[ERROR] {os.path.dirname(file_out)} is not a valid output directory and could not be created (Exception: {ex})')
+        else:
+            file_out = os.path.join(os.path.dirname(input_path),f'{input_path[:-3]}_PSC_PFT.nc')
+        if args.verbose:
+            print(f'[INFO] PFT/PSC processing')
+            print(f'[INFO] Input file: {input_path}')
+            print(f'[INFO] Output file: {file_out}')
+        from arc_processing import ArcProcessing
+        arc_proc = ArcProcessing(None, args.verbose, 'PSC_PFT',None)
+        arc_proc.compute_psc_pft_functions(input_path,file_out,None,True)
+        return
+
+
     ##FROM HERE, ALL THE MODES REQUIRE CONFIGURATION FILES, BUT DATES COULD BE ALSO PASSED AS ARGS
     if not args.config_file:
         print(f'[ERROR] Config file or input product should be defined for {args.mode} option. Exiting...')
@@ -884,6 +971,7 @@ def main():
         options.read(args.config_file)
     except:
         print(f'[ERROR] Config file {args.config_file} could not be read. Exiting...')
+        return
 
     from arc_options import ARC_OPTIONS
     arc_opt = ARC_OPTIONS(options)
@@ -907,6 +995,10 @@ def main():
     if args.mode == 'KD490':
         run_kd490(arc_opt, start_date, end_date)
         return
+
+    if args.mode == 'PSC_PFT':
+        run_psc_pft(arc_opt,start_date,end_date)
+
 
     if args.mode == 'MONTHLY_CHLA':
         # operative_mode = arc_opt.get_value_param('PROCESSING', 'operative_mode', False, 'boolean')
@@ -1082,6 +1174,63 @@ def run_resample(arc_opt, start_date, end_date):
 
         date_ref = date_ref + timedelta(hours=24)
 
+def run_psc_pft(arc_opt,start_date,end_date):
+    section = 'PSC_PFT'
+    options = arc_opt.get_basic_options(section)
+    if options is None:
+        return
+    overwrite = arc_opt.get_value_param(section, 'overwrite', False, 'boolean')
+    if args.verbose:
+        print('[INFO] PSC/PFT PROCESSING OPTIONS:')
+        for opt in options:
+            if opt == 'start_date' or opt == 'end_date':
+                continue
+            print(f'[INFO]  {opt}->{options[opt]}')
+
+    ##WORKING WITH DATES
+    if start_date is None or end_date is None:
+        start_date = options['start_date']
+        end_date = options['end_date']
+
+    if args.verbose:
+        print(f'[INFO] Start date: {start_date.strftime("%Y-%m-%d")}. Day {start_date.strftime("%j")}')
+        print(f'[INFO] End date: {end_date.strftime("%Y-%m-%d")}. Day {end_date.strftime("%j")}')
+
+    date_run = start_date
+    timeliness = 'NT'  ##timeliness is always NT for multi
+    arc_proc = ArcProcessing(None, args.verbose, 'PSC_PFT',None)
+
+    while date_run <= end_date:
+        if args.verbose:
+            print('*****************************')
+            print(f'[INFO] Date: {date_run.strftime("%Y-%d-%d")}')
+
+        make_processing = True
+        input_path = arc_opt.get_folder_date(options['input_path'], options['input_path_organization'], date_run, False)
+        dateyj = date_run.strftime('%Y%j')
+        name_chl = f'C{dateyj}_chl-arc-4km.nc'
+        input_file = os.path.join(input_path, name_chl)
+
+        if not os.path.exists(input_file):
+            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skipping...')
+            make_processing = False
+
+        output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
+                                              True)
+        if output_path is None:
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skipping...')
+            make_processing = False
+
+        output_name = f'C{dateyj}_chl-arc-4km.nc'
+        output_file = os.path.join(output_path, output_name)
+        if os.path.exists(output_file) and output_file!=input_file and not overwrite:
+            print(f'[INFO] Output file {output_file} already exists. Skipping...')
+            make_processing = False
+
+        if make_processing:
+            arc_proc.compute_psc_pft_functions(input_file,output_file,timeliness,overwrite)
+
+        date_run = date_run + timedelta(hours=24)
 
 def run_chla(arc_opt, start_date, end_date):
     section = 'CHLA'
@@ -1101,10 +1250,11 @@ def run_chla(arc_opt, start_date, end_date):
         print(f'[ERROR] file_base does not exist or is not available in the config file. Please review it')
         return
 
-    timeliness = 'NR' if os.path.basename(file_base).find('NR')>0 else 'NT' if os.path.basename(file_base).find('NT')>0 else None
-    if timeliness is None:
-        print(f'[ERROR] Timeliness is not defined in the file base. It should be NR or NT')
-        return
+    timeliness = 'NT' ##timeliness is always NT for multi
+    # timeliness = 'NR' if os.path.basename(file_base).find('NR')>0 else 'NT' if os.path.basename(file_base).find('NT')>0 else None
+    # if timeliness is None:
+    #     print(f'[ERROR] Timeliness is not defined in the file base. It should be NR or NT')
+    #     return
 
     from arc_processing import ArcProcessing
     if args.verbose:
@@ -1149,8 +1299,8 @@ def run_chla(arc_opt, start_date, end_date):
         end_date = options['end_date']
 
     if args.verbose:
-        print(f'[INFO] Start date: {start_date.strftime("%m/%Y")}')
-        print(f'[INFO] End date: {end_date.strftime("%m/%Y")}')
+        print(f'[INFO] Start date: {start_date.strftime("%Y-%m-%d")}. Day {start_date.strftime("%j")}')
+        print(f'[INFO] End date: {end_date.strftime("%Y-%m-%d")}. Day {end_date.strftime("%j")}')
 
     date_run = start_date
 
@@ -1168,13 +1318,13 @@ def run_chla(arc_opt, start_date, end_date):
         name_rrs = f'C{dateyj}_rrs-arc-4km.nc'
         input_file = os.path.join(input_path, name_rrs)
         if not os.path.exists(input_file):
-            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skiping...')
+            print(f'[WARNING] Input file {input_file} for date {date_run} is not available. Skipping...')
             make_processing = False
 
         output_path = arc_opt.get_folder_date(options['output_path'], options['output_path_organization'], date_run,
                                               True)
         if output_path is None:
-            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skiping...')
+            print(f'[WARNING] Output path {input_path} for date {date_run} is not available. Skipping...')
             make_processing = False
 
         output_name = f'C{dateyj}_chl-arc-4km.nc'

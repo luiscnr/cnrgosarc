@@ -7,6 +7,7 @@ import pytz
 from arc_mapinfo import ArcMapInfo
 from arc_gpr_model import ARC_GPR_MODEL
 from kd_algorithm import KD_ALGORITHMS
+from plankton_algorithm import PLANKTON_ALGORITHMS
 from netCDF4 import Dataset
 from datetime import datetime as dt
 from multiprocessing import Pool
@@ -323,6 +324,80 @@ class ArcProcessing:
                 var_chl_error[limits[0]:limits[1], limits[2]:limits[3]] = [chl_error_array[:, :]]
 
         datasetout.close()
+
+
+    def compute_psc_pft_functions(self, filein,fileout, timeliness,overwritte):
+        if self.arc_opt is not None:
+            section = 'PFT_PSC'
+            chl_var = self.arc_opt.get_value_param(section,'chl_var','CHL','str')
+        else:
+            chl_var = 'CHL'
+
+        pl = PLANKTON_ALGORITHMS()
+
+        if filein!=fileout:
+            ncsat = Dataset(filein)
+            if self.verbose:
+                print('[INFO] Checking CHL band')
+            if not chl_var in ncsat.variables:
+                print(f'[ERROR] Chlorophyll-a  variable {chl_var} is not available. Exiting...')
+                return
+            array_chl = ncsat.variables[chl_var][:]
+            ncsat.close()
+            datasetout = self.create_nc_file_out(fileout, filein, timeliness)
+            if datasetout is None:
+                print('[ERROR] Output dataset could not be started. Exiting.')
+                return
+        else:
+            datasetout = Dataset(filein,'a')
+            if not overwritte:
+                bands_available = True
+                for band in pl.functions:
+                    if band not in datasetout.variables:
+                        bands_available = False
+                        break
+                if bands_available:
+                    print(f'[INFO] PSC/PFT bands are already available in the output file {fileout}. Skipping...')
+                    datasetout.close()
+                    return
+            if self.verbose:
+                print('[INFO] Checking CHL band')
+            if not chl_var in datasetout.variables:
+                print(f'[ERROR] Chlorophyll-a  variable {chl_var} is not available. Exiting...')
+                return
+            array_chl = datasetout.variables[chl_var][:]
+
+
+        if self.verbose:
+            print(f'[INFO] Computing PSC/PFT functions...')
+
+
+        result = pl.compute_all_functions(array_chl, True, True, True)
+        attrs  = pl.get_attrs()
+        for name_var in result:
+
+            if not name_var in datasetout.variables:
+                if self.verbose:
+                    print(f'[INFO] Creating {name_var} variable...')
+                var = datasetout.createVariable(name_var, 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,
+                                                complevel=6)
+                var[:] = -999.0
+                if attrs is not None and name_var in attrs:
+                    for at in attrs[name_var]:
+                        try:
+                            val = float(attrs[name_var][at])
+                        except:
+                            val = str(attrs[name_var][at]).strip()
+                        var.setncattr(at, val)
+
+            if self.verbose:
+                print(f'[INFO] Setting data to variable: {name_var}')
+            datasetout.variables[name_var][:] = result[name_var]
+
+
+        datasetout.close()
+        if self.verbose:
+            print('[INFO] PSC/PFT computation completed. ')
 
     def compute_kd490_image(self, filein, fileout, timeliness):
         section = 'KD490'
@@ -1019,6 +1094,27 @@ class ArcProcessing:
                 var.valid_min = 0.0
                 var.valid_max = 100.0
                 var.comment = "OK2-560 algorithm (Morel et al., 2007)"
+
+
+        if self.output_type == 'PSC_PFT':
+            pl = PLANKTON_ALGORITHMS()
+            attrs = pl.get_attrs()
+            for name_var in pl.functions:
+                if name_var not in datasetout.variables:
+                    if self.verbose:
+                        print(f'[INFO] Creating {name_var} variable...')
+                    var = datasetout.createVariable(name_var, 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True,complevel=6)
+                    var[:] = -999.0
+                    if attrs is not None and name_var in attrs:
+                        for at in attrs[name_var]:
+                            try:
+                                val = float(attrs[name_var][at])
+                            except:
+                                val = str(attrs[name_var][at]).strip()
+                            var.setncattr(at,val)
+
+
+
 
         return datasetout
 
