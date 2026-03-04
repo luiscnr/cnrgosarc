@@ -718,6 +718,37 @@ def test_psc():
     dataset.close()
 
     return True
+
+def compute_npixels_psc_pft():
+    #dir_base = '/mnt/c/Users/LuisGonzalez/OneDrive - NOLOGIN OCEANIC WEATHER SYSTEMS S.L.U/CNR/OCTAC_WORK/ARC_WORK/PSC_PFT/'
+    dir_base = '/store/COP2-OC-TAC/arc/multi_ciao'
+    file_out = os.path.join(dir_base,'PSC-PFT_PixelsByDate.csv')
+    fw = open(file_out,'w')
+    fw.write('Date;N_CHL;N_PSC_PFT')
+    from datetime import datetime as dt
+    from netCDF4 import Dataset
+    work_date = dt(1997,9,4)
+    end_date = dt(2024,12,31)
+    while work_date<=end_date:
+        if work_date.day==1:
+            print(f'Date: {work_date.strftime("%Y-%m-%d")}')
+        dir_date  = os.path.join(dir_base,work_date.strftime('%Y/%j'))
+        file_date = os.path.join(dir_date,f'C{work_date.strftime("%Y%j_chl-arc-4km.nc")}')
+
+        if not os.path.exists(file_date):
+            line = f'{work_date.strftime("%Y-%m-%d")};0;0'
+        else:
+            dset = Dataset(file_date)
+            nchla = np.ma.count(dset.variables['CHL'][:])
+            npsc = np.ma.count(dset.variables['MICRO'][:])
+            line = f'{work_date.strftime("%Y-%m-%d")};{nchla};{npsc}'
+            dset.close()
+        fw.write('\n')
+        fw.write(line)
+        work_date = work_date + timedelta(hours=24)
+    fw.close()
+
+
 def main():
 
     # if do_global_grid_monthly():
@@ -749,10 +780,11 @@ def main():
     if args.mode == "TEST":
         #year = int(args.inputpath)
         #make_sbatch_bal(year)
-        from datetime import datetime as dt
-        start_date = dt(2020,4,12)
-        end_date = dt(2020,4,30)
-        make_sbatch_dates(start_date,end_date)
+        # from datetime import datetime as dt
+        # start_date = dt(2020,4,12)
+        # end_date = dt(2020,4,30)
+        # make_sbatch_dates(start_date,end_date)
+        compute_npixels_psc_pft()
         return
 
     print('[INFO] Started Artic Processing Tool [MULTI 4 KM]')

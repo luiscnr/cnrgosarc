@@ -373,6 +373,11 @@ class ArcProcessing:
 
 
         result = pl.compute_all_functions(array_chl, True, True, True)
+        if result is None:
+            if self.verbose:
+                print(f'[INFO] No PSC/PFT results are avaiable. Empty variables will be created.')
+            result = {f:None for f in pl.functions}
+
         attrs  = pl.get_attrs()
         for name_var in result:
 
@@ -390,9 +395,11 @@ class ArcProcessing:
                             val = str(attrs[name_var][at]).strip()
                         var.setncattr(at, val)
 
-            if self.verbose:
-                print(f'[INFO] Setting data to variable: {name_var}')
-            datasetout.variables[name_var][:] = result[name_var]
+            if result[name_var] is not None:
+                if self.verbose:
+                    print(f'[INFO] Setting data to variable: {name_var}')
+                datasetout.variables[name_var][:] = result[name_var]
+
 
 
         datasetout.close()
