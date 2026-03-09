@@ -56,7 +56,7 @@ class ArcIntegration():
         }
 
         self.granule_variables = {
-            'KD490': 'KD490_M07'
+            'KD490': 'kd_490'
         }
 
         if self.output_type == 'RRS' or self.output_type=='CORRECT_RRS':
@@ -233,7 +233,7 @@ class ArcIntegration():
         if addtransp:
             var = datasetout.createVariable(bandname, 'f4', ('time', 'y', 'x'), fill_value=-999, zlib=True, complevel=6)
             # var[:] = 0
-            var.band_name = 'OLCI band name KD490_M07'
+            var.band_name = 'OLCI band name kd_490'
             var.long_name = 'OLCI Diffuse Attenuation Coefficient at 490nm'
             var.standard_name = 'volume_attenuation_coefficient_of_downwelling_radiative_flux_in_sea_water'
             var.units = 'm^-1'
@@ -405,7 +405,7 @@ class ArcIntegration():
                         var_granule = self.granule_variables[var_avg_name]
                     avg_granule = np.array(
                         dataset_granule.variables[var_granule][limits[0]:limits[1], limits[2]:limits[3]])
-                    if var_granule == 'KD490_M07':
+                    if var_granule == 'kd_490':
                         avg_granule[avg_granule != -999] = np.power(10, avg_granule[avg_granule != -999])
 
                     mask_granule = weigthed_mask_granule
@@ -475,128 +475,6 @@ class ArcIntegration():
 
         datasetout.close()
 
-        ##DEPRECATED 2, METHOD BASED IN AREAS
-        # for y in range(0, self.height, self.ystep):
-        #     for x in range(0, self.width, self.xstep):
-        #         if self.verbose:
-        #             print(f'[INFO] -> {y} <-> {x} --------------------------------------------------------------------')
-        #         limits = self.get_limits(y, x, self.ystep, self.xstep, self.height, self.width)
-        #
-        #         # step 1, getting general arrays
-        #         sensor_mask = np.array(var_sensor_mask[limits[0]:limits[1], limits[2]:limits[3]])
-        #         ngranules = np.array(var_n_granules[limits[0]:limits[1], limits[2]:limits[3]])
-        #         weigthed_mask = np.array(var_weighted_mask[limits[0]:limits[1], limits[2]:limits[3]])
-        #
-        #         # step 1, sum values for weighted mask, ngranules and for each average band. Setting sensor mask
-        #         info_rec = self.get_rec_info(limits)
-        #         ngranules_rec = len(info_rec)
-        #         igranule_rec = 1
-        #         for name in info_rec:
-        #             if self.verbose:
-        #                 print(f'[INFO] Working with granule: {name} ({igranule_rec}/{ngranules_rec})')
-        #                 igranule_rec = igranule_rec + 1
-        #             file = os.path.join(self.dir_input, name)
-        #             dataset = Dataset(file)
-        #             weigthed_mask_granule = np.array(dataset.variables['mask'][limits[0]:limits[1], limits[2]:limits[3]])
-        #             # assuring that pixels lower than 65 degress are masked
-        #             weigthed_mask_granule[sensor_mask == -999] = -999
-        #             if self.mask_negatives:  ##Option to mask all the negative reflectances (not used in operational processing)
-        #                 for idx in range(1, 7):
-        #                     var_rrs = self.rrs_variables_all[idx]
-        #                     if var_rrs in self.average_variables:
-        #                         var_rrs_array = np.array(dataset.variables[var_rrs][limits[0]:limits[1], limits[2]:limits[3]])
-        #                         weigthed_mask_granule = np.where(var_rrs_array > 0, weigthed_mask_granule, 0)
-        #
-        #             indices = np.where(weigthed_mask_granule >= 0)
-        #             ngranules[indices] = ngranules[indices] + 1
-        #
-        #             indices = np.where(weigthed_mask_granule > 0)
-        #
-        #             if len(indices[0])==0:
-        #                 continue
-        #
-        #             weigthed_mask[indices] = weigthed_mask[indices] + weigthed_mask_granule[indices]
-        #             if name.startswith('S3A'):
-        #                 sensor_mask[indices] = sensor_mask[indices] + 1
-        #             if name.startswith('S3B'):
-        #                 sensor_mask[indices] = sensor_mask[indices] + 2
-        #
-        #             for var_avg_name in self.average_variables:
-        #                 if self.verbose:
-        #                     print(f'[INFO]--> {var_avg_name}')
-        #                 # destination var
-        #                 var_avg = datasetout.variables[var_avg_name]
-        #                 avg_array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
-        #                 # origin var
-        #                 var_granule = var_avg_name
-        #                 if var_avg_name in self.granule_variables.keys():
-        #                     var_granule = self.granule_variables[var_avg_name]
-        #                 avg_granule = np.array(dataset.variables[var_granule][limits[0]:limits[1], limits[2]:limits[3]])
-        #                 if var_granule == 'KD490_M07':
-        #                     avg_granule[avg_granule != -999] = np.power(10, avg_granule[avg_granule != -999])
-        #
-        #                 # making sum in destination var
-        #                 avg_array = np.where(np.logical_and(weigthed_mask_granule > 0, avg_array == -999), 0, avg_array)
-        #                 avg_array[indices] = avg_array[indices] + (
-        #                             avg_granule[indices] * weigthed_mask_granule[indices])
-        #                 var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [avg_array[:, :]]
-        #
-        #             dataset.close()
-        #
-        #
-        #
-        #         #STEP 2: Averaging
-        #         if np.max(weigthed_mask[:]) == 0: #nothing to average
-        #             continue
-        #
-        #         mask_modified = False
-        #         if self.verbose:
-        #             print('[INFO] Computing average...')
-        #         for var_avg_name in self.average_variables:
-        #             if self.verbose:
-        #                 print(f'[INFO]--> {var_avg_name}')
-        #             ##As mask it's modified according to min/max valid values, indices_good and indices_mask are obtained each time
-        #             indices_good = np.where(weigthed_mask > 0)
-        #             indices_mask = np.where(weigthed_mask == 0)
-        #             var_avg = datasetout.variables[var_avg_name]
-        #             avg_array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
-        #             avg_array[indices_good] = avg_array[indices_good] / weigthed_mask[indices_good]
-        #             avg_array[indices_mask] = -999
-        #             # checking again min/max valid values
-        #             valid_min = var_avg.valid_min
-        #             valid_max = var_avg.valid_max
-        #             indices_novalid_min = np.where(np.logical_and(avg_array < valid_min, weigthed_mask > 0))
-        #             if len(indices_novalid_min[0]) > 0:
-        #                 avg_array[indices_novalid_min] = -999
-        #                 weigthed_mask[indices_novalid_min] = 0
-        #                 mask_modified = True
-        #             indices_novalid_max = np.where(avg_array > valid_max)
-        #             if len(indices_novalid_max[0]) > 0:
-        #                 avg_array[indices_novalid_max] = -999
-        #                 weigthed_mask[indices_novalid_max] = 0
-        #                 mask_modified = True
-        #             var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [avg_array[:, :]]
-        #
-        #         if mask_modified:
-        #             if self.verbose:
-        #                 print('Modifying mask...')
-        #             for var_avg_name in self.average_variables:
-        #                 var_avg = datasetout.variables[var_avg_name]
-        #                 avg_array = np.array(var_avg[limits[0]:limits[1], limits[2]:limits[3]])
-        #                 avg_array[weigthed_mask == 0] = -999
-        #                 var_avg[limits[0]:limits[1], limits[2]:limits[3]] = [avg_array[:, :]]
-        #
-        #         var_sensor_mask[limits[0]:limits[1], limits[2]:limits[3]] = [sensor_mask[:, :]]
-        #         var_n_granules[limits[0]:limits[1], limits[2]:limits[3]] = [ngranules[:, :]]
-        #         var_weighted_mask[limits[0]:limits[1], limits[2]:limits[3]] = [weigthed_mask[:, :]]
-        #
-        # datasetout.close()
-
-        # var_time_dif = datasetout.variables['time_dif']
-        # var_time_min = datasetout.variables['time_min']
-        # var_time_max = datasetout.variables['time_min']
-        # var_min_oza = datasetout.variables['oza_min']
-        # var_max_oza = datasetout.variables['oza_max']
 
     def make_integration_avg(self, output_path):
         if self.verbose:
@@ -810,7 +688,7 @@ class ArcIntegration():
             if var_avg_name in self.granule_variables.keys():
                 var_granule = self.granule_variables[var_avg_name]
             avg_granule = np.array(dataset_granule.variables[var_granule][yini:yfin, xini:xfin])
-            if var_granule == 'KD490_M07':
+            if var_granule == 'kd_490':
                 avg_granule[avg_granule != -999] = np.power(10, avg_granule[avg_granule != -999])
 
             # origin mask
@@ -1017,7 +895,7 @@ class ArcIntegration():
                 if var_avg_name in self.granule_variables.keys():
                     var_granule = self.granule_variables[var_avg_name]
                 avg_granule = np.array(dataset_granule.variables[var_granule][yini:yfin, xini:xfin])
-                if var_granule == 'KD490_M07':
+                if var_granule == 'kd_490':
                     avg_granule[avg_granule != -999] = np.power(10, avg_granule[avg_granule != -999])
 
                 mask_granule = weigthed_mask_granule
