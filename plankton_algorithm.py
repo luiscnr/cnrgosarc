@@ -28,10 +28,10 @@ class PLANKTON_ALGORITHMS:
                 'value': "1-NANO-PICO"
             },
             'DINO':{
-                'type': 'poly2',
-                'a': -0.0215,
-                'b': -0.0145,
-                'c': 0.0528,
+                'type': 'exp_poly2',
+                'a': -0.5394,
+                'b': -0.3687,
+                'c': -2.8893,
             },
             'DIATO':{
                 'type': 'DIATO',
@@ -53,11 +53,11 @@ class PLANKTON_ALGORITHMS:
                 'c': 9.1400,
             },
             'PROKAR':{
-                'type':'poly3',
-                'a': -0.0033,
-                'b': -0.0172,
-                'c': -0.0451,
-                'd': 0.0304
+                'type':'exp_poly3',
+                'a': -0.3387,
+                'b': -1.1681,
+                'c': -1.5926,
+                'd': -3.4948
             },
             'HAPT':{
                 'type': 'HAPT',
@@ -105,7 +105,7 @@ class PLANKTON_ALGORITHMS:
 
     def compute_poly2(self,array,a,b,c,function=''):
         try:
-            res = (a*np.power(array,2))+(b*array)+(c)
+            res = (a*np.power(array,2))+(b*array)+c
         except Exception as ex:
             print(f'[ERROR] Error computing function {function}. Exception: {ex}')
             return None
@@ -113,7 +113,28 @@ class PLANKTON_ALGORITHMS:
     def compute_poly2_dict(self,array,dvalues,function=''):
         return self.compute_poly2(array,dvalues['a'],dvalues['b'],dvalues['c'],function=function)
 
-    #[exp(a x + b) + c x]⁻¹
+    def compute_exp_poly2(self,array,a,b,c,function=''):
+        try:
+            res = 1 / (1 + (np.exp((-1)*((a*np.power(array,2))+(b*array)+c))))
+        except Exception as ex:
+            print(f'[ERROR] Error computing function {function}. Exception: {ex}')
+            return None
+        return res
+
+    def compute_exp_poly2_dict(self,array,dvalues,function=''):
+        return self.compute_exp_poly2(array,dvalues['a'],dvalues['b'],dvalues['c'],function=function)
+
+    def compute_exp_poly3(self,array,a,b,c,d,function=''):
+        try:
+            res = 1 / (1 + (np.exp((-1)*((a*np.power(array,3))+(b*np.power(array,2))+(c*array)+d))))
+        except Exception as ex:
+            print(f'[ERROR] Error computing function {function}. Exception: {ex}')
+            return None
+        return res
+
+    def compute_exp_poly3_dict(self,array,dvalues,function=''):
+        return self.compute_exp_poly3(array,dvalues['a'],dvalues['b'],dvalues['c'],dvalues['d'],function=function)
+
     def compute_exp_ac(self,array,a,b,c,function=''):
         try:
             res = np.power(np.exp((a*array)+b)+(c * array),-1)
@@ -208,6 +229,10 @@ class PLANKTON_ALGORITHMS:
             array  = self.compute_poly3_dict(chl,self.functions[function],function=function)
         elif type_f=='poly2':
             array = self.compute_poly2_dict(chl, self.functions[function],function=function)
+        elif type_f=='exp_poly2':
+            array = self.compute_exp_poly2_dict(chl,self.functions[function],function=function)
+        elif type_f=='exp_poly3':
+            array = self.compute_exp_poly3_dict(chl,self.functions[function],function=function)
         elif type_f=='exp_af':
             array = self.compute_exp_af_dict(chl, self.functions[function],function=function)
         elif type_f=='exp_ac':

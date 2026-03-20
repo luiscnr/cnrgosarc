@@ -2,6 +2,7 @@
 import __init__,math,os,argparse,configparser,subprocess,time
 from datetime import timedelta
 from datetime import datetime as dt
+from datetime import timezone
 from calendar import monthrange
 from multiprocessing import Pool
 import numpy as np
@@ -264,15 +265,15 @@ def main():
 def check_monthly_operative_mode(arc_opt):
 
     file_base, timeliness = get_monthly_timeliness(arc_opt)
-    day_today = dt.utcnow().day
+    day_today = dt.now().astimezone(timezone.utc).day
     if timeliness == 'NR' and day_today >= 8:
         print('[WARNING] Month operative NR files are only processed between days 1 and 8 of the month')
         return None
     if timeliness == 'NR' and day_today >= 8:
         print('[WARNING] Month operative NT files are only processed after day 8 of the month')
         return None
-    month_today = dt.utcnow().month
-    year_today = dt.utcnow().year
+    month_today = dt.now().astimezone(timezone.utc).month
+    year_today = dt.now().astimezone(timezone.utc).year
     if month_today == 1:
         month_processing = 12
         year_processing = year_today - 1
